@@ -57,6 +57,202 @@ Prompt AI is a monorepo split into four areas, each with a single responsibility
 
 `/app` and `/api` are deployed as two separate Vercel projects, linked by environment variables. `/data` is deployed on Render, since Render is better suited to long running Python processes than serverless functions are. Nodemailer runs from `/api` on Vercel rather than from `/data`, since Render does not handle SMTP style outbound mail as cleanly.
 
+## System Diagrams
+
+### Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph Client["Client Layer"]
+        Browser["Web Browser"]
+    end
+
+    subgraph App["/app - Frontend (Vercel)"]
+        NextJS["Next.js App Router"]
+        Zustand["Zustand State"]
+        UI["React Components"]
+    end
+
+    subgraph API["/api - Backend (Vercel)"]
+        Express["Express.js API"]
+        Auth["JWT Auth Middleware"]
+        Prisma["Prisma ORM"]
+        Redis["Redis Cache"]
+        BullMQ["BullMQ Queue"]
+        Nodemailer["Nodemailer"]
+    end
+
+    subgraph Data["/data - AI Layer (Render)"]
+        FastAPI["FastAPI Service"]
+        LLM["LLM Orchestration"]
+        Classifier["Intent Classifier"]
+        Scorer["Prompt Scorer"]
+        Vector["pgvector Store"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        Supabase[(Supabase PostgreSQL)]
+        SMTP[(SMTP Server)]
+    end
+
+    Browser --> NextJS
+    NextJS --> UI
+    UI --> Zustand
+    NextJS -->|HTTPS| Express
+    Express --> Auth
+    Auth --> Prisma
+    Prisma --> Supabase
+    Express --> Redis
+    Express --> BullMQ
+    BullMQ -->|Internal API| FastAPI
+    FastAPI --> LLM
+    FastAPI --> Classifier
+    FastAPI --> Scorer
+    Scorer --> Vector
+    Vector --> Supabase
+    Express --> Nodemailer
+    Nodemailer --> SMTP
+
+    style App fill:#412991,color:#fff
+    style API fill:#39594D,color:#fff
+    style Data fill:#0467DF,color:#fff
+    style Infra fill:#FF7000,color:#fff
+```
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as User
+    participant App as /app (Next.js)
+    participant API as /api (Express)
+    participant Queue as BullMQ
+    participant Data as /data (FastAPI)
+    participant DB as Supabase
+    participant Cache as Redis
+
+    User->>App: Send prompt request
+    App->>API: POST /api/prompt (JWT token)
+    API->>API: Validate JWT
+    API->>Cache: Check rate limit
+    Cache-->>API: Rate limit status
+    API->>Queue: Enqueue prompt job
+    Queue->>Data: Process job (internal API)
+    Data->>Data: Classify intent
+    Data->>Data: Retrieve patterns (pgvector)
+    Data->>Data: Construct prompt
+    Data->>Data: Score prompt
+    Data-->>Queue: Return structured prompt
+    Queue-->>API: Job result
+    API->>DB: Save prompt history
+    API-->>App: Return prompt + score
+    App-->>User: Display result
+```
+
+### Data Flow Diagram
+
+```mermaid
+graph LR
+    Input[User Input] --> Parse[Intent Parser]
+    Parse --> Classify[Intent Classifier]
+    Classify --> Router[Model Router]
+    Router --> Pattern[Pattern Retrieval]
+    Pattern --> Construct[Prompt Constructor]
+    Construct --> Score[Scoring Engine]
+    Score --> Output[Structured Prompt]
+
+    DB[(Supabase)] --> Pattern
+    Vector[(pgvector)] --> Pattern
+    Cache[(Redis)] --> Score
+
+    Output --> History[Prompt History]
+    History --> DB
+
+    style Input fill:#F2A93B
+    style Output fill:#8B7CF6
+    style DB fill:#0467DF,color:#fff
+    style Vector fill:#0467DF,color:#fff
+    style Cache fill:#FF7000,color:#fff
+```
+
+### Activity Diagram
+
+```mermaid
+flowchart TD
+    Start([User submits request]) --> Auth{Authenticated?}
+    Auth -->|No| Error([Return 401])
+    Auth -->|Yes| RateLimit{Rate limit OK?}
+    RateLimit -->|No| Error
+    RateLimit -->|Yes| Validate{Input valid?}
+    Validate -->|No| Error
+    Validate -->|Yes| Queue[Enqueue to BullMQ]
+    Queue --> Classify[Classify intent]
+    Classify --> Retrieve[Retrieve patterns]
+    Retrieve --> Construct[Construct prompt]
+    Construct --> Score[Score prompt]
+    Score --> Save[Save to DB]
+    Save --> Return([Return result])
+    Return --> End([End])
+
+    style Start fill:#F2A93B
+    style End fill:#8B7CF6
+    style Error fill:#EF4444,color:#fff
+```
+
+### Component Diagram
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend Components"]
+        Hero[Hero Section]
+        Problem[Problem Section]
+        Capabilities[Capabilities]
+        ChatPreview[Chat Preview]
+        DeviceFrame[Device Frame]
+        ModelMarquee[Model Marquee]
+        Testimonials[Testimonials]
+        ClosingCTA[Closing CTA]
+        Integrations[Integrations]
+        Header[Header]
+        Footer[Footer]
+    end
+
+    subgraph Shared["Shared Components"]
+        Container[Container]
+        Logo[Logo]
+        ScrollToTop[ScrollToTop]
+    end
+
+    subgraph UI_Primitives["UI Primitives"]
+        Button[Button]
+        Card[Card]
+        Badge[Badge]
+    end
+
+    Hero --> Container
+    Problem --> Container
+    Capabilities --> Container
+    ChatPreview --> Container
+    DeviceFrame --> Container
+    ModelMarquee --> Container
+    Testimonials --> Container
+    ClosingCTA --> Container
+    Integrations --> Container
+    Footer --> Container
+
+    Header --> Logo
+    Footer --> Logo
+
+    Button --> UI_Primitives
+    Card --> UI_Primitives
+    Badge --> UI_Primitives
+
+    style Frontend fill:#412991,color:#fff
+    style Shared fill:#8B7CF6,color:#fff
+    style UI_Primitives fill:#F2A93B,color:#fff
+```
+
 ## Monorepo Structure
 
 ```

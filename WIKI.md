@@ -4,7 +4,7 @@ This file is the index for Prompt AI's documentation. As the project grows, deep
 
 ## Start Here
 
-- [README.md](./README.md) for what Prompt AI is and how to run it
+- [README.md](./README.md) for what Prompt AI is and how to run it, including system diagrams (architecture, sequence, data flow, activity, component)
 - [ARCHITECTURE.md](./ARCHITECTURE.md) for how `/app`, `/api`, and `/data` fit together
 - [CONTRIBUTING.md](./CONTRIBUTING.md) for how to submit changes
 - [SECURITY.md](./SECURITY.md) for how to report a vulnerability
