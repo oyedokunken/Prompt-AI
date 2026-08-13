@@ -27,7 +27,7 @@ export function DeviceFrame() {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section className="py-16 lg:py-24 border-t border-border-subtle overflow-hidden">
+    <section id="workspace" className="py-16 lg:py-24 border-t border-border-subtle overflow-hidden">
       <Container>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -40,12 +40,12 @@ export function DeviceFrame() {
             The workspace
           </p>
           <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary tracking-tight max-w-xl">
-            This is what your day-to-day looks like
+            Your prompts. Versioned, searchable, reusable.
           </h2>
           <p className="text-text-muted text-base mt-4 leading-relaxed max-w-xl">
-            A persistent workspace. Every prompt session in one place, versioned
-            and searchable, with the full transformation visible alongside the
-            output.
+            Prompt AI is not a one-shot tool. Every session is saved, versioned,
+            and searchable. Fork a previous prompt, compare revisions, and build
+            a personal library of prompts that actually work.
           </p>
         </motion.div>
 

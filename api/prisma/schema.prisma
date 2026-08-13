@@ -1,0 +1,71 @@
+// Prompt AI - Prisma Schema
+// Target: Supabase PostgreSQL
+// Run `npm run db:generate` after any schema change.
+// Run `npm run db:migrate` to apply changes to the database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DATABASE_DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  otpTokens     OtpToken[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// OTP tokens
+// One active token per user at a time. Previous tokens are marked used when
+// a new one is issued.
+// ---------------------------------------------------------------------------
+
+model OtpToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Refresh tokens
+// Hashed and stored. Rotated on every use. Revoked on logout.
+// ---------------------------------------------------------------------------
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

@@ -8,9 +8,12 @@ import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { href: "#capabilities", label: "Capabilities" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#capabilities", label: "Features" },
+  { href: "#pricing", label: "Pricing" },
   { href: "#models", label: "Models" },
   { href: "#testimonials", label: "Testimonials" },
+  { href: "https://github.com/oyedokunken/Prompt-AI", label: "Docs", external: true },
 ];
 
 export function Header() {
@@ -87,11 +90,12 @@ export function Header() {
               <Logo variant="color" size={28} />
             </Link>
 
-            <nav className="hidden md:flex items-center gap-1" aria-label="Primary navigation">
+            <nav className="hidden md:flex items-center gap-0.5" aria-label="Primary navigation">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
+                  {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                   className="px-3 py-2 text-sm text-text-muted hover:text-text-primary transition-colors rounded-md focus-visible:outline-accent"
                 >
                   {link.label}
@@ -99,13 +103,26 @@ export function Header() {
               ))}
             </nav>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary transition-colors focus-visible:outline-accent"
+              >
+                Log in
+              </Link>
               <Link
                 href="/signup"
-                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent text-base text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 style={{ color: "#0A0A0B" }}
               >
-                Start building
+                Start free
+              </Link>
+              <Link
+                href="/signup"
+                className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent text-xs font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                style={{ color: "#0A0A0B" }}
+              >
+                Start free
               </Link>
               <button
                 ref={menuButtonRef}
@@ -161,6 +178,7 @@ export function Header() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setDrawerOpen(false)}
+                    {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="px-4 py-3 text-sm text-text-muted hover:text-text-primary hover:bg-raised rounded-lg transition-colors focus-visible:outline-accent"
                   >
                     {link.label}
@@ -168,14 +186,21 @@ export function Header() {
                 ))}
               </nav>
 
-              <div className="p-4 border-t border-border">
+              <div className="p-4 border-t border-border flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex items-center justify-center w-full px-4 py-3 rounded-lg border border-border text-sm font-medium text-text-muted hover:text-text-primary transition-colors focus-visible:outline-accent"
+                >
+                  Log in
+                </Link>
                 <Link
                   href="/signup"
                   onClick={() => setDrawerOpen(false)}
                   className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-accent"
                   style={{ color: "#0A0A0B" }}
                 >
-                  Start building
+                  Start free
                 </Link>
               </div>
             </motion.div>

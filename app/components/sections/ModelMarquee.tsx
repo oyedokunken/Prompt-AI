@@ -80,6 +80,33 @@ const ROW_ONE: ModelCard[] = [
     iconPath:
       "M21.418 8.574l-2.84-2.84V1.25h-1.5v3.19l-5.078 5.075-5.077-5.076V1.25h-1.5v4.484l-2.84 2.84H1.25v1.5h1.817l-1.567 1.565v4.84l2.84 2.84v3.661h1.5v-2.35l5.077 5.076v2.289h1.5v-2.29l5.078-5.075v2.35h1.5v-3.661l2.84-2.84v-4.84l-1.568-1.566h1.818v-1.5zM4.84 9.634l-.09.09H3.5l.75-.75.59.66zm2.16-.535L12 4.098l5 5.001v5.802l-5 5.001-5-5V9.1zm12.91 1.36-.09-.09.59-.66.75.75h-1.25zm-7.66 9.892l-.25-.25v-1.19l5.078-5.076.001 1.567-4.829 4.949zm5.082-13.81L12.25 2.063v-1.19l.25-.25 5.082 5.083-1.333.165z",
   },
+  {
+    name: "Grok 2",
+    provider: "xAI",
+    description:
+      "Real-time knowledge model with strong reasoning. Prompt AI applies concise role-scoped framing and avoids redundant context blocks that reduce Grok's response precision.",
+    iconHex: "EDEDEF",
+    iconPath:
+      "M1.5 2h4l5.5 8L16.5 2h4L12 14.5 20.5 22h-4L12 17l-4.5 5H3.5L12 14.5z",
+  },
+  {
+    name: "o1-mini",
+    provider: "OpenAI",
+    description:
+      "Compact reasoning model optimised for STEM and code. Prompt AI keeps prompts minimal and task-scoped to stay within o1-mini's optimal reasoning window.",
+    iconHex: "412991",
+    iconPath:
+      "M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073z",
+  },
+  {
+    name: "Claude 3 Haiku",
+    provider: "Anthropic",
+    description:
+      "Fast, cost-efficient Claude model. Prompt AI trims context to core role and task blocks, eliminating decorators that add latency without improving Haiku's output.",
+    iconHex: "D97706",
+    iconPath:
+      "M12.0002 0C5.37276 0 0 5.37276 0 12.0002C0 18.6272 5.37276 24 12.0002 24C18.6272 24 24 18.6272 24 12.0002C24 5.37276 18.6272 0 12.0002 0ZM17.1582 16.8752H14.9922L12.0012 10.9062L9.00915 16.8752H6.84315L11.0952 8.78715C11.3162 8.35215 11.6422 8.12415 12.0012 8.12415C12.3612 8.12415 12.6862 8.35215 12.9062 8.78715L17.1582 16.8752Z",
+  },
 ];
 
 const ROW_TWO: ModelCard[] = [
@@ -137,6 +164,33 @@ const ROW_TWO: ModelCard[] = [
     iconHex: "4285F4",
     iconPath:
       "M11.9995 0C8.6815 6.617 6.617 8.682 0 11.9995c6.617 3.318 8.682 5.382 11.9995 12.0005C15.318 17.382 17.382 15.318 24 12.0005 17.382 8.682 15.318 6.617 11.9995 0z",
+  },
+  {
+    name: "Codestral",
+    provider: "Mistral AI",
+    description:
+      "Code-specialist model from Mistral with 80k context. Prompt AI structures fill-in-the-middle and instruction blocks explicitly to match Codestral's training format.",
+    iconHex: "FF7000",
+    iconPath:
+      "M0 0h4v4H0zm6 0h4v4H6zm6 0h4v4h-4zm6 0h4v4h-4zM0 6h4v4H0zm12 0h4v4h-4zm6 0h4v4h-4zM0 12h4v4H0zm6 0h4v4H6zm6 0h4v4h-4zm6 0h4v4h-4zM0 18h4v4H0zm12 0h4v4h-4zm6 0h4v4h-4z",
+  },
+  {
+    name: "Llama 3.2 90B",
+    provider: "Meta",
+    description:
+      "Meta's largest openly available model with vision capabilities. Prompt AI targets Llama 3.2 with BOS-aligned instruction blocks and avoids ChatML-specific formatting.",
+    iconHex: "0467DF",
+    iconPath:
+      "M6.915 4.03c-1.968 2.612-3.57 5.55-4.304 7.935C2.1 13.514 2 14.33 2 15.12c0 .467.035.924.104 1.37.314 2.043 1.394 3.72 3.05 4.715 1.025.622 2.197.932 3.38.932 1.72 0 3.39-.62 4.76-1.786C14.73 19.19 16 17.11 16 14.88c0-1.17-.335-2.367-1.045-3.57-.72-1.22-1.78-2.39-3.237-3.55C10.3 6.67 9.16 5.95 8.09 5.355c-.37-.208-.72-.405-1.05-.593-.11-.06-.21-.12-.32-.178C6.78 4.44 6.85 4.23 6.915 4.03z",
+  },
+  {
+    name: "o3-mini",
+    provider: "OpenAI",
+    description:
+      "High-efficiency reasoning model with adjustable effort levels. Prompt AI structures constraints and chain-of-thought scaffolding to maximise o3-mini's reasoning depth.",
+    iconHex: "412991",
+    iconPath:
+      "M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073z",
   },
 ];
 

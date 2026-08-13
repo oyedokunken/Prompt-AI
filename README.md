@@ -395,6 +395,66 @@ PORT=
 
 All environment variables are validated at startup using Zod schemas on `/api`. Missing or malformed variables stop the service from starting instead of failing later at request time. `DATA_SERVICE_API_KEY` on `/api` and `API_SHARED_SECRET` on `/data` must match, since `/data` rejects any request that doesn't carry this shared secret.
 
+## Authentication
+
+Prompt AI uses a hybrid authentication system combining Supabase OAuth (Google, GitHub) with a custom email + OTP flow powered by the `/api` service.
+
+### Flows
+
+**Email + OTP registration**
+1. User submits email and password on `/signup`
+2. Frontend calls `POST /auth/register` on `/api`
+3. Backend creates a User record with `emailVerified: false`
+4. Backend generates a 6-digit OTP, hashes it with HMAC-SHA256, stores in `OtpToken` table
+5. Backend sends OTP email via Nodemailer
+6. Frontend redirects to `/verify?email=...`
+7. User enters OTP, frontend calls `POST /auth/verify-otp`
+8. Backend verifies OTP, marks user as `emailVerified: true`, mirrors user into Supabase Auth
+9. Backend issues JWT access token and refresh token
+10. Frontend stores tokens and redirects to `/dashboard`
+
+**Email + password login**
+1. User submits email and password on `/login`
+2. Frontend calls `POST /auth/login` on `/api`
+3. Backend verifies password hash, checks `emailVerified`
+4. Backend issues JWT access token and refresh token
+5. Frontend stores tokens and redirects to `/dashboard`
+
+**OAuth (Google, GitHub)**
+1. User clicks OAuth button on `/login` or `/signup`
+2. Frontend calls `supabase.auth.signInWithOAuth` with provider
+3. Supabase redirects to provider
+4. Provider redirects back to `/auth/callback`
+5. Frontend callback route exchanges code for Supabase session
+6. Middleware refreshes session on every request
+7. Protected routes (`/dashboard`) require active session
+
+**Password reset**
+1. User submits email on `/forgot-password`
+2. Frontend calls `POST /auth/forgot-password` on `/api`
+3. Backend sends OTP email if user exists (always returns success to prevent enumeration)
+4. User enters OTP on `/verify` (same flow as registration verification)
+5. On success, user can set new password (password reset form to be implemented)
+
+### Security
+
+- **OTP tokens**: HMAC-SHA256 hashed with a secret pepper, 10-minute expiry, single-use
+- **Refresh tokens**: UUID hashed with SHA256, rotated on every use, revocation support
+- **JWT access tokens**: 15-minute expiry, stored in localStorage (consider HttpOnly cookies for production)
+- **JWT refresh tokens**: 30-day expiry, stored in localStorage
+- **Rate limiting**: 10 requests per 15 minutes on auth mutations, 60 requests per minute general
+- **Error messages**: Generic to prevent email enumeration
+- **Password reset**: Always returns success regardless of whether email exists
+
+### Setup
+
+1. Create a Supabase project and enable Google and GitHub OAuth providers under Authentication > Providers
+2. Set redirect URL to `https://your-domain/auth/callback` for each provider
+3. Copy `api/.env.example` to `api/.env` and fill in all values including SMTP credentials
+4. Copy `app/.env.local.example` to `app/.env.local` and fill in Supabase keys
+5. Run `npm run db:migrate` inside `api/` to apply Prisma migrations to your Supabase database
+6. Start both services: `npm run dev` in `api/` and `npm run dev` in `app/`
+
 ## Running the Project
 
 ### `/api`

@@ -2,6 +2,67 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-08-13
+
+### Added
+
+**Backend API (`/api`)**
+- Complete Express backend service with TypeScript, Prisma ORM, and Zod validation
+- Authentication system with JWT access tokens and refresh token rotation
+- Email + OTP registration and verification flow using Nodemailer
+- Dark-themed HTML OTP email template without emojis
+- Password reset via OTP endpoint
+- Supabase admin client integration for OAuth user mirroring
+- Redis client for caching and rate limiting
+- Rate limiting middleware: 10 req/15 min on auth mutations, 60 req/min general
+- Helmet security headers and CORS configuration
+- Health check endpoint at `/health`
+- Auth routes: `/auth/register`, `/auth/login`, `/auth/verify-otp`, `/auth/resend-otp`, `/auth/forgot-password`, `/auth/refresh`, `/auth/logout`, `/auth/me`
+- Prisma schema with User, OtpToken, and RefreshToken models
+- Environment validation with Zod schema that fails fast on missing config
+- OTP security: HMAC-SHA256 with secret pepper, 10-minute expiry, single-use tokens
+- Refresh token security: UUID hashed with SHA256, rotated on every use, revocation support
+
+**Frontend (`/app`)**
+- Supabase client helpers for browser and server (`@supabase/supabase-js`, `@supabase/ssr`)
+- OAuth callback route at `/auth/callback` for Google and GitHub sign-in
+- Middleware to refresh Supabase session on every request and protect `/dashboard` routes
+- Login page wired to real API for email/password and Supabase OAuth
+- Signup page wired to real API for email registration and Supabase OAuth
+- OTP verification page wired to real `/auth/verify-otp` and `/auth/resend-otp` endpoints
+- Forgot password page wired to real `/auth/forgot-password` endpoint
+- Server error banners on auth pages with red styling
+- Email parameter passing from signup to verify page via query string
+- Verified success screen with redirect to `/dashboard`
+
+**Landing page refinements**
+- Removed Pricing section (open source, no pricing)
+- Removed DeviceFrame section (redundant with Hero chat UI)
+- Moved ClosingCTA to last position before Footer
+- Added mobile CTA button to Header
+- Expanded ModelMarquee from 14 to 20 models (added Grok 2, o1-mini, Claude 3 Haiku, Codestral, Llama 3.2 90B, o3-mini)
+- Updated Footer to remove Pricing link, add Who it is for and FAQ anchors
+
+**Documentation**
+- WIKI.md updated with Authentication section linking to README
+- CHANGELOG.md entry for v0.2.0
+- README.md Authentication section added with flows, security, and setup details
+
+### Changed
+
+- Landing page section order: Hero, Problem, HowItWorks, Capabilities, ChatPreview, WhoItsFor, ModelMarquee, Testimonials, FAQ, Integrations, ClosingCTA, Footer
+- All auth pages now call real API endpoints instead of simulated delays
+- OAuth sign-in now redirects through Supabase and callback route
+
+### Security
+
+- OTP tokens are HMAC-SHA256 hashed with a secret pepper before storage
+- Refresh tokens are UUID hashed with SHA256 and rotated on every use
+- All credential error messages are generic to prevent email enumeration
+- Password reset endpoint always returns success to prevent enumeration
+- JWT access tokens expire in 15 minutes, refresh tokens in 30 days
+- Rate limiting enforced on all auth mutation endpoints
+
 ## [0.1.0] - 2026-08-03
 
 ### Added

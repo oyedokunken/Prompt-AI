@@ -17,6 +17,10 @@ This file is the index for Prompt AI's documentation. As the project grows, deep
 - [`/data/README.md`](./data/README.md) for the AI and ML layer
 - [`/docs/README.md`](./docs/README.md) for architecture notes and pattern library docs
 
+## Authentication
+
+Prompt AI uses a hybrid authentication system combining Supabase OAuth (Google, GitHub) with a custom email + OTP flow powered by the `/api` service. See the Authentication section in [README.md](./README.md#authentication) for details on flows, security, and setup.
+
 ## Planned Wiki Sections
 
 These sections don't exist yet. They are listed here so contributors know what's coming and can help build them.

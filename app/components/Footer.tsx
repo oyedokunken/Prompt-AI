@@ -5,19 +5,28 @@ import { Container } from "@/components/Container";
 
 const footerLinks = {
   Product: [
-    { label: "Capabilities", href: "#capabilities" },
+    { label: "How it works", href: "#how-it-works" },
+    { label: "Features", href: "#capabilities" },
     { label: "Models", href: "#models" },
-    { label: "Testimonials", href: "#testimonials" },
+    { label: "Who it is for", href: "#who-its-for" },
+    { label: "FAQ", href: "#faq" },
   ],
-  Resources: [
-    { label: "GitHub", href: "https://github.com/oyedokunken/prompt-ai" },
-    { label: "ARCHITECTURE.md", href: "/ARCHITECTURE.md" },
-    { label: "CONTRIBUTING.md", href: "/CONTRIBUTING.md" },
-    { label: "CHANGELOG", href: "/CHANGELOG.md" },
+  Developers: [
+    { label: "GitHub", href: "https://github.com/oyedokunken/Prompt-AI" },
+    { label: "Architecture", href: "https://github.com/oyedokunken/Prompt-AI/blob/main/ARCHITECTURE.md" },
+    { label: "Contributing", href: "https://github.com/oyedokunken/Prompt-AI/blob/main/CONTRIBUTING.md" },
+    { label: "Changelog", href: "https://github.com/oyedokunken/Prompt-AI/blob/main/CHANGELOG.md" },
+  ],
+  Company: [
+    { label: "About", href: "#" },
+    { label: "Blog", href: "#" },
+    { label: "Careers", href: "#" },
+    { label: "Contact", href: "mailto:hello@promptgpt.app" },
   ],
   Legal: [
-    { label: "License (MIT)", href: "/LICENSE" },
-    { label: "Security policy", href: "/SECURITY.md" },
+    { label: "License (MIT)", href: "https://github.com/oyedokunken/Prompt-AI/blob/main/LICENSE" },
+    { label: "Security policy", href: "https://github.com/oyedokunken/Prompt-AI/blob/main/SECURITY.md" },
+    { label: "Privacy", href: "#" },
   ],
 };
 
@@ -27,20 +36,20 @@ export function Footer() {
   return (
     <footer className="border-t border-border py-16">
       <Container>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
-          <div className="col-span-2 md:col-span-1 flex flex-col gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-10 mb-14">
+          <div className="col-span-2 lg:col-span-1 flex flex-col gap-4">
             <Logo variant="mono" size={28} />
             <p className="text-xs text-text-faint leading-relaxed max-w-[220px]">
-              Open source. Built by developers, for developers.
+              Prompt engineering, automated. Open source and built for developers.
             </p>
             <a
-              href="https://github.com/oyedokunken/prompt-ai"
+              href="https://github.com/oyedokunken/Prompt-AI"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-text-faint hover:text-text-muted transition-colors focus-visible:outline-accent rounded"
             >
               <Github size={13} />
-              oyedokunken/prompt-ai
+              oyedokunken/Prompt-AI
             </a>
           </div>
 
@@ -55,8 +64,8 @@ export function Footer() {
                     <Link
                       href={link.href}
                       className="text-xs text-text-faint hover:text-text-muted transition-colors focus-visible:outline-accent rounded"
-                      {...(link.href.startsWith("http")
-                        ? { target: "_blank", rel: "noopener noreferrer" }
+                      {...(link.href.startsWith("http") || link.href.startsWith("mailto")
+                        ? { target: link.href.startsWith("mailto") ? undefined : "_blank", rel: link.href.startsWith("http") ? "noopener noreferrer" : undefined }
                         : {})}
                     >
                       {link.label}

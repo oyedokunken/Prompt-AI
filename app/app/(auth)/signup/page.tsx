@@ -2,6 +2,8 @@
 
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -74,9 +76,11 @@ const GITHUB_ICON = (
 );
 
 export default function SignupPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [lastUsed, setLastUsed] = useState<string | null>(null);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
@@ -107,10 +111,22 @@ export default function SignupPage() {
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
+    setServerError(null);
     try {
-      await new Promise((r) => setTimeout(r, 1400));
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setServerError(json.message ?? "Registration failed. Please try again.");
+        return;
+      }
       localStorage.setItem(LAST_USED_KEY, "email");
-      console.log("Signup:", data);
+      router.push(`/verify?email=${encodeURIComponent(data.email)}`);
+    } catch {
+      setServerError("Unable to reach the server. Check your connection.");
     } finally {
       setIsSubmitting(false);
     }
@@ -118,10 +134,22 @@ export default function SignupPage() {
 
   const handleOAuth = async (provider: OAuthProvider) => {
     setOauthLoading(provider);
+    setServerError(null);
     try {
-      await new Promise((r) => setTimeout(r, 1200));
+      const supabase = createClient();
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo },
+      });
+      if (error) {
+        setServerError(error.message);
+        setOauthLoading(null);
+        return;
+      }
       localStorage.setItem(LAST_USED_KEY, provider);
-    } finally {
+    } catch {
+      setServerError("OAuth sign-in could not be initiated.");
       setOauthLoading(null);
     }
   };
@@ -166,6 +194,12 @@ export default function SignupPage() {
         <span className="text-xs text-text-faint font-mono">or</span>
         <div className="flex-1 h-px bg-border" />
       </div>
+
+      {serverError && (
+        <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mb-4" role="alert">
+          {serverError}
+        </p>
+      )}
 
       <form
         onSubmit={handleSubmit(onSubmit)}
