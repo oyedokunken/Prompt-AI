@@ -56,9 +56,18 @@ export const forgotPasswordSchema = z.object({
     .transform((v) => v.trim().toLowerCase()),
 });
 
+export const sendWelcomeSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address")
+    .transform((v) => v.trim().toLowerCase()),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type SendWelcomeInput = z.infer<typeof sendWelcomeSchema>;

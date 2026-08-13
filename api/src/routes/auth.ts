@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { authService } from "../services/authService";
+import { emailService } from "../services/emailService";
 import { validate } from "../middleware/validate";
 import { requireAuth } from "../middleware/auth";
 import { authLimiter } from "../middleware/rateLimit";
@@ -10,6 +11,7 @@ import {
   resendOtpSchema,
   refreshSchema,
   forgotPasswordSchema,
+  sendWelcomeSchema,
 } from "../schemas/auth";
 
 export const authRouter = Router();
@@ -208,6 +210,34 @@ authRouter.get(
       res.json(user);
     } catch (err) {
       console.error("[GET /auth/me]", err);
+      res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected error occurred." });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /auth/send-welcome
+// Sends a welcome email to the provided address. Used for OAuth users who
+// may not have received one during signup. Subject to rate limiting.
+// ---------------------------------------------------------------------------
+authRouter.post(
+  "/send-welcome",
+  authLimiter,
+  validate(sendWelcomeSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email } = req.body;
+      const { prisma } = await import("../lib/prisma");
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user) {
+        await emailService.sendWelcome({
+          to: user.email,
+          appUrl: (await import("../config/env")).env.APP_URL,
+        });
+      }
+      res.json({ message: "If an account with that email exists, a welcome email has been sent." });
+    } catch (err) {
+      console.error("[POST /auth/send-welcome]", err);
       res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected error occurred." });
     }
   }

@@ -144,6 +144,16 @@ export const authService = {
       }),
     ]);
 
+    // Send welcome email to first-time email signup users
+    try {
+      await emailService.sendWelcome({
+        to: user.email,
+        appUrl: env.APP_URL,
+      });
+    } catch (err) {
+      console.warn("[authService] failed to send welcome email (non-blocking):", err);
+    }
+
     // Mirror user into Supabase Auth so OAuth and email users share the same
     // session layer. If the user already exists in Supabase, this is a no-op.
     try {

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * OAuth callback handler.
  * Supabase redirects here after the user authenticates with Google or GitHub.
- * Exchanges the one-time code for a session and redirects to the app.
+ * Exchanges the one-time code for a session, sends welcome email, and redirects to the app.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -13,9 +13,20 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    if (!error && data.user?.email) {
+      // Send welcome email to OAuth users on first sign-in
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-welcome`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: data.user.email }),
+        });
+      } catch {
+        // Welcome email failure is non-blocking
+      }
+
       const redirectUrl = new URL(next, origin);
       return NextResponse.redirect(redirectUrl);
     }
