@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
 
-export default function VerifyPage() {
+function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
@@ -276,5 +276,13 @@ export default function VerifyPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyForm />
+    </Suspense>
   );
 }
