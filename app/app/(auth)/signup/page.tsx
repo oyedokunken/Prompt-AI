@@ -113,14 +113,13 @@ export default function SignupPage() {
     setIsSubmitting(true);
     setServerError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email, password: data.password }),
+      const supabase = createClient();
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setServerError(json.message ?? "Registration failed. Please try again.");
+      if (error) {
+        setServerError(error.message || "Registration failed. Please try again.");
         return;
       }
       localStorage.setItem(LAST_USED_KEY, "email");

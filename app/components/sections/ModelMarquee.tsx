@@ -8,7 +8,6 @@ interface ModelCard {
   name: string;
   provider: string;
   description: string;
-  badge?: string;
   iconPath: string;
   iconHex: string;
 }
@@ -18,7 +17,6 @@ const CLAUDE: ModelCard = {
   provider: "Anthropic",
   description:
     "Uses XML tag structure for roles and delimiters. Prompt AI applies <role>, <context>, and <output> wrappers to match Claude's preferred parsing format.",
-  badge: "Recommended",
   iconHex: "D97706",
   iconPath:
     "M12.0002 0C5.37276 0 0 5.37276 0 12.0002C0 18.6272 5.37276 24 12.0002 24C18.6272 24 24 18.6272 24 12.0002C24 5.37276 18.6272 0 12.0002 0ZM17.1582 16.8752H14.9922L12.0012 10.9062L9.00915 16.8752H6.84315L11.0952 8.78715C11.3162 8.35215 11.6422 8.12415 12.0012 8.12415C12.3612 8.12415 12.6862 8.35215 12.9062 8.78715L17.1582 16.8752Z",
@@ -195,6 +193,7 @@ const ROW_TWO: ModelCard[] = [
 ];
 
 function ModelCardEl({ card, hovered }: { card: ModelCard; hovered: boolean }) {
+  const isLive = card.name === "GPT-4o";
   return (
     <div
       className="shrink-0 w-[280px] rounded-xl border bg-surface p-4 flex flex-col gap-3 mx-3 transition-all duration-200"
@@ -229,11 +228,13 @@ function ModelCardEl({ card, hovered }: { card: ModelCard; hovered: boolean }) {
             </p>
           </div>
         </div>
-        {card.badge && (
-          <span className="shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border border-accent/30 text-accent bg-accent/5 leading-none">
-            {card.badge}
-          </span>
-        )}
+        <span
+          className={`shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border leading-none ${
+            isLive ? "border-accent/30 text-accent bg-accent/5" : "border-border text-text-faint"
+          }`}
+        >
+          {isLive ? "Live" : "Coming soon"}
+        </span>
       </div>
       <p className="text-xs text-text-muted leading-relaxed line-clamp-3">
         {card.description}

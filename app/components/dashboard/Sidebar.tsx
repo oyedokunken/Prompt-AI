@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 import {
   Plus, Search, MessageSquare, Settings, LogOut,
-  PanelLeftClose, Paperclip, Download, History,
+  PanelLeftClose, PanelLeftOpen, Paperclip, Download, History,
   BookOpen, Star, Clock, Trash2, Image, FileText,
   Film, Copy, Check,
 } from "lucide-react";
 import type { ChatSession, ExportFormat, SidebarPanel } from "@/lib/types/chat";
+
+export interface SidebarAttachment {
+  name: string;
+  type: string;
+  publicUrl: string;
+}
 
 interface SidebarProps {
   sessions: ChatSession[];
@@ -18,11 +26,16 @@ interface SidebarProps {
   onSelectSession: (s: ChatSession) => void;
   onDeleteSession: (id: string) => void;
   onExport: (format: ExportFormat) => void;
-  onClose: () => void;
+  onCopyMarkdown: () => void;
   username: string;
   avatarUrl: string | null;
   onSettings: () => void;
   onSignOut: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onAttach?: (file: File) => void;
+  attachments?: SidebarAttachment[];
+  activePath?: "history" | "settings";
 }
 
 function formatDate(iso: string) {
@@ -57,6 +70,84 @@ const PANEL_TABS: { id: SidebarPanel; icon: React.ElementType; label: string }[]
   { id: "export", icon: Download, label: "Export" },
 ];
 
+// Collapsed rail -- icon-only, every control gets a hover tooltip so the
+// sidebar stays fully usable without expanding it.
+function CollapsedRail({
+  onNewChat, onToggleCollapse, panel, onPanelChange, onSettings, onSignOut, avatarUrl, username,
+}: Pick<SidebarProps, "onNewChat" | "onToggleCollapse" | "panel" | "onPanelChange" | "onSettings" | "onSignOut" | "avatarUrl" | "username">) {
+  return (
+    <aside className="w-12 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
+      <Tooltip id="sidebar-tip" place="right" className="!text-[10px] !py-1 !px-2 !z-50" />
+
+      <button
+        data-tooltip-id="sidebar-tip"
+        data-tooltip-content="Expand sidebar"
+        onClick={onToggleCollapse}
+        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors mb-3"
+        aria-label="Expand sidebar"
+      >
+        <PanelLeftOpen size={13} />
+      </button>
+
+      <button
+        data-tooltip-id="sidebar-tip"
+        data-tooltip-content="New chat"
+        onClick={onNewChat}
+        className="w-7 h-7 rounded-md flex items-center justify-center bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 transition-colors mb-3"
+        aria-label="New chat"
+      >
+        <Plus size={13} />
+      </button>
+
+      <div className="flex flex-col gap-1 mb-auto">
+        {PANEL_TABS.map(({ id, icon: Icon, label }) => (
+          <button
+            key={id}
+            data-tooltip-id="sidebar-tip"
+            data-tooltip-content={label}
+            onClick={() => onPanelChange(id)}
+            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+              panel === id ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
+            }`}
+            aria-label={label}
+          >
+            <Icon size={13} />
+          </button>
+        ))}
+      </div>
+
+      <button
+        data-tooltip-id="sidebar-tip"
+        data-tooltip-content="Settings"
+        onClick={onSettings}
+        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors mb-1"
+        aria-label="Settings"
+      >
+        <Settings size={13} />
+      </button>
+      <button
+        data-tooltip-id="sidebar-tip"
+        data-tooltip-content="Sign out"
+        onClick={onSignOut}
+        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-red-400 hover:bg-raised transition-colors mb-3"
+        aria-label="Sign out"
+      >
+        <LogOut size={13} />
+      </button>
+
+      <div data-tooltip-id="sidebar-tip" data-tooltip-content={`@${username}`}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[9px] text-accent font-mono border border-accent/20">
+            {username[0]?.toUpperCase()}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export function Sidebar({
   sessions,
   activeSessionId,
@@ -66,15 +157,34 @@ export function Sidebar({
   onSelectSession,
   onDeleteSession,
   onExport,
-  onClose,
+  onCopyMarkdown,
   username,
   avatarUrl,
   onSettings,
   onSignOut,
+  collapsed,
+  onToggleCollapse,
+  onAttach,
+  attachments = [],
 }: SidebarProps) {
   const [search, setSearch] = useState("");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  if (collapsed) {
+    return (
+      <CollapsedRail
+        onNewChat={onNewChat}
+        onToggleCollapse={onToggleCollapse}
+        panel={panel}
+        onPanelChange={onPanelChange}
+        onSettings={onSettings}
+        onSignOut={onSignOut}
+        avatarUrl={avatarUrl}
+        username={username}
+      />
+    );
+  }
 
   const filtered = sessions.filter((s) =>
     s.title.toLowerCase().includes(search.toLowerCase())
@@ -82,10 +192,20 @@ export function Sidebar({
   const { today, yesterday, older } = groupSessions(filtered);
 
   const handleCopy = () => {
-    onExport("markdown");
+    onCopyMarkdown();
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onAttach) onAttach(file);
+    e.target.value = "";
+  };
+
+  const imagesFiles = attachments.filter((a) => a.type.startsWith("image/"));
+  const videoFiles = attachments.filter((a) => a.type.startsWith("video/"));
+  const pdfFiles = attachments.filter((a) => a.type === "application/pdf");
 
   const SessionItem = ({ s }: { s: ChatSession }) => (
     <div
@@ -144,9 +264,9 @@ export function Sidebar({
             <Plus size={10} /> New
           </button>
           <button
-            onClick={onClose}
+            onClick={onToggleCollapse}
             className="p-1 text-text-faint hover:text-text-muted transition-colors"
-            aria-label="Close sidebar"
+            aria-label="Collapse sidebar"
           >
             <PanelLeftClose size={12} />
           </button>
@@ -229,20 +349,44 @@ export function Sidebar({
             <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-[10px] text-text-faint hover:border-accent/40 hover:text-accent transition-colors cursor-pointer">
               <Plus size={10} />
               Upload file
-              <input type="file" className="hidden" accept="image/*,video/*,.pdf" />
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*,video/*,.pdf"
+                onChange={handleUploadChange}
+              />
             </label>
+            <p className="text-[9px] text-text-faint px-0.5 -mt-1.5">
+              Attaches to your next message in this chat.
+            </p>
 
             {/* Bucket groups */}
             {[
-              { label: "Images", icon: Image, accept: "image" },
-              { label: "Videos", icon: Film, accept: "video" },
-              { label: "PDFs", icon: FileText, accept: "pdf" },
-            ].map(({ label, icon: Icon }) => (
+              { label: "Images", icon: Image, files: imagesFiles },
+              { label: "Videos", icon: Film, files: videoFiles },
+              { label: "PDFs", icon: FileText, files: pdfFiles },
+            ].map(({ label, icon: Icon, files }) => (
               <div key={label}>
                 <p className="px-1 mb-1 font-mono text-[9px] uppercase tracking-widest text-text-faint flex items-center gap-1.5">
                   <Icon size={9} /> {label}
                 </p>
-                <p className="text-[10px] text-text-faint px-1">No files yet</p>
+                {files.length === 0 ? (
+                  <p className="text-[10px] text-text-faint px-1">No files yet</p>
+                ) : (
+                  <div className="space-y-1">
+                    {files.map((f) => (
+                      <a
+                        key={f.publicUrl}
+                        href={f.publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-raised/50 transition-colors truncate"
+                      >
+                        <span className="text-[10px] truncate">{f.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -260,6 +404,12 @@ export function Sidebar({
                 icon: copied ? Check : Copy,
                 action: handleCopy,
                 desc: "Copy to clipboard",
+              },
+              {
+                label: "Download .pdf",
+                icon: Download,
+                action: () => onExport("pdf"),
+                desc: "Formatted PDF report",
               },
               {
                 label: "Download .md",

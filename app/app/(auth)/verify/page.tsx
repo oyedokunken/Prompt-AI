@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
@@ -88,24 +89,17 @@ function VerifyForm() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/verify-otp`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, otp: code }),
-        }
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.message ?? "The code is incorrect or has expired.");
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "signup",
+      });
+      if (verifyError) {
+        setError(verifyError.message || "The code is incorrect or has expired.");
         setDigits(Array(CODE_LENGTH).fill(""));
         setTimeout(() => focusAt(0), 50);
         return;
-      }
-      if (typeof json.accessToken === "string") {
-        localStorage.setItem("access_token", json.accessToken);
-        localStorage.setItem("refresh_token", json.refreshToken);
       }
       setVerified(true);
     } catch {
@@ -122,11 +116,8 @@ function VerifyForm() {
     setError(null);
     setTimeout(() => focusAt(0), 50);
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/resend-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      const supabase = createClient();
+      await supabase.auth.resend({ type: "signup", email });
     } catch {
       // Resend is best-effort -- the UI already reset the cooldown
     }

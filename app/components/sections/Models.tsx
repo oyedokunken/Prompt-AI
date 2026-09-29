@@ -14,46 +14,46 @@ const item = {
 
 const models = [
   {
-    name: "Claude 3.5 Sonnet",
-    provider: "Anthropic",
-    notes:
-      "Uses XML tag structure for roles and delimiters. Prompt AI applies <role>, <context>, and <output> wrappers to match Claude's preferred parsing format.",
-    badge: "Recommended",
-  },
-  {
     name: "GPT-4o",
     provider: "OpenAI",
     notes:
       "Formats instructions as a system message with a structured user turn. Prompt AI separates role context into the system prompt and the task into the user message.",
-    badge: null,
+    badge: "Live",
+  },
+  {
+    name: "Claude 3.5 Sonnet",
+    provider: "Anthropic",
+    notes:
+      "Uses XML tag structure for roles and delimiters. Prompt AI applies <role>, <context>, and <output> wrappers to match Claude's preferred parsing format.",
+    badge: "Coming soon",
   },
   {
     name: "Gemini 1.5 Pro",
     provider: "Google",
     notes:
       "Performs well with extended context blocks. Prompt AI adjusts token budget assumptions and places constraints earlier in the instruction set for Gemini targets.",
-    badge: null,
+    badge: "Coming soon",
   },
   {
     name: "Mistral Large",
     provider: "Mistral AI",
     notes:
       "Uses ChatML-compatible formatting. Prompt AI applies instruction-tuned formatting conventions and avoids markdown-heavy structures that reduce Mistral performance.",
-    badge: null,
+    badge: "Coming soon",
   },
   {
     name: "Llama 3.1 70B",
     provider: "Meta",
     notes:
       "Applies prompt templates consistent with the llama.cpp and vLLM serving format. Prompt AI avoids token-heavy decorators that bloat context on local inference setups.",
-    badge: null,
+    badge: "Coming soon",
   },
   {
     name: "Qwen 2.5 Coder",
     provider: "Alibaba",
     notes:
       "Targets code-specific instruction tuning. Prompt AI emphasizes language, runtime, and output format constraints when building prompts for this model.",
-    badge: null,
+    badge: "Coming soon",
   },
 ];
 
@@ -104,7 +104,13 @@ export function Models() {
                   </p>
                 </div>
                 {model.badge && (
-                  <span className="shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border border-accent/30 text-accent bg-accent/5">
+                  <span
+                    className={`shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border ${
+                      model.badge === "Live"
+                        ? "border-accent/30 text-accent bg-accent/5"
+                        : "border-border text-text-faint"
+                    }`}
+                  >
                     {model.badge}
                   </span>
                 )}

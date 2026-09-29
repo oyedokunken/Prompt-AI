@@ -83,27 +83,23 @@ function LoginForm() {
     setIsSubmitting(true);
     setServerError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       });
-      const json = await res.json();
-      if (!res.ok) {
-        if (json.error === "EMAIL_NOT_VERIFIED") {
+      if (error) {
+        if (error.message.toLowerCase().includes("email not confirmed")) {
           router.push(`/verify?email=${encodeURIComponent(data.email)}`);
           return;
         }
-        setServerError(json.message ?? "Login failed. Check your credentials.");
+        setServerError(error.message || "Login failed. Check your credentials.");
         return;
       }
       localStorage.setItem(LAST_USED_KEY, "email");
-      if (typeof json.accessToken === "string") {
-        localStorage.setItem("access_token", json.accessToken);
-        localStorage.setItem("refresh_token", json.refreshToken);
-      }
       const next = searchParams.get("next") ?? "/dashboard";
       router.push(next);
+      router.refresh();
     } catch {
       setServerError("Unable to reach the server. Check your connection.");
     } finally {

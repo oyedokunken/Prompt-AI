@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { MODELS } from "@/lib/types/chat";
+
+interface IncomingAttachment {
+  name: string;
+  type: string;
+  path: string;
+  dataUrl: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/chat
@@ -55,12 +63,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { session_id, content } = (await req.json()) as {
+  const { session_id, content, attachment } = (await req.json()) as {
     session_id: string;
     content: string;
+    attachment?: IncomingAttachment;
   };
 
-  if (!session_id || !content?.trim()) {
+  if (!session_id || !(content?.trim() || attachment)) {
     return NextResponse.json({ error: "Missing session_id or content" }, { status: 400 });
   }
 
@@ -79,7 +88,14 @@ export async function POST(req: NextRequest) {
   // Persist the user message
   const { data: userMsg, error: userMsgError } = await supabase
     .from("messages")
-    .insert({ session_id, role: "user", content: content.trim(), metadata: {} })
+    .insert({
+      session_id,
+      role: "user",
+      content: content.trim(),
+      metadata: attachment
+        ? { attachment: { name: attachment.name, type: attachment.type, path: attachment.path, usedAsContext: !!attachment.dataUrl } }
+        : {},
+    })
     .select()
     .single();
 
@@ -98,7 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate the structured prompt response
-  const aiResponse = await generateResponse(content.trim(), session.model);
+  const aiResponse = await generateResponse(content.trim(), session.model, attachment ?? null);
 
   // Persist the AI message
   const { data: aiMsg, error: aiMsgError } = await supabase
@@ -134,16 +150,32 @@ export async function POST(req: NextRequest) {
 // ---------------------------------------------------------------------------
 async function generateResponse(
   userInput: string,
-  model: string
+  model: string,
+  attachment: IncomingAttachment | null
 ): Promise<{ content: string; score: number; assumptions: string[]; structured: Record<string, unknown> }> {
   // 1 — OpenAI (real structured output)
   if (openai) {
     try {
+      // Fall back to gpt-4o for any target model we don't have a real
+      // provider key for yet -- the model selector disables those, but
+      // older sessions may still carry one as their stored value.
+      const resolvedModel = MODELS.find((m) => m.id === model)?.openaiModel ?? "gpt-4o";
+
+      const userContent =
+        attachment?.dataUrl
+          ? [
+              { type: "text" as const, text: userInput },
+              { type: "image_url" as const, image_url: { url: attachment.dataUrl } },
+            ]
+          : attachment
+          ? `${userInput}\n\n[Attached file: ${attachment.name} — this file type cannot be read as context yet, only its name is known.]`
+          : userInput;
+
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: resolvedModel,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userInput },
+          { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
         temperature: 0.3,

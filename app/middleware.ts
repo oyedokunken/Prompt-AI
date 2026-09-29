@@ -46,13 +46,29 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const protectedPaths = pathname.startsWith("/dashboard") || pathname.startsWith("/chat") || pathname.startsWith("/settings");
 
   // Redirect unauthenticated users away from protected routes
-  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/chat") || pathname.startsWith("/settings"))) {
+  if (!user && (protectedPaths || pathname.startsWith("/onboarding"))) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  const onboarded = user?.user_metadata?.onboarded === true;
+
+  // First-time users land on the personalization step before the dashboard
+  if (user && !onboarded && protectedPaths) {
+    const onboardingUrl = request.nextUrl.clone();
+    onboardingUrl.pathname = "/onboarding";
+    return NextResponse.redirect(onboardingUrl);
+  }
+
+  if (user && onboarded && pathname.startsWith("/onboarding")) {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/dashboard";
+    return NextResponse.redirect(dashboardUrl);
   }
 
   // Redirect authenticated users away from auth pages
@@ -61,7 +77,7 @@ export async function middleware(request: NextRequest) {
     (pathname === "/login" || pathname === "/signup")
   ) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/dashboard";
+    dashboardUrl.pathname = onboarded ? "/dashboard" : "/onboarding";
     return NextResponse.redirect(dashboardUrl);
   }
 

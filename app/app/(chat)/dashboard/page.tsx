@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, PanelLeft, Zap } from "lucide-react";
+import { ChevronDown, Zap, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ChatInput } from "@/components/dashboard/ChatInput";
+import { ConfirmModal } from "@/components/ConfirmModal";
+import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
+import { exportSession } from "@/lib/export";
 import type {
   ChatSession, ChatMessage, SidebarPanel, ExportFormat,
 } from "@/lib/types/chat";
@@ -35,18 +39,26 @@ function ModelSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
             {MODELS.map((m) => (
               <button
                 key={m.id}
+                disabled={!m.openaiModel}
                 onClick={() => { onSelect(m); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-[11px] transition-colors ${
-                  m.id === model.id
+                className={`w-full flex items-center justify-between px-3 py-2 text-[11px] transition-colors ${
+                  !m.openaiModel
+                    ? "text-text-faint cursor-not-allowed"
+                    : m.id === model.id
                     ? "text-accent bg-accent/10"
                     : "text-text-muted hover:bg-raised"
                 }`}
               >
-                {m.label}
+                <span>{m.label}</span>
+                {!m.openaiModel && (
+                  <span className="text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
+                    Coming soon
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -58,7 +70,7 @@ function ModelSelector({
 
 // ─── Empty state ───────────────────────────────────────────────────────────
 
-function EmptyState({ onNew }: { onNew: () => void }) {
+function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; name?: string }) {
   const starters = [
     "Write a system prompt for a customer support agent",
     "Create a prompt that extracts structured data from receipts",
@@ -70,7 +82,9 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       <div className="w-10 h-10 rounded-xl bg-base border border-border flex items-center justify-center mb-4">
         <Zap size={18} className="text-accent" />
       </div>
-      <h2 className="text-base font-semibold text-text-primary mb-1">Start a conversation</h2>
+      <h2 className="text-base font-semibold text-text-primary mb-1">
+        {name ? `Hi ${name}, let's build a prompt` : "Start a conversation"}
+      </h2>
       <p className="text-sm text-text-muted max-w-xs mb-6">
         Describe what you need in plain language. Prompt AI will turn it into a
         structured, high-quality prompt.
@@ -81,7 +95,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         {starters.map((s) => (
           <button
             key={s}
-            onClick={onNew}
+            onClick={() => onStarter(s)}
             className="text-left px-3 py-2.5 rounded-lg border border-border bg-raised hover:border-accent/30 hover:bg-raised/80 transition-colors text-[11px] text-text-muted"
           >
             {s}
@@ -121,8 +135,7 @@ export default function DashboardPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auth
-  const [username, setUsername] = useState("User");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { profile } = useUserProfile();
 
   // Sessions + messages
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -130,12 +143,14 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // UI state
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPanel, setSidebarPanel] = useState<SidebarPanel>("history");
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<(typeof MODELS)[number]>(MODELS[0]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<UploadedAttachment | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────
 
@@ -143,8 +158,6 @@ export default function DashboardPage() {
     const boot = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      setAvatarUrl(user.user_metadata?.avatar_url ?? null);
-      setUsername(user.email?.split("@")[0] ?? "User");
       await loadSessions();
     };
     boot();
@@ -207,10 +220,25 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Attachments ────────────────────────────────────────────────────────
+
+  const handleAttach = async (file: File) => {
+    if (!profile) return;
+    setError(null);
+    try {
+      const uploaded = await uploadAttachment(profile.id, file);
+      setPendingAttachment(uploaded);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    }
+  };
+
   // ── Message send ───────────────────────────────────────────────────────
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || isLoading) return;
+  const handleSend = async (override?: string) => {
+    const content = (override ?? inputValue).trim();
+    if ((!content && !pendingAttachment) || isLoading) return;
+    const attachment = pendingAttachment;
 
     // If no session exists yet, create one
     let session = activeSession;
@@ -228,8 +256,8 @@ export default function DashboardPage() {
       setActiveSession(session);
     }
 
-    const content = inputValue.trim();
     setInputValue("");
+    setPendingAttachment(null);
     setIsLoading(true);
     setError(null);
 
@@ -237,14 +265,29 @@ export default function DashboardPage() {
     const tempId = `temp-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: tempId, session_id: session!.id, role: "user", content, metadata: {}, created_at: new Date().toISOString() },
+      {
+        id: tempId,
+        session_id: session!.id,
+        role: "user",
+        content,
+        metadata: attachment
+          ? { attachment: { name: attachment.name, type: attachment.type, path: attachment.path, usedAsContext: !!attachment.dataUrl } }
+          : {},
+        created_at: new Date().toISOString(),
+      },
     ]);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: session!.id, content }),
+        body: JSON.stringify({
+          session_id: session!.id,
+          content,
+          attachment: attachment
+            ? { name: attachment.name, type: attachment.type, path: attachment.path, dataUrl: attachment.dataUrl }
+            : undefined,
+        }),
       });
 
       const payload = await res.json();
@@ -279,42 +322,12 @@ export default function DashboardPage() {
 
   const handleExport = (format: ExportFormat) => {
     if (!activeSession || messages.length === 0) return;
+    exportSession(activeSession, messages, format);
+  };
 
-    let content = "";
-    const title = activeSession.title;
-
-    if (format === "json") {
-      content = JSON.stringify({ session: activeSession, messages }, null, 2);
-    } else if (format === "txt") {
-      content = messages
-        .map((m) => `[${m.role === "user" ? "You" : "Prompt AI"}]\n${m.content}`)
-        .join("\n\n---\n\n");
-    } else {
-      // markdown
-      content = `# ${title}\n\n` +
-        messages
-          .map((m) =>
-            m.role === "user"
-              ? `**You:** ${m.content}`
-              : `**Prompt AI:**\n\n${m.content}`
-          )
-          .join("\n\n---\n\n");
-    }
-
-    // Copy if format was triggered from the copy button
-    if (format === "markdown" && sidebarPanel === "export") {
-      navigator.clipboard.writeText(content);
-      return;
-    }
-
-    const ext = format === "json" ? "json" : format === "txt" ? "txt" : "md";
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleCopyMarkdown = () => {
+    if (!activeSession || messages.length === 0) return;
+    exportSession(activeSession, messages, "markdown", { copyOnly: true });
   };
 
   // ── Model change ───────────────────────────────────────────────────────
@@ -336,6 +349,16 @@ export default function DashboardPage() {
     router.push("/login");
   };
 
+  const attachmentLibrary = messages
+    .filter((m) => m.metadata.attachment)
+    .map((m) => {
+      const att = m.metadata.attachment!;
+      const bucket = att.path.split("/")[0];
+      const objectPath = att.path.slice(bucket.length + 1);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
+      return { name: att.name, type: att.type, publicUrl: data.publicUrl };
+    });
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
@@ -349,16 +372,6 @@ export default function DashboardPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
           </div>
-          {/* Sidebar toggle (mobile / collapsed) */}
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-1 text-text-faint hover:text-text-muted transition-colors"
-              aria-label="Open sidebar"
-            >
-              <PanelLeft size={13} />
-            </button>
-          )}
         </div>
 
         <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2">
@@ -371,23 +384,25 @@ export default function DashboardPage() {
       {/* ── Body ── */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        {sidebarOpen && (
-          <Sidebar
-            sessions={sessions}
-            activeSessionId={activeSession?.id}
-            panel={sidebarPanel}
-            onPanelChange={setSidebarPanel}
-            onNewChat={handleNewChat}
-            onSelectSession={selectSession}
-            onDeleteSession={handleDeleteSession}
-            onExport={handleExport}
-            onClose={() => setSidebarOpen(false)}
-            username={username}
-            avatarUrl={avatarUrl}
-            onSettings={() => router.push("/settings")}
-            onSignOut={handleSignOut}
-          />
-        )}
+        <Sidebar
+          sessions={sessions}
+          activeSessionId={activeSession?.id}
+          panel={sidebarPanel}
+          onPanelChange={setSidebarPanel}
+          onNewChat={handleNewChat}
+          onSelectSession={selectSession}
+          onDeleteSession={handleDeleteSession}
+          onExport={handleExport}
+          onCopyMarkdown={handleCopyMarkdown}
+          username={profile?.username ?? "User"}
+          avatarUrl={profile?.avatarUrl ?? null}
+          onSettings={() => router.push("/settings")}
+          onSignOut={() => setShowLogoutConfirm(true)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+          onAttach={handleAttach}
+          attachments={attachmentLibrary}
+        />
 
         {/* ── Main area ── */}
         <main className="flex-1 flex flex-col min-w-0">
@@ -407,7 +422,7 @@ export default function DashboardPage() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-5 flex flex-col gap-5">
             {messages.length === 0 && !isLoading ? (
-              <EmptyState onNew={handleNewChat} />
+              <EmptyState onStarter={(text) => handleSend(text)} name={profile?.preferredName ?? undefined} />
             ) : (
               <>
                 {messages.map((m) => (
@@ -420,14 +435,38 @@ export default function DashboardPage() {
           </div>
 
           {/* Input */}
+          {pendingAttachment && (
+            <div className="mx-4 sm:mx-6 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted">
+              <span className="truncate max-w-[200px]">{pendingAttachment.name}</span>
+              <button
+                onClick={() => setPendingAttachment(null)}
+                className="text-text-faint hover:text-red-400 transition-colors"
+                aria-label="Remove attachment"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          )}
+
           <ChatInput
             value={inputValue}
             onChange={setInputValue}
-            onSend={handleSend}
+            onSend={() => handleSend()}
+            onAttach={handleAttach}
             disabled={isLoading}
           />
         </main>
       </div>
+
+      <ConfirmModal
+        open={showLogoutConfirm}
+        title="Sign out"
+        description="You will need to log in again to access your chats."
+        confirmLabel="Sign out"
+        danger
+        onConfirm={handleSignOut}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }

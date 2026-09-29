@@ -16,6 +16,12 @@ export interface PromptMetadata {
     constraints?: string[];
     format?: string;
   };
+  attachment?: {
+    name: string;
+    type: string;
+    path: string;
+    usedAsContext: boolean;
+  };
 }
 
 export interface ChatMessage {
@@ -27,16 +33,32 @@ export interface ChatMessage {
   created_at: string;
 }
 
-export type ExportFormat = "markdown" | "json" | "txt";
+export type ExportFormat = "markdown" | "json" | "txt" | "pdf";
 export type SidebarPanel = "history" | "media" | "export";
 
+// openaiModel is null for targets we cannot actually call yet (no provider
+// key configured) -- the selector disables those rather than silently
+// generating with a different model than the one shown.
 export const MODELS = [
-  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
-  { id: "grok-2", label: "Grok 2" },
-  { id: "llama-3.1-70b", label: "Llama 3.1 70B" },
-  { id: "o1-mini", label: "o1-mini" },
+  { id: "gpt-4o", label: "GPT-4o", openaiModel: "gpt-4o" },
+  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", openaiModel: null },
+  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", openaiModel: null },
+  { id: "grok-2", label: "Grok 2", openaiModel: null },
+  { id: "llama-3.1-70b", label: "Llama 3.1 70B", openaiModel: null },
+  { id: "o1-mini", label: "o1-mini", openaiModel: null },
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]["id"];
+
+export const ATTACHMENT_BUCKETS: Record<string, { bucket: string; maxBytes: number }> = {
+  image: { bucket: "image-attachments", maxBytes: 10 * 1024 * 1024 },
+  video: { bucket: "video-attachments", maxBytes: 20 * 1024 * 1024 },
+  pdf: { bucket: "PDF-attachments", maxBytes: 10 * 1024 * 1024 },
+};
+
+export function attachmentKind(mimeType: string): keyof typeof ATTACHMENT_BUCKETS | null {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType === "application/pdf") return "pdf";
+  return null;
+}

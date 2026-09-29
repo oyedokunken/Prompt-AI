@@ -8,6 +8,7 @@ import { z } from "zod";
 import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 const schema = z.object({
   email: z
@@ -33,10 +34,9 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: data.email }),
+      const supabase = createClient();
+      await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
       // Always show the success state regardless of whether the address exists,
       // to prevent email enumeration.
