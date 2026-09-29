@@ -1,15 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
 
 // ---------------------------------------------------------------------------
 // POST /api/chat
 // Accepts { session_id, content } — saves the user message, generates a
 // structured prompt response, saves the AI message, and returns both.
 //
-// When DATA_SERVICE_URL is configured the request is proxied there.
-// Until then a local structured-prompt generator is used so the UI stays
-// fully functional from day one.
+// Priority order for AI generation:
+//   1. OpenAI (OPENAI_API_KEY set)   → GPT-4o structured output
+//   2. DATA_SERVICE_URL set          → proxy to Python /data service
+//   3. Fallback                      → local heuristic builder
 // ---------------------------------------------------------------------------
+
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+const SYSTEM_PROMPT = `You are Prompt AI — an expert at transforming vague user requests into detailed, structured prompts optimised for AI tools.
+
+Given any user input, analyse their intent and respond with a JSON object in this exact format:
+{
+  "content": "The complete structured prompt as ready-to-use markdown",
+  "score": 82,
+  "assumptions": ["What you inferred that the user did not state"],
+  "structured": {
+    "role": "The role / persona the target AI should adopt",
+    "context": "Background and relevant context",
+    "constraints": ["Hard requirement 1", "Hard requirement 2"],
+    "format": "Expected output format and structure"
+  }
+}
+
+Scoring guide (0–100):
+- 20–40  Vague, single phrase, no context — many assumptions needed
+- 41–60  Some context but key specifics are missing
+- 61–80  Good detail with minor gaps filled by reasonable assumptions
+- 81–100 Highly specific — little to no inferencing required
+
+Rules:
+- "content" must be a complete, production-ready prompt the user can paste directly into any AI tool.
+- Use markdown headers, bold labels, and bullet lists inside "content" for readability.
+- Always list every assumption you made, however small.
+- Respond ONLY with valid JSON — no prose outside the object.`;
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
@@ -96,32 +130,71 @@ export async function POST(req: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
-// Response generator
-// Proxies to DATA_SERVICE_URL when configured, otherwise uses local logic.
+// Response generator — tries OpenAI → DATA_SERVICE_URL → local fallback
 // ---------------------------------------------------------------------------
 async function generateResponse(
   userInput: string,
   model: string
 ): Promise<{ content: string; score: number; assumptions: string[]; structured: Record<string, unknown> }> {
-  const dataServiceUrl = process.env.DATA_SERVICE_URL;
+  // 1 — OpenAI (real structured output)
+  if (openai) {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userInput },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_tokens: 1500,
+      });
 
-  if (dataServiceUrl) {
-    const res = await fetch(`${dataServiceUrl}/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.DATA_SERVICE_API_KEY ?? ""}`,
-      },
-      body: JSON.stringify({ input: userInput, model }),
-    });
-    if (res.ok) return res.json() as Promise<ReturnType<typeof generateResponse>>;
+      const raw = completion.choices[0]?.message?.content ?? "{}";
+      const result = JSON.parse(raw) as {
+        content?: string;
+        score?: number;
+        assumptions?: string[];
+        structured?: Record<string, unknown>;
+      };
+
+      if (result.content && typeof result.score === "number") {
+        return {
+          content: result.content,
+          score: result.score,
+          assumptions: result.assumptions ?? [],
+          structured: result.structured ?? {},
+        };
+      }
+    } catch (err) {
+      console.error("[chat] OpenAI error — falling back to local generator:", err);
+    }
   }
 
+  // 2 — Proxy to /data service
+  const dataServiceUrl = process.env.DATA_SERVICE_URL;
+  if (dataServiceUrl) {
+    try {
+      const res = await fetch(`${dataServiceUrl}/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.DATA_SERVICE_API_KEY ?? ""}`,
+        },
+        body: JSON.stringify({ input: userInput, model }),
+      });
+      if (res.ok) return res.json() as Promise<ReturnType<typeof generateResponse>>;
+    } catch {
+      console.error("[chat] DATA_SERVICE error — falling back to local generator");
+    }
+  }
+
+  // 3 — Local heuristic fallback
   return buildStructuredPrompt(userInput);
 }
 
 // ---------------------------------------------------------------------------
-// Local structured prompt builder (used until /data service is live)
+// Local structured prompt builder (fallback when no API keys are configured)
 // ---------------------------------------------------------------------------
 function buildStructuredPrompt(userInput: string): {
   content: string;
@@ -151,9 +224,7 @@ function buildStructuredPrompt(userInput: string): {
   if (!hasConstraint) assumptions.push("No explicit constraints detected — sensible defaults applied");
 
   const structured = {
-    role: hasRole
-      ? "Domain expert (as referenced in your input)"
-      : "Expert assistant in the relevant domain",
+    role: hasRole ? "Domain expert (as referenced in your input)" : "Expert assistant in the relevant domain",
     context: userInput,
     constraints: hasConstraint
       ? ["Follow explicit requirements stated in the input", "Be precise and production-ready"]
@@ -161,9 +232,7 @@ function buildStructuredPrompt(userInput: string): {
     format: hasFormat ? "As specified in input" : "Structured text with clear sections",
   };
 
-  const content = `Here is your structured prompt:
-
----
+  const content = `## Structured Prompt
 
 **Role:** ${structured.role}
 
@@ -172,9 +241,9 @@ function buildStructuredPrompt(userInput: string): {
 **Task:** Complete the objective described above with precision and depth. Where the intent is ambiguous, choose the most professional interpretation and state the assumption explicitly.
 
 **Constraints:**
-${structured.constraints.map((c) => `- ${c}`).join("\n")}
+${(structured.constraints as string[]).map((c) => `- ${c}`).join("\n")}
 
-**Output format:** ${structured.format}
+**Output format:** ${structured.format as string}
 
 ---
 
@@ -183,7 +252,7 @@ ${structured.constraints.map((c) => `- ${c}`).join("\n")}
 ${
   assumptions.length > 0
     ? `**What was inferred:**\n${assumptions.map((a) => `- ${a}`).join("\n")}\n\nRefine your input with more specifics to push this score above 80.`
-    : "Your input is well-specified. The prompt above should be ready to use."
+    : "Your input is well-specified. The prompt above is ready to use."
 }`;
 
   return { content, score, assumptions, structured };

@@ -63,7 +63,7 @@ app.use((_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Startup
+// Startup (local dev only — Vercel handles the listener in serverless mode)
 // ---------------------------------------------------------------------------
 async function start(): Promise<void> {
   app.listen(env.PORT, () => {
@@ -77,7 +77,13 @@ async function start(): Promise<void> {
   });
 }
 
-start().catch((err) => {
-  console.error("[api] failed to start:", err);
-  process.exit(1);
-});
+// Export for Vercel serverless
+export default app;
+
+// Start listener only when running locally (not on Vercel)
+if (!process.env.VERCEL) {
+  start().catch((err) => {
+    console.error("[api] failed to start:", err);
+    process.exit(1);
+  });
+}

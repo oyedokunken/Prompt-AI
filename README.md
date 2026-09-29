@@ -2,7 +2,7 @@
 
 Prompt AI is a chat based tool that turns vague human intent into detailed, structured prompts that other AI tools can execute correctly on the first try. You describe what you want in plain language. Prompt AI asks the right questions, fills in the missing context, and returns a prompt built for the AI tool you actually need, whether that is a coding assistant, an image generator, a video model, or a general purpose chat model.
 
-Live site: https://prompt.ai/
+Live site: https://prompt-swe.vercel.app
 Repository: oyedokunken/Prompt-AI
 Developed by: [oyedokunken](https://www.oyedokun.dev/) ([oyedokunken@gmail.com](mailto:oyedokunken@gmail.com))
 
@@ -77,9 +77,8 @@ graph TB
         Express["Express.js API"]
         Auth["JWT Auth Middleware"]
         Prisma["Prisma ORM"]
-        Redis["Redis Cache"]
-        BullMQ["BullMQ Queue"]
         Nodemailer["Nodemailer"]
+        OpenAI["OpenAI SDK"]
     end
 
     subgraph Data["/data - AI Layer (Render)"]
@@ -102,9 +101,8 @@ graph TB
     Express --> Auth
     Auth --> Prisma
     Prisma --> Supabase
-    Express --> Redis
-    Express --> BullMQ
-    BullMQ -->|Internal API| FastAPI
+    Express --> OpenAI
+    Express -->|Internal API| FastAPI
     FastAPI --> LLM
     FastAPI --> Classifier
     FastAPI --> Scorer
@@ -130,13 +128,9 @@ sequenceDiagram
     participant Queue as BullMQ
     participant Data as /data (FastAPI)
     participant DB as Supabase
-    participant Cache as Redis
-
     User->>App: Send prompt request
-    App->>API: POST /api/prompt (JWT token)
-    API->>API: Validate JWT
-    API->>Cache: Check rate limit
-    Cache-->>API: Rate limit status
+    App->>API: POST /api/chat (Supabase session)
+    API->>API: Validate session
     API->>Queue: Enqueue prompt job
     Queue->>Data: Process job (internal API)
     Data->>Data: Classify intent
@@ -164,7 +158,7 @@ graph LR
 
     DB[(Supabase)] --> Pattern
     Vector[(pgvector)] --> Pattern
-    Cache[(Redis)] --> Score
+    OpenAI[(OpenAI API)] --> Score
 
     Output --> History[Prompt History]
     History --> DB
@@ -274,45 +268,56 @@ Each folder is independently runnable and has its own dependency management, env
 
 ## Tech Stack
 
-### `/app` (Frontend)
+### `/app` — Frontend
 
-- **Next.js (App Router)** for the chat interface, routing, and server rendered pages
-- **TypeScript** across the entire frontend for type safety
-- **Tailwind CSS** for styling
-- **shadcn/ui** for accessible, composable UI primitives
-- **React Hook Form** for form state and validation handling
-- **Zustand** for lightweight client side state management
-- **Zod** for runtime schema validation shared between forms and API responses
-- Hosted on **Vercel**
+| Concern | Technology | Notes |
+|---|---|---|
+| Framework | Next.js 15 | App Router, SSR + Client Components |
+| Language | TypeScript 5 | Strict mode, full type coverage |
+| Styling | Tailwind CSS 3 | Custom design tokens, JIT |
+| Auth client | Supabase SSR | Session cookies, PKCE OAuth flow |
+| Icons | Lucide React | Consistent icon set |
+| Animations | Framer Motion | Page transitions, scroll animations |
+| Validation | Zod | End-to-end type-safe form schemas |
+| Font | Geist / Geist Mono | Variable fonts, system fallback |
+| Deploy | Vercel | Edge network, auto-deploy from `main` |
 
-### `/api` (Backend)
+### `/api` — Backend
 
-- **Node.js with Express** for the API layer
-- **Prisma ORM** for type safe database access
-- **Supabase (PostgreSQL)** as the primary database and storage provider
-- **JWT (JSON Web Tokens)** for stateless authentication, with refresh token rotation
-- **Nodemailer** for transactional email (verification, password reset, notifications)
-- **Zod** for request and response validation on every route
-- **dotenv with a Zod validated env schema** so the app fails fast on missing or malformed configuration instead of failing silently in production
-- **Redis** for caching and rate limiting
-- **BullMQ** for queuing outbound calls to `/data` and external AI providers, so a slow response never blocks a request thread
-- Hosted on **Vercel**, as a separate project from `/app`
+| Concern | Technology | Notes |
+|---|---|---|
+| Framework | Express.js 4 | TypeScript, modular routes |
+| Language | TypeScript 5 | Compiled via `tsc`, strict mode |
+| ORM | Prisma 5 | Type-safe queries, `db push` schema sync |
+| Database | PostgreSQL | Hosted on Supabase |
+| Auth | JWT + bcrypt | 15 min access / 30 day refresh token pair |
+| OAuth | Supabase Auth | GitHub + Google, redirect-based PKCE |
+| Email | Nodemailer | OTP + transactional email via SMTP |
+| Security | Helmet + express-rate-limit | Security headers, per-route IP rate limits |
+| Validation | Zod | Schema-driven, fails fast on bad input |
+| AI | OpenAI SDK | GPT-4o for structured prompt generation |
+| File storage | Supabase Storage | Avatars, image, video, PDF attachments |
+| Deploy | Vercel | Separate project from `/app` |
 
-### `/data` (AI / ML Layer)
+### `/data` — AI / ML Layer *(planned)*
 
-- **Python** as the core language
-- **FastAPI** to expose the model layer as an internal service, callable only by `/api`
-- **scikit-learn** for the prompt scoring and intent classification models
-- **pgvector via Supabase** as the vector store for retrieval of known effective prompt patterns and examples
-- **pandas and NumPy** for data preparation and feature engineering
-- Hosted on **Render**
-- No authentication logic, no email, no direct client access. This service does one thing: AI.
+| Concern | Technology | Notes |
+|---|---|---|
+| Framework | FastAPI | Python, async, internal-only |
+| Inference | OpenAI API | GPT-4o via service account |
+| Classification | scikit-learn | Intent routing, prompt category detection |
+| Embeddings | pgvector (Supabase) | Known effective prompt pattern retrieval |
+| Data | pandas + NumPy | Feature engineering, scoring inputs |
+| Deploy | Render | Long-running Python processes |
 
 ### Infrastructure and Tooling
 
-- **Docker** for containerizing `/data`
-- **GitHub Actions** for CI, running linting, type checks, and tests on every pull request
-- **ESLint and Prettier** for consistent code style across `/app` and `/api`
+| Concern | Technology |
+|---|---|
+| Version control | GitHub |
+| CI | GitHub Actions (lint, typecheck, build) |
+| Containerisation | Docker (for `/data`) |
+| Code style | ESLint + Prettier |
 
 ## Core Features
 
@@ -339,11 +344,10 @@ Each folder is independently runnable and has its own dependency management, env
 ### Prerequisites
 
 - Node.js 20 or later
-- Python 3.11 or later
-- pnpm (used across `/app` and `/api`)
+- Python 3.11 or later (for `/data` only)
+- npm (used across `/app` and `/api`)
 - A Supabase project (PostgreSQL and storage)
-- Redis instance (local or hosted)
-- API keys for whichever AI providers you plan to integrate
+- An OpenAI API key
 
 ### Clone the repository
 
@@ -356,32 +360,35 @@ cd Prompt-AI
 
 Each service has its own `.env.example` file. Copy it and fill in the values before running that service.
 
-**`/api/.env`**
+**`/api/.env`** — copy from `api/.env.example`
 
 ```
 DATABASE_URL=
-DIRECT_URL=
+DATABASE_DIRECT_URL=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 JWT_ACCESS_SECRET=
 JWT_REFRESH_SECRET=
-REDIS_URL=
-SMTP_HOST=
+OTP_PEPPER=
+SMTP_HOST=          # optional — OTP emails degrade gracefully without this
 SMTP_PORT=
 SMTP_USER=
-SMTP_PASSWORD=
-DATA_SERVICE_URL=
+SMTP_PASS=
+OPENAI_API_KEY=
+DATA_SERVICE_URL=   # optional — leave blank until /data is deployed
 DATA_SERVICE_API_KEY=
-PORT=
+APP_URL=
+ALLOWED_ORIGINS=
 ```
 
-**`/app/.env.local`**
+**`/app/.env.local`** — copy from `app/.env.local.example`
 
 ```
-NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_SITE_URL=
+OPENAI_API_KEY=     # server-side only, never sent to the browser
 ```
 
 **`/data/.env`**
