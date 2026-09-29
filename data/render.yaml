@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: prompt-ai-data
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false          # set in Render dashboard — never committed
+      - key: DATA_SERVICE_API_KEY
+        sync: false          # must match /api DATA_SERVICE_API_KEY
+      - key: PORT
+        value: 8000
+    healthCheckPath: /health
