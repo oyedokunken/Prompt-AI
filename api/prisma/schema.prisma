@@ -69,3 +69,41 @@ model RefreshToken {
   @@index([userId])
   @@map("refresh_tokens")
 }
+
+// ---------------------------------------------------------------------------
+// Chat sessions
+// user_id stores the Supabase auth.users UUID (not the Prisma User cuid).
+// Accessed by the Next.js /api/chat route via Supabase client (snake_case).
+// ---------------------------------------------------------------------------
+
+model ChatSession {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  title     String    @default("New Chat")
+  model     String    @default("claude-3-5-sonnet")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  messages  Message[]
+
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+model Message {
+  id        String      @id @default(uuid())
+  sessionId String      @map("session_id")
+  role      String      // "user" | "assistant"
+  content   String
+  metadata  Json        @default("{}")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("messages")
+}
