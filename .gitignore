@@ -40,3 +40,6 @@ coverage/
 # Misc
 .cache/
 .temp/
+
+# Local notes / credentials scratch files
+db.txt

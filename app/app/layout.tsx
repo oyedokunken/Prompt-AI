@@ -2,14 +2,44 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://prompt.ai";
+
 export const metadata: Metadata = {
-  title: "Prompt AI - Structured prompts from plain language",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Prompt AI - Structured prompts from plain language",
+    template: "%s | Prompt AI",
+  },
   description:
     "Prompt AI takes vague instructions and constructs detailed, structured prompts optimized for the AI model or tool you're targeting.",
+  keywords: [
+    "AI prompts",
+    "prompt engineering",
+    "structured prompts",
+    "prompt generator",
+    "LLM prompts",
+  ],
   openGraph: {
     title: "Prompt AI",
     description: "Structured prompts from plain language.",
     type: "website",
+    url: "/",
+    siteName: "Prompt AI",
+    locale: "en_US",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Prompt AI - Structured prompts from plain language",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Prompt AI",
+    description: "Structured prompts from plain language.",
+    images: ["/og-image.png"],
   },
 };
 

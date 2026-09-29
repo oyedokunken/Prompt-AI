@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-09-29
+
+### Added
+
+**SEO and social sharing**
+- Open Graph image at `app/public/og-image.png` (1200x630) served on all pages via root layout metadata
+- Twitter/X `summary_large_image` card metadata
+- `metadataBase` canonical URL resolution driven by `NEXT_PUBLIC_SITE_URL` (defaults to https://prompt.ai)
+- Title template (`%s | Prompt AI`) and keyword metadata
+- `app/robots.ts` allowing all crawlers except `/dashboard`, `/settings`, and `/api/`, with sitemap reference
+- `app/sitemap.ts` covering `/`, `/login`, and `/signup`
+- App favicon (`icon.png`, 512px) and `apple-icon.png` (180px) generated from the brand icon tile
+- `NEXT_PUBLIC_SITE_URL` documented in `/app/.env.local.example`
+
+**Brand assets**
+- `promptai-logo.png` high-resolution transparent logo export (black "Prompt", yellow "AI")
+- `logo-export.html` and `icon-export.html` standalone render sources for regenerating brand assets
+
+### Changed
+
+- `/dashboard` and `/settings` routes now emit `noindex`/`nofollow` via `(chat)` layout metadata
+
 ## [0.2.0] - 2026-08-13
 
 ### Added
