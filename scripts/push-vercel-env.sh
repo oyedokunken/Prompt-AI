@@ -15,7 +15,7 @@ cd "$(dirname "$0")/../app"
 SUPABASE_URL="https://cglrkliewuidvdkfnivf.supabase.co"
 SUPABASE_ANON_KEY="<your-anon-key-from-supabase-dashboard>"
 API_URL="https://<your-deployed-api-url>"
-SITE_URL="https://prompt.ai"
+SITE_URL="https://prompt-swe.vercel.app"
 # -------------------------------------------------------------------
 
 for ENV in production preview development; do
