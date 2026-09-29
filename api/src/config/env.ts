@@ -31,16 +31,13 @@ const envSchema = z.object({
     .string()
     .min(32, "OTP_PEPPER must be at least 32 characters"),
 
-  // Redis
-  REDIS_URL: z.string().url("REDIS_URL must be a valid URL").default("redis://localhost:6379"),
-
-  // SMTP
-  SMTP_HOST: z.string().min(1, "SMTP_HOST is required"),
+  // SMTP (optional — server starts without these but OTP emails won't send)
+  SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),
-  SMTP_USER: z.string().min(1, "SMTP_USER is required"),
-  SMTP_PASS: z.string().min(1, "SMTP_PASS is required"),
-  EMAIL_FROM: z.string().email("EMAIL_FROM must be a valid email address"),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM: z.string().default("noreply@prompt.ai"),
   EMAIL_FROM_NAME: z.string().default("Prompt AI"),
 
   // App

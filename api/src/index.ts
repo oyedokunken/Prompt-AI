@@ -4,8 +4,6 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { authRouter } from "./routes/auth";
 import { generalLimiter } from "./middleware/rateLimit";
-import { verifyMailer } from "./lib/mailer";
-import { redis } from "./lib/redis";
 import { prisma } from "./lib/prisma";
 
 const app = express();
@@ -68,9 +66,6 @@ app.use((_req, res) => {
 // Startup
 // ---------------------------------------------------------------------------
 async function start(): Promise<void> {
-  await redis.connect();
-  await verifyMailer();
-
   app.listen(env.PORT, () => {
     console.log(`[api] running on port ${env.PORT} (${env.NODE_ENV})`);
   });
@@ -78,7 +73,6 @@ async function start(): Promise<void> {
   process.on("SIGTERM", async () => {
     console.log("[api] SIGTERM received, shutting down");
     await prisma.$disconnect();
-    await redis.quit();
     process.exit(0);
   });
 }
