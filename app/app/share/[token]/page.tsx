@@ -55,7 +55,15 @@ export default function SharedSessionPage() {
         <Link href="/" aria-label="Prompt AI home">
           <Logo variant="color" size={22} />
         </Link>
-        <span className="text-[11px] font-mono text-text-faint">Shared conversation, read only</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-mono text-text-faint hidden sm:inline">Shared conversation, read only</span>
+          <Link
+            href="/signup"
+            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors"
+          >
+            Try Prompt AI free
+          </Link>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto">
@@ -127,6 +135,19 @@ export default function SharedSessionPage() {
               {payload.messages.map((m) => (
                 <MessageBubble key={m.id} message={m} />
               ))}
+            </div>
+
+            <div className="mt-10 rounded-xl border border-accent/20 bg-accent/5 p-6 text-center">
+              <p className="text-sm font-medium text-text-primary mb-1">Like what you see?</p>
+              <p className="text-xs text-text-muted mb-4 max-w-sm mx-auto">
+                Prompt AI turns vague requests into production-ready prompts like this one, free to start.
+              </p>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors"
+              >
+                Create your own prompts free
+              </Link>
             </div>
           </div>
         )}
