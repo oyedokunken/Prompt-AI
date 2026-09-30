@@ -9,7 +9,7 @@ interface TrendChartProps {
 
 // Minimal bar trend, deliberately dependency free since the data is small
 // and the point is legibility, not a full charting library.
-export function TrendChart({ points, color = "#D97706" }: TrendChartProps) {
+export function TrendChart({ points, color = "rgb(var(--color-accent-fill))" }: TrendChartProps) {
   if (points.length === 0) {
     return <p className="text-[10px] text-text-faint">Not enough data yet.</p>;
   }

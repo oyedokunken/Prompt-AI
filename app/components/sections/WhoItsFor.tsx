@@ -4,6 +4,11 @@ import { Code2, Layers, Cpu, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { Container } from "@/components/Container";
 
+// CSS variable references so these icons stay legible against bg-raised
+// in both themes instead of a fixed hex tuned only for the dark palette.
+const ACCENT = "rgb(var(--color-accent))";
+const SIGNAL = "rgb(var(--color-signal))";
+
 const PERSONAS = [
   {
     Icon: Code2,
@@ -12,7 +17,7 @@ const PERSONAS = [
     description:
       "Stop burning tokens on poorly structured prompts. Get precise, role-correct prompts for coding, architecture, debugging, code review, and documentation, targeted to the model you're using.",
     tags: ["Code generation", "Architecture", "Debugging", "Code review"],
-    accent: "#F2A93B",
+    accent: ACCENT,
   },
   {
     Icon: Layers,
@@ -21,7 +26,7 @@ const PERSONAS = [
     description:
       "Turn feature descriptions and user stories into clean, structured prompts for spec writing, roadmap planning, user research summaries, and stakeholder communication.",
     tags: ["Spec writing", "User stories", "Roadmaps", "Research"],
-    accent: "#8B7CF6",
+    accent: SIGNAL,
   },
   {
     Icon: Cpu,
@@ -30,7 +35,7 @@ const PERSONAS = [
     description:
       "You know the models well. Prompt AI knows their internals. Get the most out of every model without babysitting the prompt structure manually for each one.",
     tags: ["Multi-model", "Prompt tuning", "Score tracking", "Library"],
-    accent: "#F2A93B",
+    accent: ACCENT,
   },
   {
     Icon: Users,
@@ -39,7 +44,7 @@ const PERSONAS = [
     description:
       "Create consistent, reusable prompt templates for your brand voice, content workflows, and creative briefs. Share them across the team without losing quality.",
     tags: ["Brand voice", "Templates", "Workflows", "Consistency"],
-    accent: "#8B7CF6",
+    accent: SIGNAL,
   },
 ];
 
