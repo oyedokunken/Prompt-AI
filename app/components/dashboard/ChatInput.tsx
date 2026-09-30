@@ -26,7 +26,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   onSend,
   onAttach,
   disabled = false,
-  placeholder = "Describe what you need — plain language works best",
+  placeholder = "Describe what you need, plain language works best",
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const valueRef = useRef(value);
@@ -219,11 +219,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </button>
         </div>
       </div>
-      <p className="text-center text-[9px] text-text-faint mt-1.5">
-        Shift+Enter for new line · Enter to send
-      </p>
-      <p className="text-center text-[9px] text-text-faint mt-0.5">
-        Review outputs and generated code before use.
+      <p className="text-center text-[9px] text-text-faint mt-1.5 truncate">
+        Shift+Enter for new line · Enter to send · Review outputs and generated code before use.
       </p>
     </div>
   );

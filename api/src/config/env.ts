@@ -21,7 +21,7 @@ const envSchema = z.object({
     .string()
     .min(32, "OTP_PEPPER must be at least 32 characters"),
 
-  // SMTP (optional — server starts without these but OTP emails won't send)
+  // SMTP (optional, server starts without these but OTP emails won't send)
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   // z.coerce.boolean() would treat the string "false" as truthy (any

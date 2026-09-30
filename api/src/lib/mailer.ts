@@ -7,7 +7,7 @@ import { env } from "../config/env";
  * For production, use Resend, Postmark, or AWS SES SMTP.
  *
  * If SMTP vars are not configured the transporter is still created but
- * sendMail calls will fail — the auth OTP flow degrades gracefully.
+ * sendMail calls will fail, the auth OTP flow degrades gracefully.
  */
 export const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,

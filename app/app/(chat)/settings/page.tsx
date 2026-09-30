@@ -12,7 +12,7 @@ import { ProviderIcon } from "@/components/ProviderIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { TrendChart } from "@/components/settings/TrendChart";
-import { Upload, Loader2, X, Pencil, Check, FileText, Paperclip, TrendingUp } from "lucide-react";
+import { Upload, Loader2, X, Pencil, Check, FileText, Paperclip, TrendingUp, Menu } from "lucide-react";
 import type { ChatSession, SidebarPanel } from "@/lib/types/chat";
 
 type SettingsTab = "profile" | "usage";
@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPanel, setSidebarPanel] = useState<SidebarPanel>("history");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
 
@@ -187,12 +188,23 @@ export default function SettingsPage() {
         savedPrompts={savedPrompts}
         onToggleSavedFavorite={toggleSavedFavorite}
         onDeleteSavedPrompt={removeSavedPrompt}
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface shrink-0">
-          <span className="font-mono text-[11px] text-text-faint">Settings</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="md:hidden p-1 text-text-faint hover:text-text-primary transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu size={16} />
+            </button>
+            <span className="font-mono text-[11px] text-text-faint">Settings</span>
+          </div>
           <ThemeToggle size={13} className="w-7 h-7" />
         </div>
 

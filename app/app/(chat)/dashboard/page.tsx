@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson } from "lucide-react";
+import { ChevronDown, Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson, Menu } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile, roleLabel } from "@/lib/hooks/useUserProfile";
 import { useExportHistory } from "@/lib/hooks/useExportHistory";
@@ -208,6 +208,7 @@ export default function DashboardPage() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // ── Command palette (Cmd+K / Ctrl+K) ──────────────────────────────────
 
@@ -546,33 +547,43 @@ export default function DashboardPage() {
       {/* ── Title bar ── */}
       <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-3">
-          {/* Traffic lights */}
-          <div className="flex gap-1.5">
+          {/* Mobile menu */}
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="md:hidden p-1 text-text-faint hover:text-text-primary transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu size={16} />
+          </button>
+          {/* Traffic lights (desktop only) */}
+          <div className="hidden md:flex gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
           </div>
         </div>
 
-        <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2">
+        <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 hidden sm:block">
           Prompt AI
         </span>
 
-        <div className="flex items-center gap-2">
-          <ShareMenu
-            disabled={!activeSession || messages.length === 0}
-            activeLink={activeShareLink}
-            onCreate={handleCreateShareLink}
-            onRevoke={revokeShareLink}
-            siteUrl={typeof window !== "undefined" ? window.location.origin : ""}
-          />
-          <ExportMenu
-            disabled={!activeSession || messages.length === 0}
-            onExport={handleExport}
-            onCopyMarkdown={handleCopyMarkdown}
-            copied={copiedMarkdown}
-          />
-          <ModelSelector model={selectedModel} onSelect={handleModelChange} />
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:flex items-center gap-2">
+            <ShareMenu
+              disabled={!activeSession || messages.length === 0}
+              activeLink={activeShareLink}
+              onCreate={handleCreateShareLink}
+              onRevoke={revokeShareLink}
+              siteUrl={typeof window !== "undefined" ? window.location.origin : ""}
+            />
+            <ExportMenu
+              disabled={!activeSession || messages.length === 0}
+              onExport={handleExport}
+              onCopyMarkdown={handleCopyMarkdown}
+              copied={copiedMarkdown}
+            />
+            <ModelSelector model={selectedModel} onSelect={handleModelChange} />
+          </div>
           <ThemeToggle size={13} className="w-7 h-7" />
           <button
             onClick={() => router.push("/settings")}
@@ -616,6 +627,8 @@ export default function DashboardPage() {
           savedPrompts={savedPrompts}
           onToggleSavedFavorite={toggleSavedFavorite}
           onDeleteSavedPrompt={removeSavedPrompt}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
         />
 
         {/* ── Main area ── */}

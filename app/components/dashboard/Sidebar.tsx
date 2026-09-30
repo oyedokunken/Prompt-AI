@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Search, MessageSquare, Settings, LogOut,
+  Plus, Search, MessageSquare, Settings, LogOut, X,
   PanelLeftClose, PanelLeftOpen, Paperclip, Download, History,
   BookOpen, Star, Trash2, Image, FileText,
   Film, FileDown, FileJson, FileType,
@@ -42,6 +43,8 @@ interface SidebarProps {
   savedPrompts?: SavedPrompt[];
   onToggleSavedFavorite?: (id: string, next: boolean) => void;
   onDeleteSavedPrompt?: (id: string) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function groupSessions(sessions: ChatSession[]) {
@@ -162,7 +165,7 @@ function CollapsedRail({
       <button
         onClick={onSettings}
         data-tooltip-id="sidebar-tip"
-        data-tooltip-content={`@${username} — Settings`}
+        data-tooltip-content={`@${username} - Settings`}
         aria-label="Open settings"
       >
         {avatarUrl ? (
@@ -200,6 +203,8 @@ export function Sidebar({
   savedPrompts = [],
   onToggleSavedFavorite,
   onDeleteSavedPrompt,
+  mobileOpen = false,
+  onMobileClose = () => {},
 }: SidebarProps) {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -212,21 +217,10 @@ export function Sidebar({
     setSearchOpen((v) => !v);
   };
 
-  if (collapsed) {
-    return (
-      <CollapsedRail
-        onNewChat={onNewChat}
-        onToggleCollapse={onToggleCollapse}
-        onSearch={() => { onToggleCollapse(); setSearchOpen(true); onPanelChange("history"); }}
-        panel={panel}
-        onPanelChange={onPanelChange}
-        onSettings={onSettings}
-        onSignOut={onSignOut}
-        avatarUrl={avatarUrl}
-        username={username}
-      />
-    );
-  }
+  // Closing the mobile drawer on these is harmless on desktop too -- it is
+  // just a redundant state-to-false call when the drawer was never open.
+  const handleNewChat = () => { onNewChat(); onMobileClose(); };
+  const handleSelectSession = (s: ChatSession) => { onSelectSession(s); onMobileClose(); };
 
   const filtered = sessions.filter((s) =>
     s.title.toLowerCase().includes(search.toLowerCase())
@@ -252,7 +246,7 @@ export function Sidebar({
       key={s.id}
       onMouseEnter={() => setHoveredId(s.id)}
       onMouseLeave={() => setHoveredId(null)}
-      onClick={() => onSelectSession(s)}
+      onClick={() => handleSelectSession(s)}
       className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 cursor-pointer transition-colors ${
         s.id === activeSessionId
           ? "bg-raised text-text-primary"
@@ -294,35 +288,12 @@ export function Sidebar({
     );
   };
 
-  return (
-    <aside className="w-56 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
-      {/* Brand + collapse + search, one row */}
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <Logo variant="color" size={18} />
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={handleSearchClick}
-            className={`p-1.5 rounded-md transition-colors ${
-              searchOpen ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
-            }`}
-            aria-label="Search chats"
-          >
-            <Search size={13} />
-          </button>
-          <button
-            onClick={onToggleCollapse}
-            className="p-1.5 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
-            aria-label="Collapse sidebar"
-          >
-            <PanelLeftClose size={13} />
-          </button>
-        </div>
-      </div>
-
+  const sidebarBody = (
+    <>
       {/* New chat */}
       <div className="px-2 pt-2">
         <button
-          onClick={onNewChat}
+          onClick={handleNewChat}
           className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-accent/10 border border-accent/20 text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors"
         >
           <Plus size={11} /> New chat
@@ -634,6 +605,104 @@ export function Sidebar({
           </button>
         </div>
       </div>
+    </>
+  );
+
+  const desktopSidebar = collapsed ? (
+    <CollapsedRail
+      onNewChat={onNewChat}
+      onToggleCollapse={onToggleCollapse}
+      onSearch={() => { onToggleCollapse(); setSearchOpen(true); onPanelChange("history"); }}
+      panel={panel}
+      onPanelChange={onPanelChange}
+      onSettings={onSettings}
+      onSignOut={onSignOut}
+      avatarUrl={avatarUrl}
+      username={username}
+    />
+  ) : (
+    <aside className="w-56 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
+      {/* Brand + collapse + search, one row */}
+      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+        <Logo variant="color" size={18} />
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={handleSearchClick}
+            className={`p-1.5 rounded-md transition-colors ${
+              searchOpen ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
+            }`}
+            aria-label="Search chats"
+          >
+            <Search size={13} />
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+            aria-label="Collapse sidebar"
+          >
+            <PanelLeftClose size={13} />
+          </button>
+        </div>
+      </div>
+      {sidebarBody}
     </aside>
+  );
+
+  const mobileDrawer = (
+    <AnimatePresence>
+      {mobileOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={onMobileClose}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-0 left-0 bottom-0 z-50 w-72 max-w-[85vw] bg-surface border-r border-border flex flex-col md:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chat menu"
+          >
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+              <Logo variant="color" size={18} />
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={handleSearchClick}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    searchOpen ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
+                  }`}
+                  aria-label="Search chats"
+                >
+                  <Search size={13} />
+                </button>
+                <button
+                  onClick={onMobileClose}
+                  className="p-1.5 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+                  aria-label="Close menu"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            {sidebarBody}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
+  return (
+    <>
+      {desktopSidebar}
+      {mobileDrawer}
+    </>
   );
 }

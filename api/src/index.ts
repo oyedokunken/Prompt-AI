@@ -8,6 +8,11 @@ import { prisma } from "./lib/prisma";
 
 const app = express();
 
+// Vercel sits in front of every request as a proxy, so Express must trust
+// its X-Forwarded-For header -- otherwise express-rate-limit cannot tell
+// requesters apart and logs a validation error on every single request.
+app.set("trust proxy", 1);
+
 // ---------------------------------------------------------------------------
 // Security headers
 // ---------------------------------------------------------------------------
@@ -63,7 +68,7 @@ app.use((_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Startup (local dev only — Vercel handles the listener in serverless mode)
+// Startup (local dev only, Vercel handles the listener in serverless mode)
 // ---------------------------------------------------------------------------
 async function start(): Promise<void> {
   app.listen(env.PORT, () => {

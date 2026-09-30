@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text: transcription.text });
   } catch (err) {
     console.error("[transcribe] OpenAI error:", err);
-    return NextResponse.json({ error: "Could not transcribe audio" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Could not transcribe audio";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

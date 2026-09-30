@@ -12,7 +12,7 @@ interface IncomingAttachment {
 
 // ---------------------------------------------------------------------------
 // POST /api/chat
-// Accepts { session_id, content } — saves the user message, generates a
+// Accepts { session_id, content }, saves the user message, generates a
 // structured prompt response, saves the AI message, and returns both.
 //
 // Priority order for AI generation:
@@ -25,7 +25,7 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-const SYSTEM_PROMPT = `You are Prompt AI — an expert at transforming vague user requests into detailed, structured prompts optimised for AI tools.
+const SYSTEM_PROMPT = `You are Prompt AI, an expert at transforming vague user requests into detailed, structured prompts optimised for AI tools.
 
 Given any user input, analyse their intent and respond with a JSON object in this exact format:
 {
@@ -42,17 +42,17 @@ Given any user input, analyse their intent and respond with a JSON object in thi
 }
 
 Scoring guide (0–100):
-- 20–40  Vague, single phrase, no context — many assumptions needed
+- 20–40  Vague, single phrase, no context, many assumptions needed
 - 41–60  Some context but key specifics are missing
 - 61–80  Good detail with minor gaps filled by reasonable assumptions
-- 81–100 Highly specific — little to no inferencing required
+- 81–100 Highly specific, little to no inferencing required
 
 Rules:
 - "title" must summarise the task itself, not restate that it is a prompt, for example "Rate limiting middleware" rather than "Prompt about rate limiting".
 - "content" must be a complete, production-ready prompt the user can paste directly into any AI tool.
 - Use markdown headers, bold labels, and bullet lists inside "content" for readability.
 - Always list every assumption you made, however small.
-- Respond ONLY with valid JSON — no prose outside the object.`;
+- Respond ONLY with valid JSON, no prose outside the object.`;
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
-// Response generator — tries OpenAI → DATA_SERVICE_URL → local fallback
+// Response generator: tries OpenAI, then DATA_SERVICE_URL, then local fallback
 // ---------------------------------------------------------------------------
 interface GeneratedPrompt {
   title?: string;
@@ -177,7 +177,7 @@ async function generateResponse(
   model: string,
   attachments: IncomingAttachment[]
 ): Promise<GeneratedPrompt> {
-  // 1 — OpenAI (real structured output)
+  // 1: OpenAI (real structured output)
   if (openai) {
     try {
       // Fall back to gpt-4o for any target model we don't have a real
@@ -188,7 +188,7 @@ async function generateResponse(
       const imageAttachments = attachments.filter((a) => a.dataUrl);
       const otherAttachments = attachments.filter((a) => !a.dataUrl);
       const otherNote = otherAttachments.length
-        ? `\n\n[Attached: ${otherAttachments.map((a) => a.name).join(", ")} — these file types cannot be read as context yet, only their names are known.]`
+        ? `\n\n[Attached: ${otherAttachments.map((a) => a.name).join(", ")}, these file types cannot be read as context yet, only their names are known.]`
         : "";
 
       const userContent =
@@ -230,11 +230,11 @@ async function generateResponse(
       }
       console.error("[chat] OpenAI returned an incomplete response, falling back:", result);
     } catch (err) {
-      console.error("[chat] OpenAI error — falling back to local generator:", err);
+      console.error("[chat] OpenAI error, falling back to local generator:", err);
     }
   }
 
-  // 2 — Proxy to /data service
+  // 2: Proxy to /data service
   const dataServiceUrl = process.env.DATA_SERVICE_URL;
   if (dataServiceUrl) {
     try {
@@ -249,11 +249,11 @@ async function generateResponse(
       if (res.ok) return (await res.json()) as GeneratedPrompt;
       console.error("[chat] DATA_SERVICE returned an error status:", res.status);
     } catch (err) {
-      console.error("[chat] DATA_SERVICE error — falling back to local generator:", err);
+      console.error("[chat] DATA_SERVICE error, falling back to local generator:", err);
     }
   }
 
-  // 3 — Local heuristic fallback
+  // 3: Local heuristic fallback
   return buildStructuredPrompt(userInput);
 }
 
@@ -280,7 +280,7 @@ function buildStructuredPrompt(userInput: string): GeneratedPrompt {
   if (!hasRole) assumptions.push("Role and expertise level inferred from context");
   if (!hasTarget) assumptions.push("Target tool or platform assumed from common usage patterns");
   if (!hasFormat) assumptions.push("Output format defaulted to structured text");
-  if (!hasConstraint) assumptions.push("No explicit constraints detected — sensible defaults applied");
+  if (!hasConstraint) assumptions.push("No explicit constraints detected, sensible defaults applied");
 
   const structured = {
     role: hasRole ? "Domain expert (as referenced in your input)" : "Expert assistant in the relevant domain",
