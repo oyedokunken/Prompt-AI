@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck } from "lucide-react";
 import type { ChatMessage } from "@/lib/types/chat";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onSave?: (message: ChatMessage) => void;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -47,9 +48,10 @@ function formatContent(raw: string) {
   });
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onSave }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
+  const [saved, setSaved] = useState(false);
   const isUser = message.role === "user";
   const meta = message.metadata;
 
@@ -57,6 +59,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSave = () => {
+    if (saved || !onSave) return;
+    onSave(message);
+    setSaved(true);
   };
 
   if (isUser) {
@@ -104,6 +112,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           >
             {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
           </button>
+
+          {/* Save to library */}
+          {onSave && (
+            <button
+              onClick={handleSave}
+              disabled={saved}
+              className={`p-0.5 transition-colors ${saved ? "text-accent" : "text-text-faint hover:text-text-muted"}`}
+              aria-label={saved ? "Saved to library" : "Save to library"}
+            >
+              {saved ? <BookmarkCheck size={11} /> : <BookmarkPlus size={11} />}
+            </button>
+          )}
 
           {/* Toggle assumptions */}
           {meta.assumptions && meta.assumptions.length > 0 && (

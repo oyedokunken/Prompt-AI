@@ -3,8 +3,34 @@ export interface ChatSession {
   user_id: string;
   title: string;
   model: string;
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface SavedPrompt {
+  id: string;
+  user_id: string;
+  session_id: string | null;
+  message_id: string | null;
+  title: string;
+  content: string;
+  score: number | null;
+  assumptions: string[];
+  structured: Record<string, unknown>;
+  is_favorite: boolean;
+  created_at: string;
+}
+
+export interface SharedLink {
+  id: string;
+  token: string;
+  user_id: string;
+  target_type: "session" | "export";
+  session_id: string;
+  export_format: ExportFormat | null;
+  revoked: boolean;
+  created_at: string;
 }
 
 export interface PromptMetadata {
@@ -34,7 +60,7 @@ export interface ChatMessage {
 }
 
 export type ExportFormat = "markdown" | "json" | "txt" | "pdf";
-export type SidebarPanel = "history" | "media" | "exports";
+export type SidebarPanel = "history" | "media" | "exports" | "saved" | "favorites";
 
 // openaiModel is null for targets we cannot actually call yet (no provider
 // key configured) -- the selector disables those rather than silently

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile, providerLabel, roleLabel, ROLE_OPTIONS } from "@/lib/hooks/useUserProfile";
 import { useUsageStats } from "@/lib/hooks/useUsageStats";
+import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ProviderIcon } from "@/components/ProviderIcon";
@@ -21,6 +22,7 @@ export default function SettingsPage() {
   const supabase = createClient();
   const { profile, refresh } = useUserProfile();
   const usage = useUsageStats();
+  const { savedPrompts, toggleFavorite: toggleSavedFavorite, remove: removeSavedPrompt } = useSavedPrompts();
   const { theme } = useTheme();
 
   const [tab, setTab] = useState<SettingsTab>("profile");
@@ -124,6 +126,14 @@ export default function SettingsPage() {
     router.push("/login");
   };
 
+  const handleToggleSessionFavorite = async (id: string, next: boolean) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_favorite: next } : s)));
+    const { error: toggleError } = await supabase.from("chat_sessions").update({ is_favorite: next }).eq("id", id);
+    if (toggleError) {
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_favorite: !next } : s)));
+    }
+  };
+
   const buildSummary = (): string => {
     if (usage.totalPrompts === 0) {
       return "You have not generated any prompts yet. Start a conversation to see your usage here.";
@@ -167,10 +177,16 @@ export default function SettingsPage() {
         }}
         username={profile.username}
         avatarUrl={profile.avatarUrl}
-        onSettings={() => {}}
+        onSettings={() => router.push("/settings")}
         onSignOut={() => setShowLogoutConfirm(true)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        preferredName={profile.preferredName}
+        roleDisplay={roleLabel(profile.role)}
+        onToggleSessionFavorite={handleToggleSessionFavorite}
+        savedPrompts={savedPrompts}
+        onToggleSavedFavorite={toggleSavedFavorite}
+        onDeleteSavedPrompt={removeSavedPrompt}
       />
 
       <div className="flex-1 flex flex-col min-w-0">

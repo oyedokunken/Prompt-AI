@@ -4,12 +4,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { useUserProfile } from "@/lib/hooks/useUserProfile";
+import { useUserProfile, roleLabel } from "@/lib/hooks/useUserProfile";
 import { useExportHistory } from "@/lib/hooks/useExportHistory";
+import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
+import { useSharedLinks } from "@/lib/hooks/useSharedLinks";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
 import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
+import { CommandPalette } from "@/components/dashboard/CommandPalette";
+import { ShareMenu } from "@/components/dashboard/ShareMenu";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
@@ -185,6 +189,8 @@ export default function DashboardPage() {
   // Auth
   const { profile } = useUserProfile();
   const { records: exportHistory, refresh: refreshExportHistory } = useExportHistory();
+  const { savedPrompts, save: savePrompt, toggleFavorite: toggleSavedFavorite, remove: removeSavedPrompt } = useSavedPrompts();
+  const { links: sharedLinks, createLink: createShareLink, revoke: revokeShareLink } = useSharedLinks();
 
   // Sessions + messages
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -201,6 +207,20 @@ export default function DashboardPage() {
   const [pendingAttachments, setPendingAttachments] = useState<UploadedAttachment[]>([]);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ── Command palette (Cmd+K / Ctrl+K) ──────────────────────────────────
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────
 
@@ -476,6 +496,33 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Favorites + saved prompts ──────────────────────────────────────────
+
+  const handleToggleSessionFavorite = async (id: string, next: boolean) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_favorite: next } : s)));
+    if (activeSession?.id === id) setActiveSession((prev) => (prev ? { ...prev, is_favorite: next } : prev));
+    const { error: toggleError } = await supabase.from("chat_sessions").update({ is_favorite: next }).eq("id", id);
+    if (toggleError) {
+      console.error("[dashboard] handleToggleSessionFavorite failed:", toggleError);
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_favorite: !next } : s)));
+    }
+  };
+
+  const handleSaveMessage = (message: ChatMessage) => {
+    savePrompt(activeSession?.id ?? null, message);
+  };
+
+  // ── Sharing ────────────────────────────────────────────────────────────
+
+  const activeShareLink = activeSession
+    ? sharedLinks.find((l) => l.session_id === activeSession.id && !l.revoked) ?? null
+    : null;
+
+  const handleCreateShareLink = async () => {
+    if (!activeSession) return;
+    await createShareLink(activeSession.id, "session");
+  };
+
   // ── Sign out ───────────────────────────────────────────────────────────
 
   const handleSignOut = async () => {
@@ -512,6 +559,13 @@ export default function DashboardPage() {
         </span>
 
         <div className="flex items-center gap-2">
+          <ShareMenu
+            disabled={!activeSession || messages.length === 0}
+            activeLink={activeShareLink}
+            onCreate={handleCreateShareLink}
+            onRevoke={revokeShareLink}
+            siteUrl={typeof window !== "undefined" ? window.location.origin : ""}
+          />
           <ExportMenu
             disabled={!activeSession || messages.length === 0}
             onExport={handleExport}
@@ -520,6 +574,19 @@ export default function DashboardPage() {
           />
           <ModelSelector model={selectedModel} onSelect={handleModelChange} />
           <ThemeToggle size={13} className="w-7 h-7" />
+          <button
+            onClick={() => router.push("/settings")}
+            className="w-7 h-7 rounded-full overflow-hidden border border-border hover:border-accent/40 transition-colors shrink-0"
+            aria-label="Open settings"
+          >
+            {profile?.avatarUrl ? (
+              <img src={profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-accent/15 flex items-center justify-center text-[10px] text-accent font-mono">
+                {(profile?.username ?? "U")[0]?.toUpperCase()}
+              </div>
+            )}
+          </button>
         </div>
       </header>
 
@@ -543,6 +610,12 @@ export default function DashboardPage() {
           onAttach={(file) => handleAttach([file])}
           attachments={attachmentLibrary}
           exportHistory={exportHistory}
+          preferredName={profile?.preferredName}
+          roleDisplay={roleLabel(profile?.role ?? null)}
+          onToggleSessionFavorite={handleToggleSessionFavorite}
+          savedPrompts={savedPrompts}
+          onToggleSavedFavorite={toggleSavedFavorite}
+          onDeleteSavedPrompt={removeSavedPrompt}
         />
 
         {/* ── Main area ── */}
@@ -567,7 +640,7 @@ export default function DashboardPage() {
             ) : (
               <>
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
+                  <MessageBubble key={m.id} message={m} onSave={m.role === "assistant" ? handleSaveMessage : undefined} />
                 ))}
                 {isLoading && <GenerationStatus />}
               </>
@@ -615,6 +688,18 @@ export default function DashboardPage() {
         danger
         onConfirm={handleSignOut}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        sessions={sessions}
+        onSelectSession={selectSession}
+        onNewChat={handleNewChat}
+        onSettings={() => router.push("/settings")}
+        onSignOut={() => setShowLogoutConfirm(true)}
+        onOpenSaved={() => setSidebarPanel("saved")}
+        onOpenFavorites={() => setSidebarPanel("favorites")}
       />
     </div>
   );
