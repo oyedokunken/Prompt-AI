@@ -11,6 +11,7 @@ This folder will grow over time. For now, the primary project documentation live
 - `SECURITY.md`, how to report vulnerabilities
 - `CHANGELOG.md`, a record of notable changes by version
 - `WIKI.md`, index and starting point for deeper reference material
+- `keep-alive.md`, what the GitHub Actions keep-alive workflow does and which repository secrets it needs
 
 ## Planned Additions
 

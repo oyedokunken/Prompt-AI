@@ -1,0 +1,130 @@
+name: Keep Alive - Render and Supabase
+
+# Keeps the two free tier backend services warm so a visitor's first
+# request never has to wait on a cold start.
+#
+# Render (data service): spins down after about 15 minutes of no
+# incoming traffic on the free tier. A ping every 10 minutes keeps it
+# from ever hitting that threshold.
+#
+# Supabase: pauses the whole project after 7 days with no API activity
+# on the free tier. A plain network request does not count as activity,
+# it has to be a real authenticated call to the REST API, so this
+# workflow runs a minimal select against the chat_sessions table with
+# the project's anon key on every run. Row level security means an
+# unauthenticated anon request always gets back an empty result rather
+# than real data, which is fine, this call only needs to register as
+# project activity, not return anything.
+#
+# Vercel is intentionally not pinged here. Vercel serverless functions
+# are invoked on demand and there is no persistent process that idles
+# out on its free tier, so there is nothing for a keep-alive to prevent
+# there.
+#
+# Required repository secrets (Settings, Secrets and variables, Actions):
+#   SUPABASE_URL         the project's Supabase URL
+#   SUPABASE_ANON_KEY    the project's public anon key
+# Without these two secrets set, the Supabase ping step will skip
+# itself and log that the secrets are missing, it will not error out
+# the whole run.
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub Actions scheduled runs are not
+    # guaranteed to fire at the exact minute and can be delayed several
+    # minutes when the shared runner queue is busy, so this interval is
+    # deliberately tighter than Render's 15 minute idle threshold to
+    # leave a safety margin. Do not loosen this interval.
+    - cron: "*/10 * * * *"
+  # Lets this be run on demand from the Actions tab for testing. The
+  # schedule above is what actually keeps the services warm, this
+  # trigger is only here to validate the workflow without waiting for
+  # the next scheduled slot.
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render data service
+        id: render
+        continue-on-error: true
+        run: |
+          set +e
+          start_ms=$(date +%s%3N)
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://prompt-ai-data.onrender.com/health")
+          curl_exit=$?
+          end_ms=$(date +%s%3N)
+          elapsed_ms=$((end_ms - start_ms))
+
+          echo "time_ms=${elapsed_ms}" >> "$GITHUB_OUTPUT"
+
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "status=timeout" >> "$GITHUB_OUTPUT"
+            echo "Render ping did not complete, curl exit code ${curl_exit}, elapsed ${elapsed_ms}ms"
+            exit 1
+          fi
+
+          echo "status=${http_code}" >> "$GITHUB_OUTPUT"
+          echo "Render responded ${http_code} in ${elapsed_ms}ms"
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Non 2xx response from Render, this is treated as a failed step but not a failed run, Render can briefly return this while waking up"
+            exit 1
+          fi
+
+      - name: Ping Supabase REST endpoint
+        id: supabase
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set +e
+
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "status=secrets_missing" >> "$GITHUB_OUTPUT"
+            echo "time_ms=0" >> "$GITHUB_OUTPUT"
+            echo "Supabase ping skipped, SUPABASE_URL or SUPABASE_ANON_KEY repository secret is not set"
+            exit 1
+          fi
+
+          start_ms=$(date +%s%3N)
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "${SUPABASE_URL%/}/rest/v1/chat_sessions?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          curl_exit=$?
+          end_ms=$(date +%s%3N)
+          elapsed_ms=$((end_ms - start_ms))
+
+          echo "time_ms=${elapsed_ms}" >> "$GITHUB_OUTPUT"
+
+          if [ "$curl_exit" -ne 0 ]; then
+            echo "status=timeout" >> "$GITHUB_OUTPUT"
+            echo "Supabase ping did not complete, curl exit code ${curl_exit}, elapsed ${elapsed_ms}ms"
+            exit 1
+          fi
+
+          echo "status=${http_code}" >> "$GITHUB_OUTPUT"
+          echo "Supabase responded ${http_code} in ${elapsed_ms}ms"
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Non 2xx response from Supabase REST endpoint"
+            exit 1
+          fi
+
+      - name: Print run summary
+        if: always()
+        run: |
+          {
+            echo "### Keep alive run summary"
+            echo ""
+            echo "| Service | Status | Response time |"
+            echo "| --- | --- | --- |"
+            echo "| Render data service | ${{ steps.render.outputs.status }} | ${{ steps.render.outputs.time_ms }}ms |"
+            echo "| Supabase REST endpoint | ${{ steps.supabase.outputs.status }} | ${{ steps.supabase.outputs.time_ms }}ms |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Render: status=${{ steps.render.outputs.status }} time=${{ steps.render.outputs.time_ms }}ms"
+          echo "Supabase: status=${{ steps.supabase.outputs.status }} time=${{ steps.supabase.outputs.time_ms }}ms"
