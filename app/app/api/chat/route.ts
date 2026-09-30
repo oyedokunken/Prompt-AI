@@ -63,13 +63,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { session_id, content, attachment } = (await req.json()) as {
+  const { session_id, content, attachments } = (await req.json()) as {
     session_id: string;
     content: string;
-    attachment?: IncomingAttachment;
+    attachments?: IncomingAttachment[];
   };
 
-  if (!session_id || !(content?.trim() || attachment)) {
+  if (!session_id || !(content?.trim() || attachments?.length)) {
     return NextResponse.json({ error: "Missing session_id or content" }, { status: 400 });
   }
 
@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
       session_id,
       role: "user",
       content: content.trim(),
-      metadata: attachment
-        ? { attachment: { name: attachment.name, type: attachment.type, path: attachment.path, usedAsContext: !!attachment.dataUrl } }
+      metadata: attachments?.length
+        ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
         : {},
     })
     .select()
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate the structured prompt response
-  const aiResponse = await generateResponse(content.trim(), session.model, attachment ?? null);
+  const aiResponse = await generateResponse(content.trim(), session.model, attachments ?? []);
 
   // Persist the AI message
   const { data: aiMsg, error: aiMsgError } = await supabase
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
 async function generateResponse(
   userInput: string,
   model: string,
-  attachment: IncomingAttachment | null
+  attachments: IncomingAttachment[]
 ): Promise<{ content: string; score: number; assumptions: string[]; structured: Record<string, unknown> }> {
   // 1 — OpenAI (real structured output)
   if (openai) {
@@ -161,15 +161,19 @@ async function generateResponse(
       // older sessions may still carry one as their stored value.
       const resolvedModel = MODELS.find((m) => m.id === model)?.openaiModel ?? "gpt-4o";
 
+      const imageAttachments = attachments.filter((a) => a.dataUrl);
+      const otherAttachments = attachments.filter((a) => !a.dataUrl);
+      const otherNote = otherAttachments.length
+        ? `\n\n[Attached: ${otherAttachments.map((a) => a.name).join(", ")} — these file types cannot be read as context yet, only their names are known.]`
+        : "";
+
       const userContent =
-        attachment?.dataUrl
+        imageAttachments.length > 0
           ? [
-              { type: "text" as const, text: userInput },
-              { type: "image_url" as const, image_url: { url: attachment.dataUrl } },
+              { type: "text" as const, text: userInput + otherNote },
+              ...imageAttachments.map((a) => ({ type: "image_url" as const, image_url: { url: a.dataUrl as string } })),
             ]
-          : attachment
-          ? `${userInput}\n\n[Attached file: ${attachment.name} — this file type cannot be read as context yet, only its name is known.]`
-          : userInput;
+          : userInput + otherNote;
 
       const completion = await openai.chat.completions.create({
         model: resolvedModel,

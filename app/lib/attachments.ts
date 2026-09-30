@@ -7,6 +7,7 @@ export interface UploadedAttachment {
   path: string;
   publicUrl: string;
   dataUrl: string | null;
+  size: number;
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -42,5 +43,5 @@ export async function uploadAttachment(userId: string, file: File): Promise<Uplo
   // Only images are sent as real model context (GPT-4o vision input).
   const dataUrl = kind === "image" ? await fileToDataUrl(file) : null;
 
-  return { name: file.name, type: file.type, path: `${bucket}/${path}`, publicUrl: data.publicUrl, dataUrl };
+  return { name: file.name, type: file.type, path: `${bucket}/${path}`, publicUrl: data.publicUrl, dataUrl, size: file.size };
 }

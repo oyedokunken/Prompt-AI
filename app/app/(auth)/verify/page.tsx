@@ -83,24 +83,38 @@ function VerifyForm() {
       return;
     }
     if (!email) {
-      setError("Email address is missing. Return to signup and try again.");
+      setError("Email address is missing. Return to login and try again.");
       return;
     }
     setIsSubmitting(true);
     setError(null);
     try {
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: "signup",
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: code }),
       });
-      if (verifyError) {
-        setError(verifyError.message || "The code is incorrect or has expired.");
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.message ?? "The code is incorrect or has expired.");
         setDigits(Array(CODE_LENGTH).fill(""));
         setTimeout(() => focusAt(0), 50);
         return;
       }
+
+      // Redeem the bridge token for a real Supabase session -- this is what
+      // the dashboard, chat, and storage actually check.
+      const supabase = createClient();
+      const { error: bridgeError } = await supabase.auth.verifyOtp({
+        email: json.email,
+        token_hash: json.tokenHash,
+        type: "magiclink",
+      });
+      if (bridgeError) {
+        setError("Could not complete sign in. Try again.");
+        return;
+      }
+
       setVerified(true);
     } catch {
       setError("Unable to reach the server. Check your connection.");
@@ -116,8 +130,15 @@ function VerifyForm() {
     setError(null);
     setTimeout(() => focusAt(0), 50);
     try {
-      const supabase = createClient();
-      await supabase.auth.resend({ type: "signup", email });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/otp/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.status === 429) {
+        const json = await res.json();
+        setCooldown(json.retryAfterSeconds ?? RESEND_COOLDOWN);
+      }
     } catch {
       // Resend is best-effort -- the UI already reset the cooldown
     }
@@ -233,7 +254,7 @@ function VerifyForm() {
               Verifying...
             </>
           ) : (
-            "Verify email"
+            "Continue"
           )}
         </button>
 

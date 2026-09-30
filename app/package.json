@@ -13,6 +13,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "clsx": "^2.1.1",
+    "emoji-picker-react": "^4.22.3",
     "framer-motion": "^11.3.19",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.414.0",

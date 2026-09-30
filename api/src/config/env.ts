@@ -34,7 +34,13 @@ const envSchema = z.object({
   // SMTP (optional — server starts without these but OTP emails won't send)
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  // z.coerce.boolean() would treat the string "false" as truthy (any
+  // non-empty string coerces to true), which silently forced implicit TLS
+  // on a STARTTLS port and broke every send. Compare the raw string instead.
+  SMTP_SECURE: z
+    .string()
+    .default("false")
+    .transform((v) => v.toLowerCase() === "true"),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().default("noreply@prompt.ai"),

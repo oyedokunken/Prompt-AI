@@ -2,24 +2,12 @@
 
 import { useState, useEffect, Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { cn } from "@/lib/utils";
-
-const schema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
-
-type FormData = z.infer<typeof schema>;
+import { EmailMagicLinkForm } from "@/components/auth/EmailMagicLinkForm";
+import { AnimatePresence, motion } from "framer-motion";
 
 type OAuthProvider = "google" | "github";
 
@@ -53,13 +41,11 @@ const GITHUB_ICON = (
 );
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [lastUsed, setLastUsed] = useState<string | null>(null);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const [emailExpanded, setEmailExpanded] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(LAST_USED_KEY);
@@ -69,43 +55,6 @@ function LoginForm() {
       setServerError("OAuth sign-in failed. Please try again.");
     }
   }, [searchParams]);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    mode: "onBlur",
-  });
-
-  const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true);
-    setServerError(null);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-      if (error) {
-        if (error.message.toLowerCase().includes("email not confirmed")) {
-          router.push(`/verify?email=${encodeURIComponent(data.email)}`);
-          return;
-        }
-        setServerError(error.message || "Login failed. Check your credentials.");
-        return;
-      }
-      localStorage.setItem(LAST_USED_KEY, "email");
-      const next = searchParams.get("next") ?? "/dashboard";
-      router.push(next);
-      router.refresh();
-    } catch {
-      setServerError("Unable to reach the server. Check your connection.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleOAuth = async (provider: OAuthProvider) => {
     setOauthLoading(provider);
@@ -123,7 +72,6 @@ function LoginForm() {
         return;
       }
       localStorage.setItem(LAST_USED_KEY, provider);
-      // Page will redirect to provider -- no need to clear oauthLoading
     } catch {
       setServerError("OAuth sign-in could not be initiated.");
       setOauthLoading(null);
@@ -146,30 +94,36 @@ function LoginForm() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 mb-6">
-        <OAuthButton
-          icon={GOOGLE_ICON}
-          label="Continue with Google"
-          onClick={() => handleOAuth("google")}
-          loading={oauthLoading === "google"}
-          disabled={!!oauthLoading || isSubmitting}
-          lastUsed={lastUsed === "google"}
-        />
-        <OAuthButton
-          icon={GITHUB_ICON}
-          label="Continue with GitHub"
-          onClick={() => handleOAuth("github")}
-          loading={oauthLoading === "github"}
-          disabled={!!oauthLoading || isSubmitting}
-          lastUsed={lastUsed === "github"}
-        />
-      </div>
-
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-text-faint font-mono">or</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
+      <AnimatePresence initial={false}>
+        {!emailExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-3 mb-4">
+              <OAuthButton
+                icon={GOOGLE_ICON}
+                label="Continue with Google"
+                onClick={() => handleOAuth("google")}
+                loading={oauthLoading === "google"}
+                disabled={!!oauthLoading}
+                lastUsed={lastUsed === "google"}
+              />
+              <OAuthButton
+                icon={GITHUB_ICON}
+                label="Continue with GitHub"
+                onClick={() => handleOAuth("github")}
+                loading={oauthLoading === "github"}
+                disabled={!!oauthLoading}
+                lastUsed={lastUsed === "github"}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {serverError && (
         <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mb-4" role="alert">
@@ -177,107 +131,7 @@ function LoginForm() {
         </p>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium text-text-primary"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            className={cn(
-              "w-full px-3.5 py-2.5 rounded-lg bg-surface border text-sm text-text-primary placeholder:text-text-faint font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors",
-              errors.email ? "border-red-500/60" : "border-border focus:border-accent/40"
-            )}
-            {...register("email")}
-          />
-          {errors.email && (
-            <p className="text-xs text-red-400" role="alert">
-              {errors.email.message}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-text-primary"
-            >
-              Password
-            </label>
-          </div>
-          <div className="relative">
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              placeholder="Your password"
-              className={cn(
-                "w-full px-3.5 py-2.5 pr-10 rounded-lg bg-surface border text-sm text-text-primary placeholder:text-text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors",
-                errors.password
-                  ? "border-red-500/60"
-                  : "border-border focus:border-accent/40"
-              )}
-              {...register("password")}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-faint hover:text-text-muted transition-colors focus-visible:outline-accent rounded"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="text-xs text-red-400" role="alert">
-              {errors.password.message}
-            </p>
-          )}
-        </div>
-
-        <div className="flex justify-end">
-          <Link
-            href="/forgot-password"
-            className="text-xs text-text-faint hover:text-text-muted transition-colors focus-visible:outline-accent rounded"
-          >
-            Forgot password?
-          </Link>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting || !!oauthLoading}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            isSubmitting || !!oauthLoading
-              ? "bg-accent/40 cursor-not-allowed"
-              : "bg-accent hover:bg-accent/90"
-          )}
-          style={{ color: "#0A0A0B" }}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 size={14} className="animate-spin" />
-              Logging in...
-            </>
-          ) : (
-            "Log in"
-          )}
-        </button>
-
-        {lastUsed === "email" && (
-          <p className="text-center text-xs text-text-faint">
-            Last used: email and password
-          </p>
-        )}
-      </form>
+      <EmailMagicLinkForm expanded={emailExpanded} onExpandedChange={setEmailExpanded} />
 
       <p className="text-center text-sm text-text-muted mt-6">
         New here?{" "}
@@ -292,14 +146,6 @@ function LoginForm() {
   );
 }
 
-export default function LoginPage() {
-  return (
-    <Suspense fallback={null}>
-      <LoginForm />
-    </Suspense>
-  );
-}
-
 interface OAuthButtonProps {
   icon: ReactNode;
   label: string;
@@ -309,31 +155,19 @@ interface OAuthButtonProps {
   lastUsed: boolean;
 }
 
-function OAuthButton({
-  icon,
-  label,
-  onClick,
-  loading,
-  disabled,
-  lastUsed,
-}: OAuthButtonProps) {
+function OAuthButton({ icon, label, onClick, loading, disabled, lastUsed }: OAuthButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        "relative w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors focus-visible:outline-accent",
+      className={`relative w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors focus-visible:outline-accent ${
         disabled
           ? "opacity-50 cursor-not-allowed border-border text-text-faint"
           : "border-border text-text-muted hover:text-text-primary hover:bg-raised hover:border-border/60"
-      )}
+      }`}
     >
-      {loading ? (
-        <Loader2 size={15} className="animate-spin text-text-faint" />
-      ) : (
-        icon
-      )}
+      {loading ? <Loader2 size={15} className="animate-spin text-text-faint" /> : icon}
       {label}
       {lastUsed && !loading && (
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono px-1.5 py-0.5 rounded border border-accent/30 text-accent bg-accent/5 leading-none">
@@ -341,5 +175,13 @@ function OAuthButton({
         </span>
       )}
     </button>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

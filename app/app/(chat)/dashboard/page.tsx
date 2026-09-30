@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Zap, X } from "lucide-react";
+import { ChevronDown, Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile } from "@/lib/hooks/useUserProfile";
+import { useExportHistory } from "@/lib/hooks/useExportHistory";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ChatInput } from "@/components/dashboard/ChatInput";
@@ -14,7 +15,7 @@ import { exportSession } from "@/lib/export";
 import type {
   ChatSession, ChatMessage, SidebarPanel, ExportFormat,
 } from "@/lib/types/chat";
-import { MODELS } from "@/lib/types/chat";
+import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION } from "@/lib/types/chat";
 
 // ─── Model selector ────────────────────────────────────────────────────────
 
@@ -61,6 +62,71 @@ function ModelSelector({
                 )}
               </button>
             ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Export menu (per conversation, lives in the chat header) ──────────────
+
+function ExportMenu({
+  disabled, onExport, onCopyMarkdown, copied,
+}: {
+  disabled: boolean;
+  onExport: (format: ExportFormat) => void;
+  onCopyMarkdown: () => void;
+  copied: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-raised text-text-muted hover:text-text-primary hover:border-border/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        aria-label="Export conversation"
+      >
+        <Download size={11} />
+        <span className="font-mono text-[10px]">Export</span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden py-1">
+            <button
+              onClick={() => { onCopyMarkdown(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-muted hover:bg-raised transition-colors"
+            >
+              {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+              {copied ? "Copied" : "Copy as Markdown"}
+            </button>
+            <button
+              onClick={() => { onExport("pdf"); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-muted hover:bg-raised transition-colors"
+            >
+              <FileType size={11} /> Download PDF
+            </button>
+            <button
+              onClick={() => { onExport("markdown"); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-muted hover:bg-raised transition-colors"
+            >
+              <FileDown size={11} /> Download Markdown
+            </button>
+            <button
+              onClick={() => { onExport("txt"); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-muted hover:bg-raised transition-colors"
+            >
+              <FileText size={11} /> Download plain text
+            </button>
+            <button
+              onClick={() => { onExport("json"); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-text-muted hover:bg-raised transition-colors"
+            >
+              <FileJson size={11} /> Download JSON
+            </button>
           </div>
         </>
       )}
@@ -136,6 +202,7 @@ export default function DashboardPage() {
 
   // Auth
   const { profile } = useUserProfile();
+  const { records: exportHistory, refresh: refreshExportHistory } = useExportHistory();
 
   // Sessions + messages
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -149,8 +216,9 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<(typeof MODELS)[number]>(MODELS[0]);
   const [error, setError] = useState<string | null>(null);
-  const [pendingAttachment, setPendingAttachment] = useState<UploadedAttachment | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<UploadedAttachment[]>([]);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────
 
@@ -187,6 +255,7 @@ export default function DashboardPage() {
 
   const selectSession = async (session: ChatSession) => {
     setActiveSession(session);
+    setPendingAttachments([]);
     const { data } = await supabase
       .from("messages")
       .select("*")
@@ -208,6 +277,7 @@ export default function DashboardPage() {
       setSessions((prev) => [session, ...prev]);
       setActiveSession(session);
       setMessages([]);
+      setPendingAttachments([]);
     }
   };
 
@@ -222,23 +292,45 @@ export default function DashboardPage() {
 
   // ── Attachments ────────────────────────────────────────────────────────
 
-  const handleAttach = async (file: File) => {
+  const handleAttach = async (files: File[]) => {
     if (!profile) return;
     setError(null);
-    try {
-      const uploaded = await uploadAttachment(profile.id, file);
-      setPendingAttachment(uploaded);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+
+    if (pendingAttachments.length + files.length > MAX_FILES_PER_MESSAGE) {
+      setError(`You can attach up to ${MAX_FILES_PER_MESSAGE} files per message.`);
+      return;
     }
+
+    let runningTotal = pendingAttachments.reduce((sum, a) => sum + a.size, 0);
+
+    for (const file of files) {
+      if (runningTotal + file.size > MAX_ATTACHMENT_BYTES_PER_CONVERSATION) {
+        setError(
+          `This conversation's attachments would exceed the ${Math.round(MAX_ATTACHMENT_BYTES_PER_CONVERSATION / (1024 * 1024))}MB limit. Remove a file or start a new chat.`
+        );
+        break;
+      }
+      try {
+        const uploaded = await uploadAttachment(profile.id, file);
+        runningTotal += file.size;
+        setPendingAttachments((prev) => [...prev, uploaded]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+        break;
+      }
+    }
+  };
+
+  const removePendingAttachment = (path: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.path !== path));
   };
 
   // ── Message send ───────────────────────────────────────────────────────
 
   const handleSend = async (override?: string) => {
     const content = (override ?? inputValue).trim();
-    if ((!content && !pendingAttachment) || isLoading) return;
-    const attachment = pendingAttachment;
+    if ((!content && pendingAttachments.length === 0) || isLoading) return;
+    const attachments = pendingAttachments;
 
     // If no session exists yet, create one
     let session = activeSession;
@@ -257,7 +349,7 @@ export default function DashboardPage() {
     }
 
     setInputValue("");
-    setPendingAttachment(null);
+    setPendingAttachments([]);
     setIsLoading(true);
     setError(null);
 
@@ -270,8 +362,8 @@ export default function DashboardPage() {
         session_id: session!.id,
         role: "user",
         content,
-        metadata: attachment
-          ? { attachment: { name: attachment.name, type: attachment.type, path: attachment.path, usedAsContext: !!attachment.dataUrl } }
+        metadata: attachments.length
+          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
           : {},
         created_at: new Date().toISOString(),
       },
@@ -284,8 +376,8 @@ export default function DashboardPage() {
         body: JSON.stringify({
           session_id: session!.id,
           content,
-          attachment: attachment
-            ? { name: attachment.name, type: attachment.type, path: attachment.path, dataUrl: attachment.dataUrl }
+          attachments: attachments.length
+            ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl }))
             : undefined,
         }),
       });
@@ -320,14 +412,18 @@ export default function DashboardPage() {
 
   // ── Export ─────────────────────────────────────────────────────────────
 
-  const handleExport = (format: ExportFormat) => {
+  const handleExport = async (format: ExportFormat) => {
     if (!activeSession || messages.length === 0) return;
-    exportSession(activeSession, messages, format);
+    await exportSession(activeSession, messages, format);
+    refreshExportHistory();
   };
 
-  const handleCopyMarkdown = () => {
+  const handleCopyMarkdown = async () => {
     if (!activeSession || messages.length === 0) return;
-    exportSession(activeSession, messages, "markdown", { copyOnly: true });
+    await exportSession(activeSession, messages, "markdown", { copyOnly: true });
+    setCopiedMarkdown(true);
+    setTimeout(() => setCopiedMarkdown(false), 2000);
+    refreshExportHistory();
   };
 
   // ── Model change ───────────────────────────────────────────────────────
@@ -350,9 +446,8 @@ export default function DashboardPage() {
   };
 
   const attachmentLibrary = messages
-    .filter((m) => m.metadata.attachment)
-    .map((m) => {
-      const att = m.metadata.attachment!;
+    .flatMap((m) => m.metadata.attachments ?? [])
+    .map((att) => {
       const bucket = att.path.split("/")[0];
       const objectPath = att.path.slice(bucket.length + 1);
       const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
@@ -378,7 +473,15 @@ export default function DashboardPage() {
           Prompt AI
         </span>
 
-        <ModelSelector model={selectedModel} onSelect={handleModelChange} />
+        <div className="flex items-center gap-2">
+          <ExportMenu
+            disabled={!activeSession || messages.length === 0}
+            onExport={handleExport}
+            onCopyMarkdown={handleCopyMarkdown}
+            copied={copiedMarkdown}
+          />
+          <ModelSelector model={selectedModel} onSelect={handleModelChange} />
+        </div>
       </header>
 
       {/* ── Body ── */}
@@ -392,16 +495,15 @@ export default function DashboardPage() {
           onNewChat={handleNewChat}
           onSelectSession={selectSession}
           onDeleteSession={handleDeleteSession}
-          onExport={handleExport}
-          onCopyMarkdown={handleCopyMarkdown}
           username={profile?.username ?? "User"}
           avatarUrl={profile?.avatarUrl ?? null}
           onSettings={() => router.push("/settings")}
           onSignOut={() => setShowLogoutConfirm(true)}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-          onAttach={handleAttach}
+          onAttach={(file) => handleAttach([file])}
           attachments={attachmentLibrary}
+          exportHistory={exportHistory}
         />
 
         {/* ── Main area ── */}
@@ -434,17 +536,24 @@ export default function DashboardPage() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          {pendingAttachment && (
-            <div className="mx-4 sm:mx-6 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted">
-              <span className="truncate max-w-[200px]">{pendingAttachment.name}</span>
-              <button
-                onClick={() => setPendingAttachment(null)}
-                className="text-text-faint hover:text-red-400 transition-colors"
-                aria-label="Remove attachment"
-              >
-                <X size={11} />
-              </button>
+          {/* Pending attachments */}
+          {pendingAttachments.length > 0 && (
+            <div className="mx-4 sm:mx-6 mb-2 flex flex-wrap gap-2">
+              {pendingAttachments.map((a) => (
+                <div
+                  key={a.path}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted"
+                >
+                  <span className="truncate max-w-[160px]">{a.name}</span>
+                  <button
+                    onClick={() => removePendingAttachment(a.path)}
+                    className="text-text-faint hover:text-red-400 transition-colors"
+                    aria-label="Remove attachment"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 

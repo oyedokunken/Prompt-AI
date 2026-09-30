@@ -6,10 +6,12 @@ import "react-tooltip/dist/react-tooltip.css";
 import {
   Plus, Search, MessageSquare, Settings, LogOut,
   PanelLeftClose, PanelLeftOpen, Paperclip, Download, History,
-  BookOpen, Star, Clock, Trash2, Image, FileText,
-  Film, Copy, Check,
+  BookOpen, Star, Trash2, Image, FileText,
+  Film, FileDown, FileJson, FileType,
 } from "lucide-react";
-import type { ChatSession, ExportFormat, SidebarPanel } from "@/lib/types/chat";
+import { Logo } from "@/components/Logo";
+import type { ChatSession, SidebarPanel } from "@/lib/types/chat";
+import type { ExportRecord } from "@/lib/hooks/useExportHistory";
 
 export interface SidebarAttachment {
   name: string;
@@ -25,8 +27,6 @@ interface SidebarProps {
   onNewChat: () => void;
   onSelectSession: (s: ChatSession) => void;
   onDeleteSession: (id: string) => void;
-  onExport: (format: ExportFormat) => void;
-  onCopyMarkdown: () => void;
   username: string;
   avatarUrl: string | null;
   onSettings: () => void;
@@ -35,18 +35,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onAttach?: (file: File) => void;
   attachments?: SidebarAttachment[];
-  activePath?: "history" | "settings";
-}
-
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const days = Math.floor(diff / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  exportHistory?: ExportRecord[];
 }
 
 function groupSessions(sessions: ChatSession[]) {
@@ -64,29 +53,58 @@ function groupSessions(sessions: ChatSession[]) {
   return { today, yesterday, older };
 }
 
-const PANEL_TABS: { id: SidebarPanel; icon: React.ElementType; label: string }[] = [
-  { id: "history", icon: MessageSquare, label: "Chats" },
+const NAV_ITEMS: { id: SidebarPanel; icon: React.ElementType; label: string }[] = [
   { id: "media", icon: Paperclip, label: "Media" },
-  { id: "export", icon: Download, label: "Export" },
+  { id: "exports", icon: Download, label: "Exports" },
+];
+
+const EXPORT_FORMAT_ICON: Record<string, React.ElementType> = {
+  pdf: FileType,
+  markdown: FileDown,
+  txt: FileText,
+  json: FileJson,
+};
+
+const EXPORT_FILTERS: { id: "all" | "pdf" | "markdown" | "txt"; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "pdf", label: "PDF" },
+  { id: "markdown", label: "Markdown" },
+  { id: "txt", label: "Text" },
 ];
 
 // Collapsed rail -- icon-only, every control gets a hover tooltip so the
 // sidebar stays fully usable without expanding it.
 function CollapsedRail({
-  onNewChat, onToggleCollapse, panel, onPanelChange, onSettings, onSignOut, avatarUrl, username,
-}: Pick<SidebarProps, "onNewChat" | "onToggleCollapse" | "panel" | "onPanelChange" | "onSettings" | "onSignOut" | "avatarUrl" | "username">) {
+  onNewChat, onToggleCollapse, onSearch, panel, onPanelChange, onSettings, onSignOut, avatarUrl, username,
+}: {
+  onNewChat: () => void;
+  onToggleCollapse: () => void;
+  onSearch: () => void;
+} & Pick<SidebarProps, "panel" | "onPanelChange" | "onSettings" | "onSignOut" | "avatarUrl" | "username">) {
   return (
     <aside className="w-12 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
       <Tooltip id="sidebar-tip" place="right" className="!text-[10px] !py-1 !px-2 !z-50" />
 
+      <div className="flex items-center gap-1 mb-3">
+        <button
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content="Expand sidebar"
+          onClick={onToggleCollapse}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+          aria-label="Expand sidebar"
+        >
+          <PanelLeftOpen size={13} />
+        </button>
+      </div>
+
       <button
         data-tooltip-id="sidebar-tip"
-        data-tooltip-content="Expand sidebar"
-        onClick={onToggleCollapse}
+        data-tooltip-content="Search chats"
+        onClick={onSearch}
         className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors mb-3"
-        aria-label="Expand sidebar"
+        aria-label="Search chats"
       >
-        <PanelLeftOpen size={13} />
+        <Search size={13} />
       </button>
 
       <button
@@ -100,7 +118,7 @@ function CollapsedRail({
       </button>
 
       <div className="flex flex-col gap-1 mb-auto">
-        {PANEL_TABS.map(({ id, icon: Icon, label }) => (
+        {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             data-tooltip-id="sidebar-tip"
@@ -156,8 +174,6 @@ export function Sidebar({
   onNewChat,
   onSelectSession,
   onDeleteSession,
-  onExport,
-  onCopyMarkdown,
   username,
   avatarUrl,
   onSettings,
@@ -166,16 +182,24 @@ export function Sidebar({
   onToggleCollapse,
   onAttach,
   attachments = [],
+  exportHistory = [],
 }: SidebarProps) {
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [exportFilter, setExportFilter] = useState<"all" | "pdf" | "markdown" | "txt">("all");
+
+  const handleSearchClick = () => {
+    onPanelChange("history");
+    setSearchOpen((v) => !v);
+  };
 
   if (collapsed) {
     return (
       <CollapsedRail
         onNewChat={onNewChat}
         onToggleCollapse={onToggleCollapse}
+        onSearch={() => { onToggleCollapse(); setSearchOpen(true); onPanelChange("history"); }}
         panel={panel}
         onPanelChange={onPanelChange}
         onSettings={onSettings}
@@ -191,12 +215,6 @@ export function Sidebar({
   );
   const { today, yesterday, older } = groupSessions(filtered);
 
-  const handleCopy = () => {
-    onCopyMarkdown();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onAttach) onAttach(file);
@@ -206,6 +224,10 @@ export function Sidebar({
   const imagesFiles = attachments.filter((a) => a.type.startsWith("image/"));
   const videoFiles = attachments.filter((a) => a.type.startsWith("video/"));
   const pdfFiles = attachments.filter((a) => a.type === "application/pdf");
+
+  const filteredExports = exportHistory.filter(
+    (e) => exportFilter === "all" || e.format === exportFilter
+  );
 
   const SessionItem = ({ s }: { s: ChatSession }) => (
     <div
@@ -247,69 +269,79 @@ export function Sidebar({
 
   return (
     <aside className="w-56 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-base border border-border flex items-center justify-center shrink-0">
-            <span className="font-mono text-[9px] text-accent font-bold">P</span>
-          </div>
-          <span className="text-[12px] font-semibold text-text-primary">Prompt AI</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onNewChat}
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 border border-accent/20 text-[10px] font-medium text-accent hover:bg-accent/15 transition-colors"
-            aria-label="New chat"
-          >
-            <Plus size={10} /> New
-          </button>
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 text-text-faint hover:text-text-muted transition-colors"
-            aria-label="Collapse sidebar"
-          >
-            <PanelLeftClose size={12} />
-          </button>
-        </div>
+      {/* Brand */}
+      <div className="px-3 py-2.5 border-b border-border">
+        <Logo variant="color" size={18} />
       </div>
 
-      {/* Panel tabs */}
-      <div className="flex border-b border-border">
-        {PANEL_TABS.map(({ id, icon: Icon, label }) => (
+      {/* Collapse + search, icon only */}
+      <div className="px-3 py-1.5 border-b border-border flex items-center gap-1">
+        <button
+          onClick={onToggleCollapse}
+          className="p-1.5 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+          aria-label="Collapse sidebar"
+        >
+          <PanelLeftClose size={13} />
+        </button>
+        <button
+          onClick={handleSearchClick}
+          className={`p-1.5 rounded-md transition-colors ${
+            searchOpen ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
+          }`}
+          aria-label="Search chats"
+        >
+          <Search size={13} />
+        </button>
+      </div>
+
+      {/* New chat */}
+      <div className="px-2 pt-2">
+        <button
+          onClick={onNewChat}
+          className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-accent/10 border border-accent/20 text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors"
+        >
+          <Plus size={11} /> New chat
+        </button>
+      </div>
+
+      {/* Nav: Media, Exports */}
+      <div className="px-2 pt-2 flex flex-col gap-0.5">
+        {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
-            onClick={() => onPanelChange(id)}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[9px] font-mono uppercase tracking-wider transition-colors ${
-              panel === id
-                ? "text-accent border-b border-accent"
-                : "text-text-faint hover:text-text-muted"
+            onClick={() => onPanelChange(panel === id ? "history" : id)}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+              panel === id ? "text-accent bg-accent/10" : "text-text-muted hover:text-text-primary hover:bg-raised"
             }`}
           >
-            <Icon size={11} />
+            <Icon size={12} />
             {label}
           </button>
         ))}
       </div>
 
+      <div className="border-t border-border mt-2" />
+
       {/* Panel content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide px-2 py-2">
 
-        {/* HISTORY panel */}
+        {/* HISTORY / chat list panel (default) */}
         {panel === "history" && (
           <>
-            {/* Search */}
-            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-raised mb-2">
-              <Search size={9} className="text-text-faint shrink-0" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search chats..."
-                className="text-[10px] text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0"
-              />
-            </div>
+            {searchOpen && (
+              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-raised mb-2">
+                <Search size={9} className="text-text-faint shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search chats..."
+                  className="text-[10px] text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0"
+                />
+              </div>
+            )}
 
-            {/* Session groups */}
             {filtered.length === 0 ? (
               <p className="text-[10px] text-text-faint text-center mt-6">No chats yet</p>
             ) : (
@@ -320,7 +352,6 @@ export function Sidebar({
               </>
             )}
 
-            {/* Library */}
             <div className="mt-3 pt-2 border-t border-border">
               <p className="px-2 mb-1 font-mono text-[9px] uppercase tracking-widest text-text-faint">
                 Library
@@ -345,7 +376,6 @@ export function Sidebar({
         {/* MEDIA panel */}
         {panel === "media" && (
           <div className="space-y-3">
-            {/* Upload button */}
             <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-[10px] text-text-faint hover:border-accent/40 hover:text-accent transition-colors cursor-pointer">
               <Plus size={10} />
               Upload file
@@ -360,7 +390,6 @@ export function Sidebar({
               Attaches to your next message in this chat.
             </p>
 
-            {/* Bucket groups */}
             {[
               { label: "Images", icon: Image, files: imagesFiles },
               { label: "Videos", icon: Film, files: videoFiles },
@@ -392,69 +421,57 @@ export function Sidebar({
           </div>
         )}
 
-        {/* EXPORT panel */}
-        {panel === "export" && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] text-text-faint mb-3">
-              Export the active conversation.
+        {/* EXPORTS history panel -- a log of past exports, not an action */}
+        {panel === "exports" && (
+          <div className="space-y-2">
+            <p className="text-[10px] text-text-faint px-0.5">
+              Everything you have exported so far. Export a conversation from its chat header.
             </p>
-            {[
-              {
-                label: copied ? "Copied!" : "Copy as Markdown",
-                icon: copied ? Check : Copy,
-                action: handleCopy,
-                desc: "Copy to clipboard",
-              },
-              {
-                label: "Download .pdf",
-                icon: Download,
-                action: () => onExport("pdf"),
-                desc: "Formatted PDF report",
-              },
-              {
-                label: "Download .md",
-                icon: Download,
-                action: () => onExport("markdown"),
-                desc: "Markdown file",
-              },
-              {
-                label: "Download .txt",
-                icon: Download,
-                action: () => onExport("txt"),
-                desc: "Plain text",
-              },
-              {
-                label: "Download .json",
-                icon: Download,
-                action: () => onExport("json"),
-                desc: "Raw JSON",
-              },
-            ].map(({ label, icon: Icon, action, desc }) => (
-              <button
-                key={label}
-                onClick={action}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-border hover:border-accent/30 hover:bg-raised/50 transition-colors text-left"
-              >
-                <Icon size={11} className="text-accent shrink-0" />
-                <div>
-                  <p className="text-[10px] font-medium text-text-primary">{label}</p>
-                  <p className="text-[9px] text-text-faint">{desc}</p>
-                </div>
-              </button>
-            ))}
 
-            {/* Last updated */}
-            <div className="mt-4 pt-3 border-t border-border">
-              <p className="text-[9px] text-text-faint flex items-center gap-1">
-                <Clock size={9} />
-                Exports include all messages in the active chat.
-              </p>
+            <div className="flex gap-1">
+              {EXPORT_FILTERS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setExportFilter(id)}
+                  className={`px-2 py-1 rounded-md text-[9px] font-mono uppercase tracking-wide transition-colors ${
+                    exportFilter === id
+                      ? "bg-accent/10 text-accent border border-accent/20"
+                      : "text-text-faint border border-transparent hover:text-text-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {filteredExports.length === 0 ? (
+              <p className="text-[10px] text-text-faint text-center mt-6">No exports yet</p>
+            ) : (
+              <div className="space-y-1 mt-1">
+                {filteredExports.map((record) => {
+                  const Icon = EXPORT_FORMAT_ICON[record.format] ?? FileText;
+                  return (
+                    <div
+                      key={record.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-raised/50 transition-colors"
+                    >
+                      <Icon size={11} className="text-accent shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-text-primary truncate">{record.session_title}</p>
+                        <p className="text-[9px] text-text-faint font-mono">
+                          {record.format} - {new Date(record.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Footer – user */}
+      {/* Footer - user */}
       <div className="px-2.5 py-2.5 border-t border-border flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {avatarUrl ? (

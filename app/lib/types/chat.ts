@@ -16,12 +16,12 @@ export interface PromptMetadata {
     constraints?: string[];
     format?: string;
   };
-  attachment?: {
+  attachments?: {
     name: string;
     type: string;
     path: string;
     usedAsContext: boolean;
-  };
+  }[];
 }
 
 export interface ChatMessage {
@@ -34,7 +34,7 @@ export interface ChatMessage {
 }
 
 export type ExportFormat = "markdown" | "json" | "txt" | "pdf";
-export type SidebarPanel = "history" | "media" | "export";
+export type SidebarPanel = "history" | "media" | "exports";
 
 // openaiModel is null for targets we cannot actually call yet (no provider
 // key configured) -- the selector disables those rather than silently
@@ -62,3 +62,8 @@ export function attachmentKind(mimeType: string): keyof typeof ATTACHMENT_BUCKET
   if (mimeType === "application/pdf") return "pdf";
   return null;
 }
+
+// Keeps a single user or a single conversation from exhausting API token
+// budget through attachments.
+export const MAX_FILES_PER_MESSAGE = 3;
+export const MAX_ATTACHMENT_BYTES_PER_CONVERSATION = 50 * 1024 * 1024;

@@ -1,13 +1,17 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import { ArrowRight, Paperclip, Loader2 } from "lucide-react";
+import { useRef, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square } from "lucide-react";
+import type { EmojiClickData } from "emoji-picker-react";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 interface ChatInputProps {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
-  onAttach?: (file: File) => void;
+  onAttach?: (files: File[]) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -21,6 +25,17 @@ export function ChatInput({
   placeholder = "Describe what you need — plain language works best",
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const valueRef = useRef(value);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   // Auto-resize textarea up to ~5 lines
   useEffect(() => {
@@ -37,30 +52,107 @@ export function ChatInput({
     }
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onAttach) onAttach(file);
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length && onAttach) onAttach(files);
     e.target.value = "";
   };
 
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    onChange(valueRef.current + emojiData.emoji);
+    textareaRef.current?.focus();
+  };
+
+  const startRecording = async () => {
+    setVoiceError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setIsTranscribing(true);
+        try {
+          const audioForm = new FormData();
+          audioForm.append("audio", blob, "voice-message.webm");
+          const res = await fetch("/api/transcribe", { method: "POST", body: audioForm });
+          const payload = await res.json();
+          if (!res.ok) throw new Error(payload.error ?? "Transcription failed");
+          if (payload.text) {
+            const current = valueRef.current;
+            onChange(current ? `${current} ${payload.text}`.trim() : payload.text);
+          }
+        } catch (err) {
+          setVoiceError(err instanceof Error ? err.message : "Could not transcribe audio");
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch {
+      setVoiceError("Microphone access was denied");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
+  const busy = disabled || isTranscribing;
+
   return (
     <div className="px-4 sm:px-6 pb-4 pt-2">
+      {voiceError && (
+        <p className="text-[10px] text-red-400 mb-1.5">{voiceError}</p>
+      )}
       <div
         className={`flex items-end gap-2 rounded-xl border bg-raised px-3 py-2.5 transition-colors ${
-          disabled ? "border-border opacity-60" : "border-border focus-within:border-accent/40"
+          busy ? "border-border opacity-60" : "border-border focus-within:border-accent/40"
         }`}
       >
         {/* Attach */}
-        <label className="p-1 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 mb-0.5" aria-label="Attach file">
+        <label className="p-1 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 mb-0.5" aria-label="Attach files">
           <Paperclip size={14} />
           <input
             type="file"
+            multiple
             className="hidden"
             accept="image/*,video/*,.pdf"
-            onChange={handleFile}
-            disabled={disabled}
+            onChange={handleFiles}
+            disabled={busy}
           />
         </label>
+
+        {/* Emoji */}
+        <div className="relative shrink-0 mb-0.5">
+          <button
+            type="button"
+            onClick={() => setShowEmoji((v) => !v)}
+            disabled={busy}
+            className="p-1 text-text-faint hover:text-text-muted transition-colors"
+            aria-label="Insert emoji"
+          >
+            <Smile size={14} />
+          </button>
+          {showEmoji && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)} />
+              <div className="absolute bottom-9 left-0 z-20">
+                <EmojiPicker onEmojiClick={handleEmojiClick} width={300} height={360} />
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Textarea */}
         <textarea
@@ -68,23 +160,43 @@ export function ChatInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKey}
-          placeholder={placeholder}
-          disabled={disabled}
+          placeholder={isTranscribing ? "Transcribing your voice message..." : placeholder}
+          disabled={busy}
           rows={1}
           className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed"
           style={{ maxHeight: 120 }}
         />
+
+        {/* Voice */}
+        <button
+          type="button"
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={disabled || isTranscribing}
+          className={`shrink-0 mb-0.5 p-1 transition-colors ${
+            isRecording ? "text-red-400" : "text-text-faint hover:text-text-muted"
+          }`}
+          aria-label={isRecording ? "Stop recording" : "Record a voice message"}
+        >
+          {isRecording ? (
+            <span className="relative flex items-center justify-center w-3.5 h-3.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
+              <Square size={10} className="relative fill-current" />
+            </span>
+          ) : (
+            <Mic size={14} />
+          )}
+        </button>
 
         {/* Send */}
         <div className="flex items-center gap-2 shrink-0 mb-0.5">
           <span className="font-mono text-[10px] text-text-faint hidden sm:block">⏎</span>
           <button
             onClick={onSend}
-            disabled={disabled || !value.trim()}
+            disabled={busy || !value.trim()}
             className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
             aria-label="Send"
           >
-            {disabled ? (
+            {busy ? (
               <Loader2 size={13} className="text-base animate-spin" />
             ) : (
               <ArrowRight size={13} style={{ color: "#0A0A0B" }} />
@@ -94,6 +206,9 @@ export function ChatInput({
       </div>
       <p className="text-center text-[9px] text-text-faint mt-1.5">
         Shift+Enter for new line · Enter to send
+      </p>
+      <p className="text-center text-[9px] text-text-faint mt-0.5">
+        Review outputs and generated code before use.
       </p>
     </div>
   );

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import jwt from "jsonwebtoken";
+import disposableDomains from "disposable-email-domains";
 import { prisma } from "../lib/prisma";
 import { supabaseAdmin } from "../lib/supabase";
 import { emailService } from "./emailService";
@@ -9,7 +10,15 @@ import { env } from "../config/env";
 
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_DIGITS = 6;
+const OTP_RESEND_COOLDOWN_SECONDS = 30;
 const BCRYPT_ROUNDS = 12;
+
+const DISPOSABLE_DOMAINS = new Set(disposableDomains);
+
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split("@")[1]?.toLowerCase();
+  return !!domain && DISPOSABLE_DOMAINS.has(domain);
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -112,7 +121,104 @@ export const authService = {
   },
 
   // -------------------------------------------------------------------------
-  // OTP verification
+  // Passwordless OTP request
+  // Used for both signup and returning login, the email path treats them
+  // identically: find or create the user, then send a fresh code, subject
+  // to a resend cooldown and a disposable-domain block.
+  // -------------------------------------------------------------------------
+  async requestOtp(email: string): Promise<{ retryAfterSeconds?: number }> {
+    if (isDisposableEmail(email)) {
+      throw new Error("DISPOSABLE_EMAIL");
+    }
+
+    let user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      user = await prisma.user.create({ data: { email, emailVerified: false } });
+    }
+
+    const latestToken = await prisma.otpToken.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (latestToken) {
+      const secondsSince = (Date.now() - latestToken.createdAt.getTime()) / 1000;
+      if (secondsSince < OTP_RESEND_COOLDOWN_SECONDS) {
+        return { retryAfterSeconds: Math.ceil(OTP_RESEND_COOLDOWN_SECONDS - secondsSince) };
+      }
+    }
+
+    await authService.sendVerificationOtp(user.id, user.email);
+    return {};
+  },
+
+  // -------------------------------------------------------------------------
+  // Passwordless OTP verification
+  // Verifies the code, then bridges into a real Supabase session: mirrors
+  // the user into Supabase Auth if needed and generates a magic link token
+  // the frontend redeems client-side with the anon key. This is what keeps
+  // email auth on the same session layer as Google and GitHub, rather than
+  // issuing a custom token the rest of the app (RLS, storage, dashboard)
+  // has no way to recognize.
+  // -------------------------------------------------------------------------
+  async verifyOtpAndBridge(email: string, otp: string): Promise<{ email: string; tokenHash: string }> {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error("INVALID_OTP");
+
+    const token = await prisma.otpToken.findFirst({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!token || !verifyOtpHash(otp, token.tokenHash)) {
+      throw new Error("INVALID_OTP");
+    }
+
+    const wasAlreadyVerified = user.emailVerified;
+
+    await prisma.$transaction([
+      prisma.otpToken.update({ where: { id: token.id }, data: { usedAt: new Date() } }),
+      prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
+    ]);
+
+    if (!wasAlreadyVerified) {
+      try {
+        await emailService.sendWelcome({ to: user.email, appUrl: env.APP_URL });
+      } catch (err) {
+        console.warn("[authService] failed to send welcome email (non-blocking):", err);
+      }
+    }
+
+    // Mirror user into Supabase Auth so OAuth and email users share the same
+    // session layer. If the user already exists in Supabase, this is a no-op.
+    try {
+      const { error } = await supabaseAdmin.auth.admin.createUser({
+        email: user.email,
+        email_confirm: true,
+        user_metadata: { prompt_ai_user_id: user.id },
+      });
+      if (error && error.message !== "User already registered") {
+        console.warn("[authService] supabase createUser warning:", error.message);
+      }
+    } catch (err) {
+      console.warn("[authService] supabase createUser failed (non-blocking):", err);
+    }
+
+    const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink",
+      email: user.email,
+    });
+
+    if (linkError || !data?.properties?.hashed_token) {
+      console.error("[authService] generateLink failed:", linkError);
+      throw new Error("SESSION_BRIDGE_FAILED");
+    }
+
+    return { email: user.email, tokenHash: data.properties.hashed_token };
+  },
+
+  // -------------------------------------------------------------------------
+  // OTP verification (legacy password-based flow)
   // Verifies the code, marks the user as confirmed, and issues JWT + refresh.
   // If the user does not yet exist in Supabase Auth, creates them there.
   // -------------------------------------------------------------------------

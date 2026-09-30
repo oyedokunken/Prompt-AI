@@ -12,9 +12,77 @@ import {
   refreshSchema,
   forgotPasswordSchema,
   sendWelcomeSchema,
+  otpRequestSchema,
 } from "../schemas/auth";
 
 export const authRouter = Router();
+
+// ---------------------------------------------------------------------------
+// POST /auth/otp/request
+// Passwordless email auth. Used for both signup and returning login, and
+// also doubles as the resend action, all subject to the same cooldown.
+// ---------------------------------------------------------------------------
+authRouter.post(
+  "/otp/request",
+  authLimiter,
+  validate(otpRequestSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await authService.requestOtp(req.body.email as string);
+      if (result.retryAfterSeconds) {
+        res.status(429).json({
+          error: "RESEND_COOLDOWN",
+          message: `Wait ${result.retryAfterSeconds} seconds before requesting another code.`,
+          retryAfterSeconds: result.retryAfterSeconds,
+        });
+        return;
+      }
+      res.json({ message: "If that email can receive mail, a code is on its way." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message === "DISPOSABLE_EMAIL") {
+        res.status(422).json({
+          error: "DISPOSABLE_EMAIL",
+          message: "Disposable or temporary email addresses are not accepted. Use an address you can actually receive mail at.",
+        });
+      } else {
+        console.error("[POST /auth/otp/request]", err);
+        res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected error occurred." });
+      }
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /auth/otp/verify
+// Verifies the code and returns a Supabase magic-link token hash. The
+// frontend redeems this with supabase.auth.verifyOtp to establish a real
+// Supabase session, this endpoint never issues a session by itself.
+// ---------------------------------------------------------------------------
+authRouter.post(
+  "/otp/verify",
+  authLimiter,
+  validate(verifyOtpSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const bridge = await authService.verifyOtpAndBridge(
+        req.body.email as string,
+        req.body.otp as string
+      );
+      res.json(bridge);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message === "INVALID_OTP") {
+        res.status(400).json({ error: "INVALID_OTP", message: "The code is incorrect or has expired." });
+      } else if (message === "SESSION_BRIDGE_FAILED") {
+        res.status(502).json({ error: "SESSION_BRIDGE_FAILED", message: "Could not complete sign in. Try again." });
+      } else {
+        console.error("[POST /auth/otp/verify]", err);
+        res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected error occurred." });
+      }
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // POST /auth/register

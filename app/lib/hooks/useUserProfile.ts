@@ -10,17 +10,29 @@ export interface UserProfile {
   preferredName: string | null;
   avatarUrl: string | null;
   provider: string;
+  role: string | null;
   createdAt: string | null;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
-  email: "Email and password",
+  email: "Email",
   google: "Google",
   github: "GitHub",
 };
 
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider;
+}
+
+export const ROLE_OPTIONS = [
+  { id: "developer", label: "Developer" },
+  { id: "designer", label: "Designer" },
+  { id: "product", label: "Product manager" },
+  { id: "other", label: "Something else" },
+] as const;
+
+export function roleLabel(role: string | null): string {
+  return ROLE_OPTIONS.find((r) => r.id === role)?.label ?? "Not set";
 }
 
 // Single source of truth for the signed-in user's profile fields
@@ -45,6 +57,7 @@ export function useUserProfile() {
       preferredName: user.user_metadata?.preferred_name ?? null,
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       provider: user.app_metadata?.provider ?? "email",
+      role: user.user_metadata?.role ?? null,
       createdAt: user.created_at ?? null,
     });
     setLoading(false);
