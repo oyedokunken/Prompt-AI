@@ -65,8 +65,12 @@ export function DeviceFrame() {
 }
 
 function Laptop() {
+  // This is an illustration of a physical laptop showing a screenshot of
+  // the product, not a themed UI surface. It stays dark regardless of the
+  // site's own theme, the same way a device mockup would not change the
+  // color of its plastic or metal chassis based on the page around it.
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="dark mx-auto max-w-4xl">
       <div
         className="relative rounded-t-2xl border border-border bg-[#0D0D0F] shadow-2xl"
         style={{ paddingTop: "62%" }}

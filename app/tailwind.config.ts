@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,16 +10,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        base: "#0A0A0B",
-        surface: "#111113",
-        raised: "#17171A",
-        border: "#232327",
-        "border-subtle": "#1A1A1D",
-        "text-primary": "#EDEDEF",
-        "text-muted": "#8B8B93",
-        "text-faint": "#5C5C63",
-        accent: "#F2A93B",
-        signal: "#8B7CF6",
+        base: "rgb(var(--color-bg) / <alpha-value>)",
+        surface: "rgb(var(--color-bg-surface) / <alpha-value>)",
+        raised: "rgb(var(--color-bg-raised) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
+        "border-subtle": "rgb(var(--color-border-subtle) / <alpha-value>)",
+        "text-primary": "rgb(var(--color-ink) / <alpha-value>)",
+        "text-muted": "rgb(var(--color-ink-muted) / <alpha-value>)",
+        "text-faint": "rgb(var(--color-ink-faint) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        "accent-fill": "rgb(var(--color-accent-fill) / <alpha-value>)",
+        "accent-fill-foreground": "rgb(var(--color-accent-fill-foreground) / <alpha-value>)",
+        signal: "rgb(var(--color-signal) / <alpha-value>)",
+        "signal-fill": "rgb(var(--color-signal-fill) / <alpha-value>)",
+        "signal-fill-foreground": "rgb(var(--color-signal-fill-foreground) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-geist)", "system-ui", "sans-serif"],

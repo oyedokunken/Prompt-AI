@@ -85,14 +85,14 @@ export function Integrations() {
           className="pointer-events-none absolute left-0 top-0 bottom-0 w-24 z-10"
           style={{
             background:
-              "linear-gradient(to right, #0A0A0B, transparent)",
+              "linear-gradient(to right, rgb(var(--color-bg)), transparent)",
           }}
         />
         <div
           className="pointer-events-none absolute right-0 top-0 bottom-0 w-24 z-10"
           style={{
             background:
-              "linear-gradient(to left, #0A0A0B, transparent)",
+              "linear-gradient(to left, rgb(var(--color-bg)), transparent)",
           }}
         />
 

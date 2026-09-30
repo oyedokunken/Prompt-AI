@@ -5,6 +5,45 @@
 :root {
   --font-geist: "Geist", system-ui, sans-serif;
   --font-geist-mono: "Geist Mono", monospace;
+
+  /* Light theme (default). Space separated RGB triples so Tailwind can
+     apply opacity modifiers with rgb(var(--x) / <alpha-value>). */
+  --color-bg: 255 255 255;
+  --color-bg-surface: 247 247 248;
+  --color-bg-raised: 240 240 242;
+  --color-border: 228 228 231;
+  --color-border-subtle: 236 236 238;
+  --color-ink: 10 10 11;
+  --color-ink-muted: 82 82 91;
+  --color-ink-faint: 113 113 122;
+
+  /* accent/signal: used as text, icons, borders directly against the page
+     background. Darkened in light mode to hold WCAG AA contrast on white.
+     accent-fill/signal-fill: used for solid button and badge backgrounds,
+     where the fill's own foreground text sets the contrast, so these stay
+     at the brighter brand value in both themes. */
+  --color-accent: 154 105 8;
+  --color-accent-fill: 242 169 59;
+  --color-accent-fill-foreground: 10 10 11;
+  --color-signal: 90 74 191;
+  --color-signal-fill: 139 124 246;
+  --color-signal-fill-foreground: 10 10 11;
+}
+
+.dark {
+  --color-bg: 10 10 11;
+  --color-bg-surface: 17 17 19;
+  --color-bg-raised: 23 23 26;
+  --color-border: 35 35 39;
+  --color-border-subtle: 26 26 29;
+  --color-ink: 237 237 239;
+  --color-ink-muted: 139 139 147;
+  --color-ink-faint: 92 92 99;
+
+  --color-accent: 242 169 59;
+  --color-accent-fill: 242 169 59;
+  --color-signal: 139 124 246;
+  --color-signal-fill: 139 124 246;
 }
 
 html {
@@ -12,11 +51,12 @@ html {
 }
 
 body {
-  background-color: #0A0A0B;
-  color: #EDEDEF;
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-ink));
   font-family: var(--font-geist);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 @layer base {
@@ -27,7 +67,7 @@ body {
   }
 
   :focus-visible {
-    outline: 2px solid #F2A93B;
+    outline: 2px solid rgb(var(--color-accent-fill));
     outline-offset: 2px;
     border-radius: 4px;
   }

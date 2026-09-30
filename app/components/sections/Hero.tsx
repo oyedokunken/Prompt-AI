@@ -152,7 +152,7 @@ export function Hero() {
       <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" preserveAspectRatio="xMidYMid slice">
         <defs>
           <pattern id="hero-dot-grid" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="#232327" fillOpacity="0.45" />
+            <circle cx="1" cy="1" r="1" className="fill-border" fillOpacity="0.7" />
           </pattern>
           <radialGradient id="hero-dot-fade" cx="50%" cy="10%" r="70%" gradientUnits="userSpaceOnUse" gradientTransform="scale(1 1.4)">
             <stop offset="0%" stopColor="white" stopOpacity="1" />
@@ -204,7 +204,7 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center gap-3"
           >
-            <Link href="/signup" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" style={{ color: "#0A0A0B" }}>
+            <Link href="/signup" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
               Start free <ArrowRight size={15} />
             </Link>
             <a href="https://github.com/oyedokunken/Prompt-AI" target="_blank" rel="noopener noreferrer"
@@ -222,7 +222,10 @@ export function Hero() {
           className="w-full"
           aria-label="Prompt AI chat interface"
         >
-          <div className="rounded-xl border border-border bg-surface shadow-2xl overflow-hidden" style={{ height: "520px" }}>
+          {/* This mockup always renders in dark, like a fixed product screenshot,
+              regardless of the site's own light or dark theme. The "dark"
+              class rescopes every token below to the dark palette. */}
+          <div className="dark rounded-xl border border-border bg-surface text-text-primary shadow-2xl overflow-hidden" style={{ height: "520px" }}>
 
             {/* Window chrome */}
             <div className="flex items-center justify-between px-4 h-10 border-b border-border bg-[#0D0D0F] shrink-0">
@@ -250,8 +253,8 @@ export function Hero() {
                 {/* Logo */}
                 <div className="px-3 py-3 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center shrink-0">
-                      <Zap size={12} style={{ color: "#0A0A0B" }} />
+                    <div className="w-6 h-6 rounded-md bg-accent-fill flex items-center justify-center shrink-0">
+                      <Zap size={12} className="text-accent-fill-foreground" />
                     </div>
                     <span className="text-[13px] font-semibold text-text-primary">Prompt AI</span>
                   </div>
@@ -385,8 +388,8 @@ export function Hero() {
                     <span className="text-sm text-text-faint flex-1 select-none">Describe what you need...</span>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] text-text-faint hidden sm:block">↵</span>
-                      <span className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0 cursor-default" aria-hidden="true">
-                        <ArrowRight size={13} style={{ color: "#0A0A0B" }} />
+                      <span className="w-7 h-7 rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center shrink-0 cursor-default" aria-hidden="true">
+                        <ArrowRight size={13} />
                       </span>
                     </div>
                   </div>

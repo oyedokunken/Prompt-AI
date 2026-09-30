@@ -198,7 +198,7 @@ function ModelCardEl({ card, hovered }: { card: ModelCard; hovered: boolean }) {
     <div
       className="shrink-0 w-[280px] rounded-xl border bg-surface p-4 flex flex-col gap-3 mx-3 transition-all duration-200"
       style={{
-        borderColor: hovered ? "rgba(242,169,59,0.3)" : "#232327",
+        borderColor: hovered ? "rgba(242,169,59,0.3)" : "rgb(var(--color-border))",
         transform: hovered ? "translateY(-3px)" : "translateY(0)",
       }}
     >
@@ -211,7 +211,7 @@ function ModelCardEl({ card, hovered }: { card: ModelCard; hovered: boolean }) {
               height="22"
               fill="currentColor"
               style={{
-                color: hovered ? `#${card.iconHex}` : "#5C5C63",
+                color: hovered ? `#${card.iconHex}` : "rgb(var(--color-ink-faint))",
                 transition: "color 0.2s ease",
               }}
               aria-label={card.provider}

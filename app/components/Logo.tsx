@@ -8,11 +8,14 @@ interface LogoProps {
   className?: string;
 }
 
+// The icon chip is a fixed brand badge, a small dark square with a glyph
+// inside, the same way most logo marks keep a constant badge color rather
+// than inverting with the page theme. The wordmark next to it is not part
+// of that fixed badge, so it uses the theme's ink tokens and must stay
+// legible against whichever background it is placed on.
 export function Logo({ variant = "color", size = 32, className }: LogoProps) {
-  const accentColor = variant === "color" ? "#F2A93B" : "#5C5C63";
-  const inkColor = variant === "color" ? "#EDEDEF" : "#8B8B93";
-  const bgColor = variant === "color" ? "#111113" : "#111113";
-  const borderColor = variant === "color" ? "#232327" : "#1A1A1D";
+  const isMono = variant === "mono";
+  const glyphColor = isMono ? "#8B8B93" : "#F2A93B";
 
   return (
     <span
@@ -32,8 +35,8 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           width="32"
           height="32"
           rx="8"
-          fill={bgColor}
-          stroke={borderColor}
+          fill="#111113"
+          stroke="#232327"
           strokeWidth="1"
         />
         <text
@@ -42,7 +45,7 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           fontFamily="'Geist Mono', monospace"
           fontSize="12"
           fontWeight="600"
-          fill={accentColor}
+          fill={glyphColor}
         >
           &gt;
         </text>
@@ -52,7 +55,7 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           fontFamily="'Geist Mono', monospace"
           fontSize="12"
           fontWeight="400"
-          fill={inkColor}
+          fill="#EDEDEF"
         >
           _
         </text>
@@ -62,7 +65,7 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           width="8"
           height="2"
           rx="1"
-          fill={accentColor}
+          fill={glyphColor}
           opacity="0.7"
         />
       </svg>
@@ -72,12 +75,12 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           fontSize: `${Math.round(size * 0.5)}px`,
           fontWeight: 600,
           letterSpacing: "-0.02em",
-          color: inkColor,
           lineHeight: 1,
         }}
+        className={isMono ? "text-text-muted" : "text-text-primary"}
       >
         Prompt
-        <span style={{ color: accentColor }}>AI</span>
+        <span className={isMono ? "text-text-muted" : "text-accent"}>AI</span>
       </span>
     </span>
   );

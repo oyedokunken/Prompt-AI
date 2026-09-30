@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -104,6 +105,7 @@ export function Header() {
             </nav>
 
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Link
                 href="/login"
                 className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary transition-colors focus-visible:outline-accent"
@@ -112,15 +114,13 @@ export function Header() {
               </Link>
               <Link
                 href="/signup"
-                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                style={{ color: "#0A0A0B" }}
+                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 Start free
               </Link>
               <Link
                 href="/signup"
-                className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent text-xs font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                style={{ color: "#0A0A0B" }}
+                className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 Start free
               </Link>
@@ -163,13 +163,16 @@ export function Header() {
             >
               <div className="flex items-center justify-between px-6 h-16 border-b border-border">
                 <Logo variant="color" size={28} />
-                <button
-                  onClick={() => setDrawerOpen(false)}
-                  className="p-2 rounded-md text-text-muted hover:text-text-primary focus-visible:outline-accent"
-                  aria-label="Close navigation menu"
-                >
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <ThemeToggle />
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-md text-text-muted hover:text-text-primary focus-visible:outline-accent"
+                    aria-label="Close navigation menu"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <nav className="flex flex-col gap-1 p-4 flex-1" aria-label="Mobile navigation">
@@ -197,8 +200,7 @@ export function Header() {
                 <Link
                   href="/signup"
                   onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-accent"
-                  style={{ color: "#0A0A0B" }}
+                  className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-accent"
                 >
                   Start free
                 </Link>

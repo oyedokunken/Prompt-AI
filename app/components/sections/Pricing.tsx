@@ -115,7 +115,7 @@ export function Pricing() {
             >
               {plan.badge && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="px-3 py-1 rounded-full text-[11px] font-mono font-medium bg-accent text-base border border-accent/50 whitespace-nowrap" style={{ color: "#0A0A0B" }}>
+                  <span className="px-3 py-1 rounded-full text-[11px] font-mono font-medium bg-accent-fill text-accent-fill-foreground border border-accent-fill/50 whitespace-nowrap">
                     {plan.badge}
                   </span>
                 </div>
@@ -155,10 +155,9 @@ export function Pricing() {
                 {...(plan.href.startsWith("mailto") ? {} : {})}
                 className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   plan.highlighted
-                    ? "bg-accent hover:bg-accent/90"
+                    ? "bg-accent-fill text-accent-fill-foreground hover:bg-accent-fill/90"
                     : "border border-border bg-raised hover:bg-raised/80 text-text-primary"
                 }`}
-                style={plan.highlighted ? { color: "#0A0A0B" } : {}}
               >
                 {plan.cta}
                 {plan.highlighted && <ArrowRight size={14} />}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "@/lib/theme/ThemeProvider";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://prompt.ai";
 
@@ -47,6 +48,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Must run before any stylesheet or app script so the correct
+            theme class is on <html> before first paint. A useEffect runs
+            after first paint and would not prevent the flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -62,7 +67,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

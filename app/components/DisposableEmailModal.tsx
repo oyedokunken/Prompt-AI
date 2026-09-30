@@ -38,8 +38,7 @@ export function DisposableEmailModal({ open, onClose }: DisposableEmailModalProp
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg bg-accent text-xs font-semibold hover:bg-accent/90 transition-colors"
-            style={{ color: "#0A0A0B" }}
+            className="px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors"
           >
             Got it
           </button>

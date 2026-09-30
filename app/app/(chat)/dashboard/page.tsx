@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ChatInput } from "@/components/dashboard/ChatInput";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
 import { exportSession } from "@/lib/export";
 import type {
@@ -481,6 +482,7 @@ export default function DashboardPage() {
             copied={copiedMarkdown}
           />
           <ModelSelector model={selectedModel} onSelect={handleModelChange} />
+          <ThemeToggle size={13} className="w-7 h-7" />
         </div>
       </header>
 

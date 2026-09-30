@@ -30,8 +30,7 @@ export function ClosingCTA() {
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              style={{ color: "#0A0A0B" }}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               Create a free account
               <ArrowRight size={15} />

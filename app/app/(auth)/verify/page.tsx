@@ -170,8 +170,7 @@ function VerifyForm() {
           <button
             type="button"
             onClick={() => router.push("/dashboard")}
-            className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-accent text-sm font-semibold hover:bg-accent/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            style={{ color: "#0A0A0B" }}
+            className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             Go to dashboard
           </button>
@@ -241,12 +240,11 @@ function VerifyForm() {
           onClick={handleSubmit}
           disabled={isSubmitting || !isFilled}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors text-accent-fill-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             isSubmitting || !isFilled
-              ? "bg-accent/40 cursor-not-allowed"
-              : "bg-accent hover:bg-accent/90"
+              ? "bg-accent-fill/40 cursor-not-allowed"
+              : "bg-accent-fill hover:bg-accent-fill/90"
           )}
-          style={{ color: "#0A0A0B" }}
         >
           {isSubmitting ? (
             <>

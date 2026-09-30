@@ -193,13 +193,13 @@ export function ChatInput({
           <button
             onClick={onSend}
             disabled={busy || !value.trim()}
-            className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent/90 transition-colors"
+            className="w-7 h-7 rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent-fill/90 transition-colors"
             aria-label="Send"
           >
             {busy ? (
-              <Loader2 size={13} className="text-base animate-spin" />
+              <Loader2 size={13} className="animate-spin" />
             ) : (
-              <ArrowRight size={13} style={{ color: "#0A0A0B" }} />
+              <ArrowRight size={13} />
             )}
           </button>
         </div>

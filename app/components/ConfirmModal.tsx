@@ -69,9 +69,10 @@ export function ConfirmModal({
           <button
             onClick={onConfirm}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              danger ? "bg-red-500 text-white hover:bg-red-500/90" : "bg-accent hover:bg-accent/90"
+              danger
+                ? "bg-red-500 text-white hover:bg-red-500/90"
+                : "bg-accent-fill text-accent-fill-foreground hover:bg-accent-fill/90"
             }`}
-            style={danger ? undefined : { color: "#0A0A0B" }}
           >
             {confirmLabel}
           </button>

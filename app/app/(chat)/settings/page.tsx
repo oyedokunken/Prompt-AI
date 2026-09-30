@@ -8,6 +8,8 @@ import { useUsageStats } from "@/lib/hooks/useUsageStats";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ProviderIcon } from "@/components/ProviderIcon";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/lib/theme/ThemeProvider";
 import { TrendChart } from "@/components/settings/TrendChart";
 import { Upload, Loader2, X, Pencil, Check, FileText, Paperclip, TrendingUp } from "lucide-react";
 import type { ChatSession, SidebarPanel } from "@/lib/types/chat";
@@ -19,6 +21,7 @@ export default function SettingsPage() {
   const supabase = createClient();
   const { profile, refresh } = useUserProfile();
   const usage = useUsageStats();
+  const { theme } = useTheme();
 
   const [tab, setTab] = useState<SettingsTab>("profile");
   const [uploading, setUploading] = useState(false);
@@ -174,6 +177,7 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface shrink-0">
           <span className="font-mono text-[11px] text-text-faint">Settings</span>
+          <ThemeToggle size={13} className="w-7 h-7" />
         </div>
 
         {/* Tabs */}
@@ -263,6 +267,20 @@ export default function SettingsPage() {
                       <p className="text-xs text-red-400 mt-2">{error}</p>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Appearance */}
+              <div className="rounded-xl border border-border bg-surface p-6 mb-6">
+                <h2 className="text-sm font-medium text-text-primary mb-4">Appearance</h2>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-text-primary">Theme</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      {theme === "dark" ? "Dark" : "Light"} is currently active. This applies everywhere and is remembered on this device.
+                    </p>
+                  </div>
+                  <ThemeToggle />
                 </div>
               </div>
 
@@ -410,7 +428,7 @@ export default function SettingsPage() {
                               <span className="text-xs text-text-muted w-32 truncate">{model}</span>
                               <div className="flex-1 h-2 rounded-full bg-raised overflow-hidden">
                                 <div
-                                  className="h-full bg-accent rounded-full"
+                                  className="h-full bg-accent-fill rounded-full"
                                   style={{ width: `${Math.max((count / max) * 100, 6)}%` }}
                                 />
                               </div>

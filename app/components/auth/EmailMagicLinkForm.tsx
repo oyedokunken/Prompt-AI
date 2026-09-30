@@ -140,9 +140,10 @@ export function EmailMagicLinkForm({ expanded, onExpandedChange }: EmailMagicLin
                 disabled={isSubmitting}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors",
-                  isSubmitting ? "bg-accent/40 cursor-not-allowed" : "bg-accent hover:bg-accent/90"
+                  isSubmitting
+                    ? "bg-accent-fill/40 cursor-not-allowed text-accent-fill-foreground"
+                    : "bg-accent-fill hover:bg-accent-fill/90 text-accent-fill-foreground"
                 )}
-                style={{ color: "#0A0A0B" }}
               >
                 {isSubmitting ? (
                   <>

@@ -43,7 +43,7 @@ function ScoreBar({ label, pct, delay }: { label: string; pct: number; delay: nu
       </span>
       <div className="flex-1 h-1.5 rounded-full bg-raised overflow-hidden">
         <motion.div
-          className="h-full rounded-full bg-signal"
+          className="h-full rounded-full bg-signal-fill"
           initial={{ width: 0 }}
           animate={inView ? { width: `${pct}%` } : { width: 0 }}
           transition={{ duration: 0.9, ease: "easeOut", delay }}

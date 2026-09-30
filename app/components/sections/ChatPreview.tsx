@@ -7,15 +7,21 @@ import { Container } from "@/components/Container";
 
 const USER_MESSAGE = "write a jwt refresh token endpoint";
 
+// CSS variable references rather than fixed hex, so this syntax highlighting
+// switches with the theme instead of staying tuned for a dark background only.
+const ACCENT = "rgb(var(--color-accent))";
+const SIGNAL = "rgb(var(--color-signal))";
+const MUTED = "rgb(var(--color-ink-muted))";
+
 const OUTPUT_LINES = [
-  { color: "#F2A93B", text: "ROLE: Senior backend engineer" },
-  { color: "#8B7CF6", text: "CONTEXT: Node.js 20, Express 5, PostgreSQL 16" },
-  { color: "#8B7CF6", text: "TASK: Build a POST /api/auth/refresh endpoint:" },
-  { color: "#8B8B93", text: "  - Read refresh token from httpOnly cookie" },
-  { color: "#8B8B93", text: "  - Validate against stored hash in the DB" },
-  { color: "#8B8B93", text: "  - Rotate token, issue new access token" },
-  { color: "#F2A93B", text: "CONSTRAINTS: Rate limited, parameterized SQL" },
-  { color: "#8B7CF6", text: "OUTPUT: Route handler + middleware + JSDoc" },
+  { color: ACCENT, text: "ROLE: Senior backend engineer" },
+  { color: SIGNAL, text: "CONTEXT: Node.js 20, Express 5, PostgreSQL 16" },
+  { color: SIGNAL, text: "TASK: Build a POST /api/auth/refresh endpoint:" },
+  { color: MUTED, text: "  - Read refresh token from httpOnly cookie" },
+  { color: MUTED, text: "  - Validate against stored hash in the DB" },
+  { color: MUTED, text: "  - Rotate token, issue new access token" },
+  { color: ACCENT, text: "CONSTRAINTS: Rate limited, parameterized SQL" },
+  { color: SIGNAL, text: "OUTPUT: Route handler + middleware + JSDoc" },
 ];
 
 const PROMPT_OUTPUT = OUTPUT_LINES.map((l) => l.text).join("\n");
@@ -124,7 +130,7 @@ export function ChatPreview() {
                 <div className="flex gap-3">
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30"
-                    style={{ background: "rgba(139, 124, 246, 0.1)" }}
+                    style={{ background: "rgb(var(--color-signal) / 0.1)" }}
                     aria-hidden="true"
                   >
                     <span className="font-mono text-[10px] text-signal">P</span>
@@ -215,7 +221,7 @@ export function ChatPreview() {
                 </div>
                 <div className="h-1.5 rounded-full bg-raised overflow-hidden mb-2">
                   <motion.div
-                    className="h-full rounded-full bg-signal"
+                    className="h-full rounded-full bg-signal-fill"
                     initial={{ width: 0 }}
                     whileInView={{ width: "94%" }}
                     viewport={{ once: true }}

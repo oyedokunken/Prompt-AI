@@ -103,12 +103,11 @@ export default function OnboardingPage() {
           onClick={handleSubmit}
           disabled={isSubmitting || !name.trim() || !role}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mt-1",
+            "w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors text-accent-fill-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent mt-1",
             isSubmitting || !name.trim() || !role
-              ? "bg-accent/40 cursor-not-allowed"
-              : "bg-accent hover:bg-accent/90"
+              ? "bg-accent-fill/40 cursor-not-allowed"
+              : "bg-accent-fill hover:bg-accent-fill/90"
           )}
-          style={{ color: "#0A0A0B" }}
         >
           {isSubmitting ? (
             <>
