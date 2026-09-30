@@ -55,7 +55,7 @@ export default function SharedSessionPage() {
         <Link href="/" aria-label="Prompt AI home">
           <Logo variant="color" size={22} />
         </Link>
-        <span className="text-[11px] font-mono text-text-faint">Shared conversation - read only</span>
+        <span className="text-[11px] font-mono text-text-faint">Shared conversation, read only</span>
       </header>
 
       <main className="flex-1 overflow-y-auto">
@@ -88,7 +88,7 @@ export default function SharedSessionPage() {
                 <p className="text-xs text-text-faint mt-1">
                   Shared from Prompt AI
                   {payload.target_type === "export" && payload.export_format
-                    ? ` - originally exported as ${payload.export_format}`
+                    ? `, originally exported as ${payload.export_format}`
                     : ""}
                 </p>
               </div>

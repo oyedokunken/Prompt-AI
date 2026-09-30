@@ -33,6 +33,11 @@ export default function SettingsPage() {
   const [sidebarPanel, setSidebarPanel] = useState<SidebarPanel>("history");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { type: "session"; id: string; label: string }
+    | { type: "saved-prompt"; id: string; label: string }
+    | null
+  >(null);
   const [editingRole, setEditingRole] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
 
@@ -127,6 +132,27 @@ export default function SettingsPage() {
     router.push("/login");
   };
 
+  const requestDeleteSession = (id: string) => {
+    const target = sessions.find((s) => s.id === id);
+    setPendingDelete({ type: "session", id, label: target?.title ?? "this chat" });
+  };
+
+  const requestDeleteSavedPrompt = (id: string) => {
+    const target = savedPrompts.find((p) => p.id === id);
+    setPendingDelete({ type: "saved-prompt", id, label: target?.title ?? "this saved prompt" });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === "session") {
+      await supabase.from("chat_sessions").delete().eq("id", pendingDelete.id);
+      setSessions((prev) => prev.filter((s) => s.id !== pendingDelete.id));
+    } else {
+      await removeSavedPrompt(pendingDelete.id);
+    }
+    setPendingDelete(null);
+  };
+
   const handleToggleSessionFavorite = async (id: string, next: boolean) => {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_favorite: next } : s)));
     const { error: toggleError } = await supabase.from("chat_sessions").update({ is_favorite: next }).eq("id", id);
@@ -172,10 +198,7 @@ export default function SettingsPage() {
         onPanelChange={setSidebarPanel}
         onNewChat={() => router.push("/dashboard")}
         onSelectSession={() => router.push("/dashboard")}
-        onDeleteSession={async (id) => {
-          await supabase.from("chat_sessions").delete().eq("id", id);
-          setSessions((prev) => prev.filter((s) => s.id !== id));
-        }}
+        onDeleteSession={requestDeleteSession}
         username={profile.username}
         avatarUrl={profile.avatarUrl}
         onSettings={() => router.push("/settings")}
@@ -187,7 +210,7 @@ export default function SettingsPage() {
         onToggleSessionFavorite={handleToggleSessionFavorite}
         savedPrompts={savedPrompts}
         onToggleSavedFavorite={toggleSavedFavorite}
-        onDeleteSavedPrompt={removeSavedPrompt}
+        onDeleteSavedPrompt={requestDeleteSavedPrompt}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />
@@ -482,6 +505,20 @@ export default function SettingsPage() {
         danger
         onConfirm={handleSignOut}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <ConfirmModal
+        open={!!pendingDelete}
+        title={pendingDelete?.type === "session" ? "Delete chat" : "Delete saved prompt"}
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete "${pendingDelete.label}"? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
       />
     </div>
   );

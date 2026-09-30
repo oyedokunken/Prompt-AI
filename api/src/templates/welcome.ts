@@ -44,23 +44,7 @@ export function renderWelcomeEmail(data: WelcomeEmailData): RenderedEmail {
             <!-- Header -->
             <tr>
               <td style="padding:24px 32px;border-bottom:1px solid #e4e4e7;">
-                <table cellpadding="0" cellspacing="0" border="0" role="presentation">
-                  <tr>
-                    <td valign="middle" style="padding-right:10px;">
-                      <div style="width:32px;height:32px;background-color:#111113;border:1px solid #232327;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <rect width="32" height="32" rx="8" fill="#111113" stroke="#232327" stroke-width="1"/>
-                          <text x="5" y="20" font-family="monospace" font-size="12" font-weight="600" fill="#F2A93B">&gt;</text>
-                          <text x="14" y="20" font-family="monospace" font-size="12" font-weight="400" fill="#EDEDEF">_</text>
-                          <rect x="14" y="21" width="8" height="2" rx="1" fill="#F2A93B" opacity="0.7"/>
-                        </svg>
-                      </div>
-                    </td>
-                    <td valign="middle">
-                      <span style="font-size:16px;font-weight:600;color:#0a0a0b;letter-spacing:-0.02em;">Prompt<span style="color:#9a6908;">AI</span></span>
-                    </td>
-                  </tr>
-                </table>
+                <img src="${appUrl}/promptai-logo.png" width="104" height="34" alt="${appName}" style="display:block;border:0;outline:none;" />
               </td>
             </tr>
 
@@ -144,7 +128,7 @@ If you have questions or run into issues, reply to this email. We read every mes
 
 This email was sent because you created an account. If you did not create this account, you can safely ignore it.
 
-${appName} -- ${appUrl}
+${appName}, ${appUrl}
 `;
 
   return { subject, html, text };

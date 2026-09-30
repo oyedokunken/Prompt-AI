@@ -21,8 +21,10 @@ interface IncomingAttachment {
 //   3. Fallback                      → local heuristic builder
 // ---------------------------------------------------------------------------
 
+// .trim() guards against a trailing newline in the Vercel env var value,
+// which OpenAI's SDK rejects outright when building the Bearer header.
 const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() })
   : null;
 
 const SYSTEM_PROMPT = `You are Prompt AI, an expert at transforming vague user requests into detailed, structured prompts optimised for AI tools.

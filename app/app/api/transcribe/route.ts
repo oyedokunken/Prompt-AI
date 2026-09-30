@@ -9,8 +9,10 @@ import OpenAI from "openai";
 // the chat input for review, this route never sends anything automatically.
 // ---------------------------------------------------------------------------
 
+// .trim() guards against a trailing newline in the Vercel env var value,
+// which OpenAI's SDK rejects outright when building the Bearer header.
 const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() })
   : null;
 
 export async function POST(req: NextRequest) {

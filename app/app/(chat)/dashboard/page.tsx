@@ -206,6 +206,12 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<UploadedAttachment[]>([]);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { type: "session"; id: string; label: string }
+    | { type: "saved-prompt"; id: string; label: string }
+    | { type: "attachment"; path: string; label: string }
+    | null
+  >(null);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -311,10 +317,15 @@ export default function DashboardPage() {
     setPendingAttachments([]);
   };
 
-  const handleDeleteSession = async (id: string) => {
+  const requestDeleteSession = (id: string) => {
+    const target = sessions.find((s) => s.id === id);
+    setPendingDelete({ type: "session", id, label: target?.title ?? "this chat" });
+  };
+
+  const performDeleteSession = async (id: string) => {
     const { error: deleteError } = await supabase.from("chat_sessions").delete().eq("id", id);
     if (deleteError) {
-      console.error("[dashboard] handleDeleteSession failed:", deleteError);
+      console.error("[dashboard] performDeleteSession failed:", deleteError);
       setError(`Could not delete that chat: ${deleteError.message}`);
       return;
     }
@@ -356,8 +367,36 @@ export default function DashboardPage() {
     }
   };
 
-  const removePendingAttachment = (path: string) => {
+  const requestRemoveAttachment = (path: string) => {
+    const target = pendingAttachments.find((a) => a.path === path);
+    setPendingDelete({ type: "attachment", path, label: target?.name ?? "this file" });
+  };
+
+  const performRemoveAttachment = (path: string) => {
     setPendingAttachments((prev) => prev.filter((a) => a.path !== path));
+  };
+
+  const requestDeleteSavedPrompt = (id: string) => {
+    const target = savedPrompts.find((p) => p.id === id);
+    setPendingDelete({ type: "saved-prompt", id, label: target?.title ?? "this saved prompt" });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === "session") {
+      await performDeleteSession(pendingDelete.id);
+    } else if (pendingDelete.type === "saved-prompt") {
+      await removeSavedPrompt(pendingDelete.id);
+    } else {
+      performRemoveAttachment(pendingDelete.path);
+    }
+    setPendingDelete(null);
+  };
+
+  const DELETE_COPY: Record<"session" | "saved-prompt" | "attachment", { title: string; verb: string }> = {
+    session: { title: "Delete chat", verb: "delete this chat" },
+    "saved-prompt": { title: "Delete saved prompt", verb: "delete this saved prompt" },
+    attachment: { title: "Remove attachment", verb: "remove this attachment" },
   };
 
   // ── Message send ───────────────────────────────────────────────────────
@@ -611,7 +650,7 @@ export default function DashboardPage() {
           onPanelChange={setSidebarPanel}
           onNewChat={handleNewChat}
           onSelectSession={selectSession}
-          onDeleteSession={handleDeleteSession}
+          onDeleteSession={requestDeleteSession}
           username={profile?.username ?? "User"}
           avatarUrl={profile?.avatarUrl ?? null}
           onSettings={() => router.push("/settings")}
@@ -626,7 +665,7 @@ export default function DashboardPage() {
           onToggleSessionFavorite={handleToggleSessionFavorite}
           savedPrompts={savedPrompts}
           onToggleSavedFavorite={toggleSavedFavorite}
-          onDeleteSavedPrompt={removeSavedPrompt}
+          onDeleteSavedPrompt={requestDeleteSavedPrompt}
           mobileOpen={mobileSidebarOpen}
           onMobileClose={() => setMobileSidebarOpen(false)}
         />
@@ -671,7 +710,7 @@ export default function DashboardPage() {
                 >
                   <span className="truncate max-w-[160px]">{a.name}</span>
                   <button
-                    onClick={() => removePendingAttachment(a.path)}
+                    onClick={() => requestRemoveAttachment(a.path)}
                     className="text-text-faint hover:text-red-400 transition-colors"
                     aria-label="Remove attachment"
                   >
@@ -701,6 +740,16 @@ export default function DashboardPage() {
         danger
         onConfirm={handleSignOut}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <ConfirmModal
+        open={!!pendingDelete}
+        title={pendingDelete ? DELETE_COPY[pendingDelete.type].title : ""}
+        description={pendingDelete ? `Are you sure you want to ${DELETE_COPY[pendingDelete.type].verb}, "${pendingDelete.label}"? This cannot be undone.` : ""}
+        confirmLabel={pendingDelete?.type === "attachment" ? "Remove" : "Delete"}
+        danger
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
       />
 
       <CommandPalette

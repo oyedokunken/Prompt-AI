@@ -8,7 +8,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://prompt.ai";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Prompt AI - Structured prompts from plain language",
+    default: "Prompt AI: Structured prompts from plain language",
     template: "%s | Prompt AI",
   },
   description:
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Prompt AI - Structured prompts from plain language",
+        alt: "Prompt AI: Structured prompts from plain language",
       },
     ],
   },
