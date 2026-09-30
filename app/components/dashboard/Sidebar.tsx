@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,6 +45,35 @@ interface SidebarProps {
   onDeleteSavedPrompt?: (id: string) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+}
+
+// Briefly highlights a session's title in the sidebar the moment it turns
+// from the "New Chat" placeholder into a real, AI-inferred title, so the
+// title's appearance reads as a deliberate event rather than a silent
+// re-render.
+function AnimatedSessionTitle({ title }: { title: string }) {
+  const prevTitle = useRef(title);
+  const [justTitled, setJustTitled] = useState(false);
+
+  useEffect(() => {
+    if (prevTitle.current === "New Chat" && title !== "New Chat") {
+      setJustTitled(true);
+      const t = setTimeout(() => setJustTitled(false), 1400);
+      prevTitle.current = title;
+      return () => clearTimeout(t);
+    }
+    prevTitle.current = title;
+  }, [title]);
+
+  return (
+    <motion.span
+      animate={justTitled ? { opacity: [0, 1], x: [-6, 0] } : undefined}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className={`text-[10px] truncate flex-1 transition-colors ${justTitled ? "text-accent" : ""}`}
+    >
+      {title}
+    </motion.span>
+  );
 }
 
 function groupSessions(sessions: ChatSession[]) {
@@ -242,8 +271,12 @@ export function Sidebar({
   );
 
   const SessionItem = ({ s }: { s: ChatSession }) => (
-    <div
+    <motion.div
       key={s.id}
+      layout
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
       onMouseEnter={() => setHoveredId(s.id)}
       onMouseLeave={() => setHoveredId(null)}
       onClick={() => handleSelectSession(s)}
@@ -254,7 +287,7 @@ export function Sidebar({
       }`}
     >
       <MessageSquare size={10} className="shrink-0" />
-      <span className="text-[10px] truncate flex-1">{s.title}</span>
+      <AnimatedSessionTitle title={s.title} />
       {(hoveredId === s.id || s.is_favorite) && onToggleSessionFavorite && (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleSessionFavorite(s.id, !s.is_favorite); }}
@@ -273,7 +306,7 @@ export function Sidebar({
           <Trash2 size={9} />
         </button>
       )}
-    </div>
+    </motion.div>
   );
 
   const SessionGroup = ({ label, items }: { label: string; items: ChatSession[] }) => {

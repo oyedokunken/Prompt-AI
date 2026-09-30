@@ -33,7 +33,25 @@ export interface SharedLink {
   created_at: string;
 }
 
+export interface MemoryCandidate {
+  category: string;
+  key: string;
+  value: string;
+  confidence?: number;
+}
+
+export interface PromptReadiness {
+  status: "ready" | "needs_context";
+  missing?: string[];
+  notes?: string;
+}
+
+// "clarify": the AI needs a little more context before it can produce a
+// real prompt, content is a short conversational question. "ready" (or
+// absent, for messages generated before this field existed): content is
+// the finished, production-ready prompt.
 export interface PromptMetadata {
+  mode?: "clarify" | "ready";
   score?: number;
   assumptions?: string[];
   structured?: {
@@ -42,6 +60,9 @@ export interface PromptMetadata {
     constraints?: string[];
     format?: string;
   };
+  readiness?: PromptReadiness;
+  explanation?: string;
+  memoryCandidates?: MemoryCandidate[];
   attachments?: {
     name: string;
     type: string;
@@ -58,6 +79,26 @@ export interface ChatMessage {
   metadata: PromptMetadata;
   created_at: string;
 }
+
+export interface UserMemory {
+  id: string;
+  user_id: string;
+  category: string;
+  key: string;
+  value: string;
+  source: "onboarding" | "conversation" | "manual";
+  confidence: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const MEMORY_CATEGORIES = [
+  { id: "about", label: "About you" },
+  { id: "preferences", label: "Preferences" },
+  { id: "projects", label: "Projects & context" },
+  { id: "skills", label: "Skills & tools" },
+  { id: "other", label: "Other" },
+] as const;
 
 export type ExportFormat = "markdown" | "json" | "txt" | "pdf";
 export type SidebarPanel = "history" | "media" | "exports" | "saved" | "favorites";

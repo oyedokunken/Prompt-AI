@@ -11,6 +11,9 @@ export interface UserProfile {
   avatarUrl: string | null;
   provider: string;
   role: string | null;
+  about: string | null;
+  workingOn: string | null;
+  primaryUse: string | null;
   createdAt: string | null;
 }
 
@@ -58,6 +61,9 @@ export function useUserProfile() {
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       provider: user.app_metadata?.provider ?? "email",
       role: user.user_metadata?.role ?? null,
+      about: user.user_metadata?.about ?? null,
+      workingOn: user.user_metadata?.working_on ?? null,
+      primaryUse: user.user_metadata?.primary_use ?? null,
       createdAt: user.created_at ?? null,
     });
     setLoading(false);

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck } from "lucide-react";
-import type { ChatMessage } from "@/lib/types/chat";
+import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck } from "lucide-react";
+import type { ChatMessage, MemoryCandidate } from "@/lib/types/chat";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   onSave?: (message: ChatMessage) => void;
+  onSaveMemories?: (candidates: MemoryCandidate[]) => void;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -17,7 +18,22 @@ function ScoreBadge({ score }: { score: number }) {
 
   return (
     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-mono font-medium ${color}`}>
-      {score}/100
+      ~{score}/100 estimate
+    </span>
+  );
+}
+
+function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
+  if (status === "ready") {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-[9px] font-mono font-medium">
+        <CircleCheck size={9} /> Ready to build
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-[9px] font-mono font-medium">
+      <CircleHelp size={9} /> Needs context
     </span>
   );
 }
@@ -41,19 +57,21 @@ function formatContent(raw: string) {
     );
 
     return (
-      <p key={i} className={`${line.startsWith("-") ? "ml-3" : ""} leading-relaxed`}>
+      <p key={i} className={`${line.startsWith("-") || /^\d+\./.test(line.trim()) ? "ml-1" : ""} leading-relaxed`}>
         {rendered}
       </p>
     );
   });
 }
 
-export function MessageBubble({ message, onSave }: MessageBubbleProps) {
+export function MessageBubble({ message, onSave, onSaveMemories }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [memoryHandled, setMemoryHandled] = useState(false);
   const isUser = message.role === "user";
   const meta = message.metadata;
+  const isClarify = meta.mode === "clarify";
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -65,6 +83,12 @@ export function MessageBubble({ message, onSave }: MessageBubbleProps) {
     if (saved || !onSave) return;
     onSave(message);
     setSaved(true);
+  };
+
+  const handleSaveMemories = () => {
+    if (!meta.memoryCandidates?.length || !onSaveMemories) return;
+    onSaveMemories(meta.memoryCandidates);
+    setMemoryHandled(true);
   };
 
   if (isUser) {
@@ -98,11 +122,19 @@ export function MessageBubble({ message, onSave }: MessageBubbleProps) {
           </div>
         </div>
 
+        {/* Explanation, ready mode only */}
+        {!isClarify && meta.explanation && (
+          <p className="text-[11px] text-text-muted italic mt-1.5 px-0.5 leading-relaxed">
+            {meta.explanation}
+          </p>
+        )}
+
         {/* Footer row */}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <p className="font-mono text-[10px] text-text-faint">Prompt AI</p>
 
-          {meta.score !== undefined && <ScoreBadge score={meta.score} />}
+          {!isClarify && meta.readiness?.status && <ReadinessBadge status={meta.readiness.status} />}
+          {!isClarify && meta.score !== undefined && <ScoreBadge score={meta.score} />}
 
           {/* Copy */}
           <button
@@ -113,8 +145,8 @@ export function MessageBubble({ message, onSave }: MessageBubbleProps) {
             {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
           </button>
 
-          {/* Save to library */}
-          {onSave && (
+          {/* Save to library, ready mode only */}
+          {!isClarify && onSave && (
             <button
               onClick={handleSave}
               disabled={saved}
@@ -148,6 +180,36 @@ export function MessageBubble({ message, onSave }: MessageBubbleProps) {
                 <span className="text-accent shrink-0">·</span> {a}
               </p>
             ))}
+          </div>
+        )}
+
+        {/* Memory candidates, offered for explicit user approval, never saved silently */}
+        {!memoryHandled && meta.memoryCandidates && meta.memoryCandidates.length > 0 && (
+          <div className="mt-2 px-3 py-2.5 rounded-lg border border-accent/20 bg-accent/5 space-y-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-accent flex items-center gap-1.5">
+              <Brain size={10} /> Worth remembering?
+            </p>
+            <div className="space-y-1">
+              {meta.memoryCandidates.map((c, i) => (
+                <p key={i} className="text-[11px] text-text-muted">
+                  <span className="text-text-primary font-medium">{c.key}:</span> {c.value}
+                </p>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-0.5">
+              <button
+                onClick={handleSaveMemories}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent-fill text-accent-fill-foreground text-[10px] font-semibold hover:bg-accent-fill/90 transition-colors"
+              >
+                <BookmarkPlus size={10} /> Save to memory
+              </button>
+              <button
+                onClick={() => setMemoryHandled(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-faint hover:text-text-muted transition-colors"
+              >
+                <X size={10} /> Not now
+              </button>
+            </div>
           </div>
         )}
       </div>

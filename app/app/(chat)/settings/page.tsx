@@ -12,10 +12,11 @@ import { ProviderIcon } from "@/components/ProviderIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { TrendChart } from "@/components/settings/TrendChart";
+import { MemoryTab } from "@/components/settings/MemoryTab";
 import { Upload, Loader2, X, Pencil, Check, FileText, Paperclip, TrendingUp, Menu } from "lucide-react";
 import type { ChatSession, SidebarPanel } from "@/lib/types/chat";
 
-type SettingsTab = "profile" | "usage";
+type SettingsTab = "profile" | "memory" | "usage";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -235,6 +236,7 @@ export default function SettingsPage() {
         <div className="flex border-b border-border px-6 gap-1 shrink-0">
           {([
             { id: "profile", label: "Profile" },
+            { id: "memory", label: "Memory" },
             { id: "usage", label: "Usage" },
           ] as { id: SettingsTab; label: string }[]).map(({ id, label }) => (
             <button
@@ -402,6 +404,8 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {tab === "memory" && <MemoryTab />}
 
           {tab === "usage" && (
             <div className="max-w-3xl mx-auto">

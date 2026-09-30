@@ -8,6 +8,7 @@ import { useUserProfile, roleLabel } from "@/lib/hooks/useUserProfile";
 import { useExportHistory } from "@/lib/hooks/useExportHistory";
 import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
 import { useSharedLinks } from "@/lib/hooks/useSharedLinks";
+import { useMemories } from "@/lib/hooks/useMemories";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
@@ -191,6 +192,7 @@ export default function DashboardPage() {
   const { records: exportHistory, refresh: refreshExportHistory } = useExportHistory();
   const { savedPrompts, save: savePrompt, toggleFavorite: toggleSavedFavorite, remove: removeSavedPrompt } = useSavedPrompts();
   const { links: sharedLinks, createLink: createShareLink, revoke: revokeShareLink } = useSharedLinks();
+  const { addCandidates: saveMemoryCandidates } = useMemories();
 
   // Sessions + messages
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -245,6 +247,13 @@ export default function DashboardPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Reflect the active conversation in the browser tab
+  useEffect(() => {
+    document.title = activeSession && activeSession.title !== "New Chat"
+      ? `${activeSession.title} | Prompt AI`
+      : "Prompt AI";
+  }, [activeSession]);
 
   // ── Session helpers ────────────────────────────────────────────────────
 
@@ -602,8 +611,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 hidden sm:block">
-          Prompt AI
+        <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 hidden sm:block max-w-[40%] truncate">
+          {activeSession && activeSession.title !== "New Chat" ? activeSession.title : "Prompt AI"}
         </span>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -692,7 +701,12 @@ export default function DashboardPage() {
             ) : (
               <>
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} onSave={m.role === "assistant" ? handleSaveMessage : undefined} />
+                  <MessageBubble
+                    key={m.id}
+                    message={m}
+                    onSave={m.role === "assistant" ? handleSaveMessage : undefined}
+                    onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
+                  />
                 ))}
                 {isLoading && <GenerationStatus />}
               </>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { MODELS } from "@/lib/types/chat";
+import { buildSystemPrompt, buildFallbackTurn, type GeneratedTurn } from "@/lib/ai/systemPrompt";
+import { selectRelevantMemories } from "@/lib/ai/memoryRelevance";
 
 interface IncomingAttachment {
   name: string;
@@ -12,13 +14,15 @@ interface IncomingAttachment {
 
 // ---------------------------------------------------------------------------
 // POST /api/chat
-// Accepts { session_id, content }, saves the user message, generates a
-// structured prompt response, saves the AI message, and returns both.
+// Accepts { session_id, content }, saves the user message, retrieves the
+// user's profile and relevant memory, runs the prompt-engineering turn
+// (which may ask clarifying questions instead of generating a final prompt),
+// saves the AI message, and returns both.
 //
 // Priority order for AI generation:
-//   1. OpenAI (OPENAI_API_KEY set)   → GPT-4o structured output
-//   2. DATA_SERVICE_URL set          → proxy to Python /data service
-//   3. Fallback                      → local heuristic builder
+//   1. OpenAI (OPENAI_API_KEY set)   -> GPT-4o structured output
+//   2. DATA_SERVICE_URL set          -> proxy to Python /data service
+//   3. Fallback                      -> local heuristic builder
 // ---------------------------------------------------------------------------
 
 // .trim() guards against a trailing newline in the Vercel env var value,
@@ -27,34 +31,9 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() })
   : null;
 
-const SYSTEM_PROMPT = `You are Prompt AI, an expert at transforming vague user requests into detailed, structured prompts optimised for AI tools.
-
-Given any user input, analyse their intent and respond with a JSON object in this exact format:
-{
-  "title": "A short, specific conversation title, four to six words, no trailing punctuation",
-  "content": "The complete structured prompt as ready-to-use markdown",
-  "score": 82,
-  "assumptions": ["What you inferred that the user did not state"],
-  "structured": {
-    "role": "The role / persona the target AI should adopt",
-    "context": "Background and relevant context",
-    "constraints": ["Hard requirement 1", "Hard requirement 2"],
-    "format": "Expected output format and structure"
-  }
-}
-
-Scoring guide (0–100):
-- 20–40  Vague, single phrase, no context, many assumptions needed
-- 41–60  Some context but key specifics are missing
-- 61–80  Good detail with minor gaps filled by reasonable assumptions
-- 81–100 Highly specific, little to no inferencing required
-
-Rules:
-- "title" must summarise the task itself, not restate that it is a prompt, for example "Rate limiting middleware" rather than "Prompt about rate limiting".
-- "content" must be a complete, production-ready prompt the user can paste directly into any AI tool.
-- Use markdown headers, bold labels, and bullet lists inside "content" for readability.
-- Always list every assumption you made, however small.
-- Respond ONLY with valid JSON, no prose outside the object.`;
+// Bounds how much prior conversation gets replayed into each call, the
+// smallest amount that still gives the model real continuity.
+const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -94,43 +73,97 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Session not found: ${sessionError?.message ?? "no matching row"}` }, { status: 404 });
   }
 
-  // Persist the user message
-  const { data: userMsg, error: userMsgError } = await supabase
-    .from("messages")
-    .insert({
-      session_id,
-      role: "user",
-      content: content.trim(),
-      metadata: attachments?.length
-        ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
-        : {},
-    })
-    .select()
-    .single();
+  // Prior conversation, the new user message, and this user's memory are
+  // three independent reads/writes, run them concurrently rather than
+  // paying for their latency sequentially.
+  const [historyResult, userMsgResult, memoryResult] = await Promise.all([
+    supabase
+      .from("messages")
+      .select("role, content")
+      .eq("session_id", session_id)
+      .order("created_at", { ascending: true })
+      .limit(MAX_HISTORY_MESSAGES),
+    supabase
+      .from("messages")
+      .insert({
+        session_id,
+        role: "user",
+        content: content.trim(),
+        metadata: attachments?.length
+          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
+          : {},
+      })
+      .select()
+      .single(),
+    supabase
+      .from("user_memories")
+      .select("category, key, value")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  const historyRows = historyResult.data;
+  const { data: userMsg, error: userMsgError } = userMsgResult;
 
   if (userMsgError) {
     console.error("[api/chat] failed to persist user message:", userMsgError);
     return NextResponse.json({ error: userMsgError.message }, { status: 500 });
   }
 
-  console.log("[api/chat] user message persisted, generating response", { model: session.model, hasOpenAI: !!openai });
+  // Best-effort context retrieval. A failure here must never block
+  // generation, it just means the turn proceeds without that context.
+  const profileContext = {
+    preferredName: (user.user_metadata?.preferred_name as string) ?? null,
+    role: (user.user_metadata?.role as string) ?? null,
+    about: (user.user_metadata?.about as string) ?? null,
+    workingOn: (user.user_metadata?.working_on as string) ?? null,
+    primaryUse: (user.user_metadata?.primary_use as string) ?? null,
+  };
+  let relevantMemories: { category: string; key: string; value: string }[] = [];
+  try {
+    if (memoryResult.error) throw memoryResult.error;
+    relevantMemories = selectRelevantMemories(memoryResult.data ?? [], content.trim());
+  } catch (err) {
+    console.error("[api/chat] memory retrieval failed (continuing without it):", err);
+  }
 
-  // Generate the structured prompt response. The title comes from the same
-  // call rather than a second request, so an automatic title is ready at
-  // essentially no extra latency instead of appearing long after the fact.
-  const aiResponse = await generateResponse(content.trim(), session.model, attachments ?? []);
+  console.log("[api/chat] user message persisted, generating response", {
+    model: session.model,
+    hasOpenAI: !!openai,
+    historyLength: historyRows?.length ?? 0,
+    memoriesUsed: relevantMemories.length,
+  });
 
-  console.log("[api/chat] generation complete", { scoreLen: aiResponse.score, hasTitle: !!aiResponse.title });
+  const turn = await generateTurn(
+    content.trim(),
+    session.model,
+    attachments ?? [],
+    historyRows ?? [],
+    profileContext,
+    relevantMemories
+  );
 
+  console.log("[api/chat] generation complete", { mode: turn.mode, hasTitle: !!turn.title });
+
+  // If title generation didn't produce anything this turn, the session
+  // stays "New Chat" rather than settling for a worse fallback, so the
+  // next successful turn can still retitle it properly.
   let sessionTitle: string | null = null;
-  if (session.title === "New Chat") {
-    sessionTitle = (aiResponse.title || content.trim().slice(0, 60)).trim();
-    if (!aiResponse.title && content.trim().length > 60) sessionTitle += "…";
+  if (session.title === "New Chat" && turn.title?.trim()) {
+    sessionTitle = turn.title.trim();
     await supabase
       .from("chat_sessions")
       .update({ title: sessionTitle })
       .eq("id", session_id);
   }
+
+  const assistantContent =
+    turn.mode === "clarify"
+      ? formatClarifyMessage(turn.message, turn.questions)
+      : turn.content ?? "";
+
+  const score = turn.mode === "ready" ? deriveReadinessScore(turn) : undefined;
 
   // Persist the AI message
   const { data: aiMsg, error: aiMsgError } = await supabase
@@ -138,11 +171,15 @@ export async function POST(req: NextRequest) {
     .insert({
       session_id,
       role: "assistant",
-      content: aiResponse.content,
+      content: assistantContent,
       metadata: {
-        score: aiResponse.score,
-        assumptions: aiResponse.assumptions,
-        structured: aiResponse.structured,
+        mode: turn.mode,
+        score,
+        assumptions: turn.assumptions,
+        structured: turn.structured,
+        readiness: turn.readiness,
+        explanation: turn.explanation,
+        memoryCandidates: turn.memoryCandidates,
       },
     })
     .select()
@@ -163,22 +200,35 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ userMsg, aiMsg, sessionTitle });
 }
 
-// ---------------------------------------------------------------------------
-// Response generator: tries OpenAI, then DATA_SERVICE_URL, then local fallback
-// ---------------------------------------------------------------------------
-interface GeneratedPrompt {
-  title?: string;
-  content: string;
-  score: number;
-  assumptions: string[];
-  structured: Record<string, unknown>;
+function formatClarifyMessage(message: string | undefined, questions: string[] | undefined): string {
+  const intro = message?.trim() || "I can build this for you. A little more context would help:";
+  if (!questions || questions.length === 0) return intro;
+  const list = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
+  return `${intro}\n\n${list}`;
 }
 
-async function generateResponse(
+// A heuristic estimate, not the model's own number, computed the same way
+// every time so it stays internally consistent turn to turn.
+function deriveReadinessScore(turn: GeneratedTurn): number {
+  let score = 90;
+  score -= Math.min((turn.assumptions?.length ?? 0) * 6, 40);
+  score -= (turn.readiness?.missing?.length ?? 0) * 10;
+  if (turn.readiness?.status === "needs_context") score -= 15;
+  return Math.max(30, Math.min(97, Math.round(score)));
+}
+
+// ---------------------------------------------------------------------------
+// Turn generator: tries OpenAI, then DATA_SERVICE_URL, then local fallback
+// ---------------------------------------------------------------------------
+
+async function generateTurn(
   userInput: string,
   model: string,
-  attachments: IncomingAttachment[]
-): Promise<GeneratedPrompt> {
+  attachments: IncomingAttachment[],
+  history: { role: string; content: string }[],
+  profile: { preferredName: string | null; role: string | null; about: string | null; workingOn: string | null; primaryUse: string | null },
+  memories: { category: string; key: string; value: string }[]
+): Promise<GeneratedTurn> {
   // 1: OpenAI (real structured output)
   if (openai) {
     try {
@@ -201,36 +251,33 @@ async function generateResponse(
             ]
           : userInput + otherNote;
 
+      const historyMessages = history.map((m) => ({
+        role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: m.content,
+      }));
+
       const completion = await openai.chat.completions.create({
         model: resolvedModel,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: buildSystemPrompt(profile, memories) },
+          ...historyMessages,
           { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.3,
-        max_tokens: 1500,
+        temperature: 0.4,
+        max_tokens: 2000,
       });
 
       const raw = completion.choices[0]?.message?.content ?? "{}";
-      const result = JSON.parse(raw) as {
-        title?: string;
-        content?: string;
-        score?: number;
-        assumptions?: string[];
-        structured?: Record<string, unknown>;
-      };
+      const result = JSON.parse(raw) as GeneratedTurn;
 
-      if (result.content && typeof result.score === "number") {
-        return {
-          title: result.title,
-          content: result.content,
-          score: result.score,
-          assumptions: result.assumptions ?? [],
-          structured: result.structured ?? {},
-        };
+      if (result.mode === "clarify" && (result.message || (result.questions && result.questions.length))) {
+        return result;
       }
-      console.error("[chat] OpenAI returned an incomplete response, falling back:", result);
+      if (result.mode === "ready" && result.content) {
+        return result;
+      }
+      console.error("[chat] OpenAI returned an incomplete turn, falling back:", result);
     } catch (err) {
       console.error("[chat] OpenAI error, falling back to local generator:", err);
     }
@@ -248,7 +295,10 @@ async function generateResponse(
         },
         body: JSON.stringify({ input: userInput, model }),
       });
-      if (res.ok) return (await res.json()) as GeneratedPrompt;
+      if (res.ok) {
+        const data = (await res.json()) as Partial<GeneratedTurn>;
+        if (data.content) return { mode: "ready", ...data } as GeneratedTurn;
+      }
       console.error("[chat] DATA_SERVICE returned an error status:", res.status);
     } catch (err) {
       console.error("[chat] DATA_SERVICE error, falling back to local generator:", err);
@@ -256,65 +306,5 @@ async function generateResponse(
   }
 
   // 3: Local heuristic fallback
-  return buildStructuredPrompt(userInput);
-}
-
-// ---------------------------------------------------------------------------
-// Local structured prompt builder (fallback when no API keys are configured)
-// ---------------------------------------------------------------------------
-function buildStructuredPrompt(userInput: string): GeneratedPrompt {
-  const words = userInput.split(/\s+/).filter(Boolean);
-  const hasTarget = /\b(for|using|with|in|to)\b/i.test(userInput);
-  const hasFormat = /\b(format|markdown|json|list|table|bullet|step)\b/i.test(userInput);
-  const hasRole = /\b(senior|junior|expert|beginner|developer|designer|engineer|manager)\b/i.test(userInput);
-  const hasConstraint = /\b(must|should|need|require|only|never|always)\b/i.test(userInput);
-
-  let score = 35;
-  if (words.length > 8) score += 10;
-  if (words.length > 20) score += 10;
-  if (hasTarget) score += 10;
-  if (hasFormat) score += 10;
-  if (hasRole) score += 10;
-  if (hasConstraint) score += 10;
-  score = Math.min(score, 95);
-
-  const assumptions: string[] = [];
-  if (!hasRole) assumptions.push("Role and expertise level inferred from context");
-  if (!hasTarget) assumptions.push("Target tool or platform assumed from common usage patterns");
-  if (!hasFormat) assumptions.push("Output format defaulted to structured text");
-  if (!hasConstraint) assumptions.push("No explicit constraints detected, sensible defaults applied");
-
-  const structured = {
-    role: hasRole ? "Domain expert (as referenced in your input)" : "Expert assistant in the relevant domain",
-    context: userInput,
-    constraints: hasConstraint
-      ? ["Follow explicit requirements stated in the input", "Be precise and production-ready"]
-      : ["Be precise and specific", "Provide actionable, production-ready output", "Clearly state any remaining assumptions"],
-    format: hasFormat ? "As specified in input" : "Structured text with clear sections",
-  };
-
-  const content = `## Structured Prompt
-
-**Role:** ${structured.role}
-
-**Context:** ${userInput}
-
-**Task:** Complete the objective described above with precision and depth. Where the intent is ambiguous, choose the most professional interpretation and state the assumption explicitly.
-
-**Constraints:**
-${(structured.constraints as string[]).map((c) => `- ${c}`).join("\n")}
-
-**Output format:** ${structured.format as string}
-
----
-
-**Completeness score: ${score}/100**
-
-${
-  assumptions.length > 0
-    ? `**What was inferred:**\n${assumptions.map((a) => `- ${a}`).join("\n")}\n\nRefine your input with more specifics to push this score above 80.`
-    : "Your input is well-specified. The prompt above is ready to use."
-}`;
-
-  return { content, score, assumptions, structured };
+  return buildFallbackTurn(userInput);
 }
