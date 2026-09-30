@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { EmailOtpForm } from "@/components/auth/EmailOtpForm";
+import { EmailPasswordSignupForm } from "@/components/auth/EmailPasswordSignupForm";
 
 type OAuthProvider = "google" | "github";
 
@@ -111,7 +111,7 @@ export default function SignupPage() {
         </p>
       )}
 
-      <EmailOtpForm ctaLabel="Send me a code" />
+      <EmailPasswordSignupForm />
 
       <p className="text-center text-sm text-text-muted mt-6">
         Already have an account?{" "}

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { EmailMagicLinkForm } from "@/components/auth/EmailMagicLinkForm";
+import { EmailPasswordLoginForm } from "@/components/auth/EmailPasswordLoginForm";
 import { AnimatePresence, motion } from "framer-motion";
 
 type OAuthProvider = "google" | "github";
@@ -131,7 +131,7 @@ function LoginForm() {
         </p>
       )}
 
-      <EmailMagicLinkForm expanded={emailExpanded} onExpandedChange={setEmailExpanded} />
+      <EmailPasswordLoginForm expanded={emailExpanded} onExpandedChange={setEmailExpanded} />
 
       <p className="text-center text-sm text-text-muted mt-6">
         New here?{" "}

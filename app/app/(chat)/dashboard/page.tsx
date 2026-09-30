@@ -8,7 +8,8 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile";
 import { useExportHistory } from "@/lib/hooks/useExportHistory";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
-import { ChatInput } from "@/components/dashboard/ChatInput";
+import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
+import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
@@ -137,7 +138,7 @@ function ExportMenu({
 
 // ─── Empty state ───────────────────────────────────────────────────────────
 
-function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; name?: string }) {
+function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; name?: string | null }) {
   const starters = [
     "Write a system prompt for a customer support agent",
     "Create a prompt that extracts structured data from receipts",
@@ -173,33 +174,13 @@ function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; na
   );
 }
 
-// ─── Typing indicator ──────────────────────────────────────────────────────
-
-function TypingIndicator() {
-  return (
-    <div className="flex gap-3">
-      <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30 bg-signal/10">
-        <span className="font-mono text-[10px] text-signal">P</span>
-      </div>
-      <div className="flex items-center gap-1 px-4 py-3 rounded-2xl rounded-tl-md bg-base border border-border">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="w-1.5 h-1.5 rounded-full bg-text-faint animate-[blink_1.2s_step-end_infinite]"
-            style={{ animationDelay: `${i * 0.2}s` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── Dashboard page ────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
 
   // Auth
   const { profile } = useUserProfile();
@@ -241,10 +222,15 @@ export default function DashboardPage() {
   // ── Session helpers ────────────────────────────────────────────────────
 
   const loadSessions = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error: loadError } = await supabase
       .from("chat_sessions")
       .select("*")
       .order("updated_at", { ascending: false });
+    if (loadError) {
+      console.error("[dashboard] loadSessions failed:", loadError);
+      setError(`Could not load your chats: ${loadError.message}`);
+      return;
+    }
     const rows = (data as ChatSession[]) ?? [];
     setSessions(rows);
     // Open most-recent session by default
@@ -257,33 +243,60 @@ export default function DashboardPage() {
   const selectSession = async (session: ChatSession) => {
     setActiveSession(session);
     setPendingAttachments([]);
-    const { data } = await supabase
+    const { data, error: msgError } = await supabase
       .from("messages")
       .select("*")
       .eq("session_id", session.id)
       .order("created_at", { ascending: true });
+    if (msgError) {
+      console.error("[dashboard] selectSession failed:", msgError);
+      setError(`Could not load this conversation: ${msgError.message}`);
+      return;
+    }
     setMessages((data as ChatMessage[]) ?? []);
   };
 
-  const handleNewChat = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
+  // Creates a session row and returns it, or null with setError already
+  // called. Every caller must check for null rather than assuming success,
+  // a silent failure here is what makes "nothing happens when I chat" look
+  // like the whole product is broken instead of one failed insert.
+  const createSession = async (): Promise<ChatSession | null> => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("[dashboard] createSession: no authenticated user", userError);
+      setError("Your session has expired. Refresh the page and log in again.");
+      return null;
+    }
+    const { data, error: insertError } = await supabase
       .from("chat_sessions")
       .insert({ user_id: user.id, title: "New Chat", model: selectedModel.id })
       .select()
       .single();
-    if (data) {
-      const session = data as ChatSession;
-      setSessions((prev) => [session, ...prev]);
-      setActiveSession(session);
-      setMessages([]);
-      setPendingAttachments([]);
+    if (insertError || !data) {
+      console.error("[dashboard] createSession failed:", insertError);
+      setError(`Could not start a new chat: ${insertError?.message ?? "unknown error"}`);
+      return null;
     }
+    return data as ChatSession;
+  };
+
+  const handleNewChat = async () => {
+    setError(null);
+    const session = await createSession();
+    if (!session) return;
+    setSessions((prev) => [session, ...prev]);
+    setActiveSession(session);
+    setMessages([]);
+    setPendingAttachments([]);
   };
 
   const handleDeleteSession = async (id: string) => {
-    await supabase.from("chat_sessions").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("chat_sessions").delete().eq("id", id);
+    if (deleteError) {
+      console.error("[dashboard] handleDeleteSession failed:", deleteError);
+      setError(`Could not delete that chat: ${deleteError.message}`);
+      return;
+    }
     setSessions((prev) => prev.filter((s) => s.id !== id));
     if (activeSession?.id === id) {
       setActiveSession(null);
@@ -333,18 +346,16 @@ export default function DashboardPage() {
     if ((!content && pendingAttachments.length === 0) || isLoading) return;
     const attachments = pendingAttachments;
 
+    console.log("[chat] send starting", { hasSession: !!activeSession, contentLength: content.length });
+
     // If no session exists yet, create one
     let session = activeSession;
     if (!session) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("chat_sessions")
-        .insert({ user_id: user.id, title: "New Chat", model: selectedModel.id })
-        .select()
-        .single();
-      if (!data) return;
-      session = data as ChatSession;
+      session = await createSession();
+      if (!session) {
+        console.error("[chat] send aborted, could not create a session");
+        return;
+      }
       setSessions((prev) => [session!, ...prev]);
       setActiveSession(session);
     }
@@ -371,11 +382,12 @@ export default function DashboardPage() {
     ]);
 
     try {
+      console.log("[chat] POST /api/chat", { session_id: session.id });
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: session!.id,
+          session_id: session.id,
           content,
           attachments: attachments.length
             ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl }))
@@ -383,8 +395,25 @@ export default function DashboardPage() {
         }),
       });
 
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "Something went wrong");
+      console.log("[chat] /api/chat responded", { status: res.status, ok: res.ok });
+
+      let payload: { error?: string; userMsg?: ChatMessage; aiMsg?: ChatMessage; sessionTitle?: string };
+      try {
+        payload = await res.json();
+      } catch (parseErr) {
+        console.error("[chat] response was not valid JSON:", parseErr);
+        throw new Error(`Server returned an unreadable response (status ${res.status}).`);
+      }
+
+      if (!res.ok) {
+        console.error("[chat] /api/chat returned an error:", payload);
+        throw new Error(payload.error ?? `Request failed with status ${res.status}`);
+      }
+
+      if (!payload.userMsg || !payload.aiMsg) {
+        console.error("[chat] /api/chat succeeded but response is missing messages:", payload);
+        throw new Error("The server did not return a complete response.");
+      }
 
       // Replace optimistic bubble + add AI response
       setMessages((prev) => [
@@ -398,17 +427,25 @@ export default function DashboardPage() {
         setSessions((prev) =>
           prev.map((s) =>
             s.id === session!.id
-              ? { ...s, title: payload.sessionTitle, updated_at: new Date().toISOString() }
+              ? { ...s, title: payload.sessionTitle as string, updated_at: new Date().toISOString() }
               : s
           )
         );
       }
     } catch (err) {
+      console.error("[chat] send failed:", err);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStarterClick = (text: string) => {
+    setInputValue(text);
+    // Wait a tick so the textarea has the new value before we move the
+    // cursor to the end of it.
+    requestAnimationFrame(() => chatInputRef.current?.focus());
   };
 
   // ── Export ─────────────────────────────────────────────────────────────
@@ -526,13 +563,13 @@ export default function DashboardPage() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-5 flex flex-col gap-5">
             {messages.length === 0 && !isLoading ? (
-              <EmptyState onStarter={(text) => handleSend(text)} name={profile?.preferredName ?? undefined} />
+              <EmptyState onStarter={handleStarterClick} name={profile?.preferredName ?? undefined} />
             ) : (
               <>
                 {messages.map((m) => (
                   <MessageBubble key={m.id} message={m} />
                 ))}
-                {isLoading && <TypingIndicator />}
+                {isLoading && <GenerationStatus />}
               </>
             )}
             <div ref={bottomRef} />
@@ -560,6 +597,7 @@ export default function DashboardPage() {
           )}
 
           <ChatInput
+            ref={chatInputRef}
             value={inputValue}
             onChange={setInputValue}
             onSend={() => handleSend()}

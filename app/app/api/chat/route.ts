@@ -29,6 +29,7 @@ const SYSTEM_PROMPT = `You are Prompt AI — an expert at transforming vague use
 
 Given any user input, analyse their intent and respond with a JSON object in this exact format:
 {
+  "title": "A short, specific conversation title, four to six words, no trailing punctuation",
   "content": "The complete structured prompt as ready-to-use markdown",
   "score": 82,
   "assumptions": ["What you inferred that the user did not state"],
@@ -47,6 +48,7 @@ Scoring guide (0–100):
 - 81–100 Highly specific — little to no inferencing required
 
 Rules:
+- "title" must summarise the task itself, not restate that it is a prompt, for example "Rate limiting middleware" rather than "Prompt about rate limiting".
 - "content" must be a complete, production-ready prompt the user can paste directly into any AI tool.
 - Use markdown headers, bold labels, and bullet lists inside "content" for readability.
 - Always list every assumption you made, however small.
@@ -57,9 +59,11 @@ export async function POST(req: NextRequest) {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (userError || !user) {
+    console.error("[api/chat] no authenticated user:", userError);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -68,6 +72,8 @@ export async function POST(req: NextRequest) {
     content: string;
     attachments?: IncomingAttachment[];
   };
+
+  console.log("[api/chat] request", { userId: user.id, session_id, contentLength: content?.trim().length ?? 0 });
 
   if (!session_id || !(content?.trim() || attachments?.length)) {
     return NextResponse.json({ error: "Missing session_id or content" }, { status: 400 });
@@ -82,7 +88,8 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (sessionError || !session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    console.error("[api/chat] session lookup failed:", sessionError);
+    return NextResponse.json({ error: `Session not found: ${sessionError?.message ?? "no matching row"}` }, { status: 404 });
   }
 
   // Persist the user message
@@ -100,21 +107,28 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (userMsgError) {
+    console.error("[api/chat] failed to persist user message:", userMsgError);
     return NextResponse.json({ error: userMsgError.message }, { status: 500 });
   }
 
-  // Auto-title the session from the first user message
+  console.log("[api/chat] user message persisted, generating response", { model: session.model, hasOpenAI: !!openai });
+
+  // Generate the structured prompt response. The title comes from the same
+  // call rather than a second request, so an automatic title is ready at
+  // essentially no extra latency instead of appearing long after the fact.
+  const aiResponse = await generateResponse(content.trim(), session.model, attachments ?? []);
+
+  console.log("[api/chat] generation complete", { scoreLen: aiResponse.score, hasTitle: !!aiResponse.title });
+
   let sessionTitle: string | null = null;
   if (session.title === "New Chat") {
-    sessionTitle = content.trim().slice(0, 60) + (content.trim().length > 60 ? "…" : "");
+    sessionTitle = (aiResponse.title || content.trim().slice(0, 60)).trim();
+    if (!aiResponse.title && content.trim().length > 60) sessionTitle += "…";
     await supabase
       .from("chat_sessions")
       .update({ title: sessionTitle })
       .eq("id", session_id);
   }
-
-  // Generate the structured prompt response
-  const aiResponse = await generateResponse(content.trim(), session.model, attachments ?? []);
 
   // Persist the AI message
   const { data: aiMsg, error: aiMsgError } = await supabase
@@ -133,6 +147,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (aiMsgError) {
+    console.error("[api/chat] failed to persist AI message:", aiMsgError);
     return NextResponse.json({ error: aiMsgError.message }, { status: 500 });
   }
 
@@ -142,17 +157,26 @@ export async function POST(req: NextRequest) {
     .update({ updated_at: new Date().toISOString() })
     .eq("id", session_id);
 
+  console.log("[api/chat] done", { session_id });
   return NextResponse.json({ userMsg, aiMsg, sessionTitle });
 }
 
 // ---------------------------------------------------------------------------
 // Response generator — tries OpenAI → DATA_SERVICE_URL → local fallback
 // ---------------------------------------------------------------------------
+interface GeneratedPrompt {
+  title?: string;
+  content: string;
+  score: number;
+  assumptions: string[];
+  structured: Record<string, unknown>;
+}
+
 async function generateResponse(
   userInput: string,
   model: string,
   attachments: IncomingAttachment[]
-): Promise<{ content: string; score: number; assumptions: string[]; structured: Record<string, unknown> }> {
+): Promise<GeneratedPrompt> {
   // 1 — OpenAI (real structured output)
   if (openai) {
     try {
@@ -188,6 +212,7 @@ async function generateResponse(
 
       const raw = completion.choices[0]?.message?.content ?? "{}";
       const result = JSON.parse(raw) as {
+        title?: string;
         content?: string;
         score?: number;
         assumptions?: string[];
@@ -196,12 +221,14 @@ async function generateResponse(
 
       if (result.content && typeof result.score === "number") {
         return {
+          title: result.title,
           content: result.content,
           score: result.score,
           assumptions: result.assumptions ?? [],
           structured: result.structured ?? {},
         };
       }
+      console.error("[chat] OpenAI returned an incomplete response, falling back:", result);
     } catch (err) {
       console.error("[chat] OpenAI error — falling back to local generator:", err);
     }
@@ -219,9 +246,10 @@ async function generateResponse(
         },
         body: JSON.stringify({ input: userInput, model }),
       });
-      if (res.ok) return res.json() as Promise<ReturnType<typeof generateResponse>>;
-    } catch {
-      console.error("[chat] DATA_SERVICE error — falling back to local generator");
+      if (res.ok) return (await res.json()) as GeneratedPrompt;
+      console.error("[chat] DATA_SERVICE returned an error status:", res.status);
+    } catch (err) {
+      console.error("[chat] DATA_SERVICE error — falling back to local generator:", err);
     }
   }
 
@@ -232,12 +260,7 @@ async function generateResponse(
 // ---------------------------------------------------------------------------
 // Local structured prompt builder (fallback when no API keys are configured)
 // ---------------------------------------------------------------------------
-function buildStructuredPrompt(userInput: string): {
-  content: string;
-  score: number;
-  assumptions: string[];
-  structured: Record<string, unknown>;
-} {
+function buildStructuredPrompt(userInput: string): GeneratedPrompt {
   const words = userInput.split(/\s+/).filter(Boolean);
   const hasTarget = /\b(for|using|with|in|to)\b/i.test(userInput);
   const hasFormat = /\b(format|markdown|json|list|table|bullet|step)\b/i.test(userInput);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import dynamic from "next/dynamic";
 import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square } from "lucide-react";
 import type { EmojiClickData } from "emoji-picker-react";
@@ -16,16 +16,31 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({
+export interface ChatInputHandle {
+  focus: () => void;
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({
   value,
   onChange,
   onSend,
   onAttach,
   disabled = false,
   placeholder = "Describe what you need — plain language works best",
-}: ChatInputProps) {
+}, ref) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const valueRef = useRef(value);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      // Put the cursor at the end rather than selecting or leaving it at 0.
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    },
+  }));
   const [showEmoji, setShowEmoji] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -212,4 +227,4 @@ export function ChatInput({
       </p>
     </div>
   );
-}
+});
