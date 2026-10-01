@@ -16,7 +16,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import events
-from core.context import PipelineContext, assemble_context, read_attachments, run_research
+from core.context import (
+    PipelineContext,
+    assemble_context,
+    attach_memory,
+    fresh_memory_candidates,
+    read_attachments,
+    run_research,
+    widen_memory,
+)
 from core.pipeline import clarify, construct, intent, research, score
 from core.prompts.loader import ACTIVE_VERSION
 from core.providers import get_provider
@@ -26,6 +34,7 @@ from schemas.responses import (
     AnswerEvent,
     ClarifyingQuestionEvent,
     ErrorEvent,
+    MemoryRef,
     ResultEvent,
     SourceSummary,
 )
@@ -52,6 +61,11 @@ def _question_event(state: ClarifyState) -> ClarifyingQuestionEvent:
     )
 
 
+def _memory_used(ctx: PipelineContext) -> list[MemoryRef]:
+    """The stored memory that informed this reply, shown to the user."""
+    return [MemoryRef(category=m.category, key=m.key, value=m.value) for m in ctx.relevant_memories]
+
+
 def _summaries(sources: list[SourceNote]) -> list[SourceSummary]:
     """What the user is shown. The extracted text itself stays server side."""
     return [SourceSummary(kind=s.kind, label=s.label, summary=s.summary, links=s.links) for s in sources]
@@ -63,6 +77,10 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
     pending = clarify.pending_question(state) if state else None
 
     try:
+        # Memory is consulted before anything else, for every kind of message.
+        # What bears on this request is selected here, not the whole store.
+        ctx = await attach_memory(ctx, provider)
+
         # Attachments are read first, so intent detection can see what is in
         # them. A file can answer what would otherwise have been asked.
         if ctx.attachments:
@@ -96,12 +114,17 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
 
         if decision.kind == "conversation":
             yield events.answering()
-            text = await construct.answer_directly(ctx, provider)
+            # A message about the user themselves makes everything stored relevant.
+            if decision.about_user:
+                ctx = widen_memory(ctx)
+            answered = await construct.answer_directly(ctx, provider)
             # A direct question does not consume the pending clarifying
             # question, it is handed back still waiting.
             position, total = clarify.position(state) if pending and state else (None, None)
             yield AnswerEvent(
-                content=text,
+                content=answered.text,
+                memory_candidates=fresh_memory_candidates(answered.memory_candidates, ctx.all_memories),
+                memory_used=_memory_used(ctx),
                 clarify_state=state if pending else None,
                 pending_question=pending,
                 position=position,
@@ -150,13 +173,15 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
 
         yield events.finalizing()
         yield ResultEvent(
+            message=built.message,
             content=built.content,
             score=scored.score,
             diff=scored.diff,
             structured=built.structured,
             readiness=built.readiness,
             explanation=built.explanation,
-            memory_candidates=built.memory_candidates,
+            memory_candidates=fresh_memory_candidates(built.memory_candidates, ctx.all_memories),
+            memory_used=_memory_used(ctx),
             sources=_summaries(ctx.sources),
             format_style=construct.format_style_for(ctx, state),
             template_version=ACTIVE_VERSION,

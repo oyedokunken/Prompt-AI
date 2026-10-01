@@ -106,7 +106,12 @@ export interface PromptMetadata {
   };
   readiness?: PromptReadiness;
   explanation?: string;
-  memoryCandidates?: MemoryCandidate[];
+  // The conversational wrapper around a finished prompt, kept apart from it.
+  preamble?: string | null;
+  // Stored memory that informed this reply.
+  memoryUsed?: { category: string; key: string; value: string }[];
+  // Facts saved to memory automatically while producing this reply.
+  memorySaved?: { category: string; key: string; value: string; action: "added" | "updated" }[];
   attachments?: {
     name: string;
     type: string;

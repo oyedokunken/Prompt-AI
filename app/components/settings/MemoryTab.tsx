@@ -22,12 +22,13 @@ function MemoryRow({
   const [editing, setEditing] = useState(false);
   const [key, setKey] = useState(memory.key);
   const [value, setValue] = useState(memory.value);
+  const [category, setCategory] = useState(memory.category);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     if (!key.trim() || !value.trim()) return;
     setSaving(true);
-    await onSave(memory.id, key.trim(), value.trim(), memory.category);
+    await onSave(memory.id, key.trim(), value.trim(), category);
     setSaving(false);
     setEditing(false);
   };
@@ -35,6 +36,16 @@ function MemoryRow({
   if (editing) {
     return (
       <div className="flex flex-col gap-2 px-4 py-3 rounded-lg border border-accent/30 bg-accent/5">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="px-2.5 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary outline-none focus:border-accent/40"
+          aria-label="Category"
+        >
+          {MEMORY_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
         <input
           value={key}
           onChange={(e) => setKey(e.target.value)}
@@ -50,7 +61,7 @@ function MemoryRow({
         />
         <div className="flex justify-end gap-2">
           <button
-            onClick={() => { setEditing(false); setKey(memory.key); setValue(memory.value); }}
+            onClick={() => { setEditing(false); setKey(memory.key); setValue(memory.value); setCategory(memory.category); }}
             className="p-1.5 rounded-md text-text-faint hover:text-text-muted transition-colors"
             aria-label="Cancel"
           >
@@ -72,10 +83,15 @@ function MemoryRow({
   return (
     <div className="group flex items-start justify-between gap-3 px-4 py-3 rounded-lg border border-border bg-surface hover:border-border/60 transition-colors">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-text-primary">{memory.key}</p>
+        <p className="text-sm font-medium text-text-primary">
+          {memory.key}
+          <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-text-faint">
+            {memory.source === "manual" ? "added by you" : memory.source === "onboarding" ? "from onboarding" : "saved from a chat"}
+          </span>
+        </p>
         <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{memory.value}</p>
       </div>
-      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button
           onClick={() => setEditing(true)}
           className="p-1.5 rounded-md text-text-faint hover:text-text-muted transition-colors"
@@ -127,9 +143,9 @@ export function MemoryTab() {
         <h1 className="text-xl font-semibold text-text-primary">Memory</h1>
       </div>
       <p className="text-sm text-text-muted mb-6 leading-relaxed">
-        Prompt AI uses these details to personalize your prompt engineering experience, so it asks
-        fewer redundant questions over time. You control everything here, add, edit, or remove
-        anything at any time.
+        Prompt AI saves stable, useful details from your conversations here on its own, and checks
+        them before every reply so it asks fewer redundant questions. You control everything, add,
+        edit, or remove anything at any time.
       </p>
 
       {loading ? (
@@ -140,11 +156,19 @@ export function MemoryTab() {
       ) : memories.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
           <Brain size={20} className="text-text-faint mx-auto mb-3" />
-          <p className="text-sm text-text-primary font-medium">Prompt AI doesn't know anything about you yet</p>
-          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-            As you chat, useful and stable context can be saved here. You can also add something
-            yourself right now.
+          <p className="text-sm text-text-primary font-medium">Prompt AI does not know anything about you yet</p>
+          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto leading-relaxed">
+            Useful, stable context will be saved here as you chat, such as your stack, your work and
+            how you like things done. Nothing is guessed. You can also add something yourself right now.
           </p>
+          {!addingCategory && (
+            <button
+              onClick={() => setAddingCategory("about")}
+              className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors"
+            >
+              <Plus size={12} /> Add something now
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6 mb-6">
@@ -212,7 +236,7 @@ export function MemoryTab() {
             </button>
           </div>
         </div>
-      ) : (
+      ) : memories.length === 0 ? null : (
         <button
           onClick={() => setAddingCategory("about")}
           className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-dashed border-border text-xs text-text-faint hover:border-accent/40 hover:text-accent transition-colors mb-4"

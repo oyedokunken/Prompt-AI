@@ -1,0 +1,10 @@
+#!/bin/sh
+# Removes co-author trailers that name an AI tool, so no commit carries one
+# no matter which editor or agent produced it. Enabled with:
+#   git config core.hooksPath .githooks
+file="$1"
+pattern='^[[:space:]]*co-authored-by:.*(claude|anthropic|devin|cognition|copilot|openai|chatgpt|gpt|cursor|codex|gemini|windsurf|aider|\[bot\])'
+if grep -qiE "$pattern" "$file"; then
+  grep -viE "$pattern" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+fi
+exit 0

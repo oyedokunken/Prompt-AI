@@ -15,12 +15,14 @@ This project is public and open to contributors. It is built for developers, by 
 - [The Problem](#the-problem)
 - [How Prompt AI Solves It](#how-prompt-ai-solves-it)
 - [Architecture Overview](#architecture-overview)
+- [System Diagrams](#system-diagrams)
 - [Monorepo Structure](#monorepo-structure)
 - [Tech Stack](#tech-stack)
 - [Core Features](#core-features)
 - [Edge Cases We Actively Handle](#edge-cases-we-actively-handle)
 - [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
+- [Authentication](#authentication)
 - [Running the Project](#running-the-project)
 - [Project Roadmap](#project-roadmap)
 - [Contributing](#contributing)
@@ -50,10 +52,12 @@ The long term goal is a system that understands how other AI models think better
 
 Prompt AI is a monorepo split into four areas, each with a single responsibility.
 
-- **`/app`** is the Next.js frontend. It owns the chat interface and everything the user sees.
-- **`/api`** is the backend. It owns authentication, business logic, email (via Nodemailer), rate limiting, and every request that involves the database. It is the only service allowed to talk to `/data`.
-- **`/data`** is strictly the AI layer. It hosts the LLM orchestration, classification, and scoring models, and exposes a narrow internal API that only `/api` calls. It has no auth, no email, and no direct client access.
-- **`/docs`** holds architecture notes, prompt engineering pattern documentation, and contribution guides that don't belong in code.
+- **`/app`** is the Next.js frontend. It owns the chat interface, the dashboard and settings, and everything the user sees.
+- **`/api`** is the backend. It owns authentication, the database, email (via Nodemailer), rate limiting, and all business logic that is not AI. For every chat turn it loads the user's profile, stored memory and conversation history, sends them to `/data`, relays the streamed result unchanged, and persists the outcome. It is the only service allowed to talk to `/data`.
+- **`/data`** is strictly the intelligence layer. It is stateless, with no database and no direct client access. It receives everything it needs from `/api` and runs the pipeline: select relevant memory, read attachments, detect intent, search the web when current information is needed, run the one question at a time clarifying flow, construct the prompt, and score it. It is the only service that calls a model provider, and it does so through a provider interface.
+- **`/docs`** holds the database schema and operational notes that don't belong in code.
+
+Three rules keep these boundaries honest: `/data` is the only caller of a model provider, `/api` is the only caller of `/data`, and `/data` never fetches anything itself. That last rule is what keeps the system from guessing about a user it was never told about. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full request flow and a responsibility table.
 
 `/app` and `/api` are deployed as two separate Vercel projects, linked by environment variables. `/data` is deployed on Render, since Render is better suited to long running Python processes than serverless functions are. Nodemailer runs from `/api` on Vercel rather than from `/data`, since Render does not handle SMTP style outbound mail as cleanly.
 
@@ -69,45 +73,42 @@ graph TB
 
     subgraph App["/app - Frontend (Vercel)"]
         NextJS["Next.js App Router"]
-        Zustand["Zustand State"]
         UI["React Components"]
     end
 
     subgraph API["/api - Backend (Vercel)"]
         Express["Express.js API"]
-        Auth["JWT Auth Middleware"]
-        Prisma["Prisma ORM"]
+        Verify["Supabase Token Verification"]
+        ChatRoute["Chat Route: context, relay, persistence"]
+        MemSave["Automatic Memory Saving"]
         Nodemailer["Nodemailer"]
-        OpenAI["OpenAI SDK"]
     end
 
-    subgraph Data["/data - AI Layer (Render)"]
+    subgraph Data["/data - Intelligence Layer (Render)"]
         FastAPI["FastAPI Service"]
-        LLM["LLM Orchestration"]
-        Classifier["Intent Classifier"]
-        Scorer["Prompt Scorer"]
-        Vector["pgvector Store"]
+        Pipeline["Pipeline: memory, files, intent, search, questions, construct, score"]
+        Provider["Provider Interface"]
     end
 
     subgraph Infra["Infrastructure"]
-        Supabase[(Supabase PostgreSQL)]
+        Supabase[(Supabase: Auth, Postgres, Storage)]
         SMTP[(SMTP Server)]
+        LLM[(Model Provider)]
     end
 
     Browser --> NextJS
     NextJS --> UI
-    UI --> Zustand
-    NextJS -->|HTTPS| Express
-    Express --> Auth
-    Auth --> Prisma
-    Prisma --> Supabase
-    Express --> OpenAI
-    Express -->|Internal API| FastAPI
-    FastAPI --> LLM
-    FastAPI --> Classifier
-    FastAPI --> Scorer
-    Scorer --> Vector
-    Vector --> Supabase
+    UI -->|Simple reads and writes| Supabase
+    NextJS -->|HTTPS, bearer token| Express
+    Express --> Verify
+    Verify --> ChatRoute
+    ChatRoute --> Supabase
+    ChatRoute --> MemSave
+    MemSave --> Supabase
+    ChatRoute -->|Shared secret, streamed| FastAPI
+    FastAPI --> Pipeline
+    Pipeline --> Provider
+    Provider --> LLM
     Express --> Nodemailer
     Nodemailer --> SMTP
 
@@ -125,68 +126,98 @@ sequenceDiagram
     participant User as User
     participant App as /app (Next.js)
     participant API as /api (Express)
-    participant Queue as BullMQ
     participant Data as /data (FastAPI)
+    participant LLM as Model Provider
     participant DB as Supabase
-    User->>App: Send prompt request
-    App->>API: POST /api/chat (Supabase session)
-    API->>API: Validate session
-    API->>Queue: Enqueue prompt job
-    Queue->>Data: Process job (internal API)
-    Data->>Data: Classify intent
-    Data->>Data: Retrieve patterns (pgvector)
-    Data->>Data: Construct prompt
-    Data->>Data: Score prompt
-    Data-->>Queue: Return structured prompt
-    Queue-->>API: Job result
-    API->>DB: Save prompt history
-    API-->>App: Return prompt + score
-    App-->>User: Display result
+    User->>App: Send message
+    App->>API: POST /chat/stream (bearer token)
+    API->>DB: Verify token, load session, history, memory
+    API->>DB: Store user message
+    API->>Data: POST /generate (profile, memory, history, files, open question state)
+    Data->>LLM: Embed memory, select relevant items
+    opt Attachments
+        Data->>LLM: Read images, extract PDF and Word text
+    end
+    Data->>LLM: Classify intent
+    opt Search warranted
+        Data->>LLM: Web search
+    end
+    alt Critical detail missing
+        Data-->>API: One clarifying question + updated state
+    else Casual or about the user
+        Data->>LLM: Conversational reply
+        Data-->>API: Reply + memory used + facts worth keeping
+    else Prompt can be built
+        Data->>LLM: Construct prompt
+        Data-->>API: Prompt + message + score + diff + sources + memory used
+    end
+    Data-->>API: Stage events, streamed throughout
+    API-->>App: Events relayed unchanged
+    API->>DB: Store reply, save new memory automatically
+    API-->>App: Final event with stored rows and what was saved
+    App-->>User: Display reply, prompt card, passive memory notice
 ```
 
 ### Data Flow Diagram
 
 ```mermaid
 graph LR
-    Input[User Input] --> Parse[Intent Parser]
-    Parse --> Classify[Intent Classifier]
-    Classify --> Router[Model Router]
-    Router --> Pattern[Pattern Retrieval]
-    Pattern --> Construct[Prompt Constructor]
-    Construct --> Score[Scoring Engine]
+    Input[User Message] --> Memory[Memory Selection]
+    Files[Attached Files] --> Ingest[Attachment Reading]
+    Memory --> Intent[Intent Detection]
+    Ingest --> Intent
+    Intent -->|Conversation| Reply[Conversational Reply]
+    Intent -->|Missing detail| Clarify[Clarifying Question]
+    Intent -->|Sufficient| Research{Search needed?}
+    Research -->|Yes| Search[Web Search]
+    Research -->|No| Construct[Prompt Constructor]
+    Search --> Construct
+    Construct --> Score[Scoring and Diff]
     Score --> Output[Structured Prompt]
 
-    DB[(Supabase)] --> Pattern
-    Vector[(pgvector)] --> Pattern
-    OpenAI[(OpenAI API)] --> Score
+    DB[(Supabase)] --> Memory
+    LLM[(Model Provider)] --> Intent
+    LLM --> Construct
+    LLM --> Search
+    LLM --> Ingest
 
-    Output --> History[Prompt History]
+    Output --> History[Chat History]
+    Reply --> History
+    Reply --> NewMem[Memory Candidates]
+    Output --> NewMem
+    NewMem --> Saver[Automatic Saving in /api]
+    Saver --> DB
     History --> DB
 
     style Input fill:#F2A93B
     style Output fill:#8B7CF6
     style DB fill:#0467DF,color:#fff
-    style Vector fill:#0467DF,color:#fff
-    style Cache fill:#FF7000,color:#fff
+    style LLM fill:#0467DF,color:#fff
 ```
 
 ### Activity Diagram
 
 ```mermaid
 flowchart TD
-    Start([User submits request]) --> Auth{Authenticated?}
+    Start([User submits message]) --> Auth{Token valid?}
     Auth -->|No| Error([Return 401])
     Auth -->|Yes| RateLimit{Rate limit OK?}
     RateLimit -->|No| Error
     RateLimit -->|Yes| Validate{Input valid?}
     Validate -->|No| Error
-    Validate -->|Yes| Queue[Enqueue to BullMQ]
-    Queue --> Classify[Classify intent]
-    Classify --> Retrieve[Retrieve patterns]
-    Retrieve --> Construct[Construct prompt]
-    Construct --> Score[Score prompt]
-    Score --> Save[Save to DB]
-    Save --> Return([Return result])
+    Validate -->|Yes| Load[Load profile, memory, history, open question state]
+    Load --> Send[Send to /data]
+    Send --> Select[Select relevant memory]
+    Select --> Read[Read attachments]
+    Read --> Intent{Intent}
+    Intent -->|Conversation| Reply[Reply from memory and context]
+    Intent -->|Missing detail| Ask[Ask one question]
+    Intent -->|Sufficient| Search[Search if planned]
+    Search --> Build[Construct and score prompt]
+    Reply --> Persist[Persist reply, save memory]
+    Ask --> Persist
+    Build --> Persist
+    Persist --> Return([Return stored rows and what was saved])
     Return --> End([End])
 
     style Start fill:#F2A93B
@@ -210,6 +241,18 @@ graph TB
         Integrations[Integrations]
         Header[Header]
         Footer[Footer]
+    end
+
+    subgraph Dashboard["Dashboard Components"]
+        Sidebar[Sidebar]
+        ChatInput[Chat Input]
+        MessageBubble[Message Bubble]
+        PromptCard[Prompt Card with Copy]
+        ClarifyInterview[Clarify Interview]
+        GenerationStatus[Generation Status]
+        MemoryToast[Memory Toast]
+        MemoryTab[Memory Settings]
+        Markdown[Markdown Renderer]
     end
 
     subgraph Shared["Shared Components"]
@@ -238,11 +281,16 @@ graph TB
     Header --> Logo
     Footer --> Logo
 
+    MessageBubble --> Markdown
+    MessageBubble --> PromptCard
+    MemoryTab --> MemoryToast
+
     Button --> UI_Primitives
     Card --> UI_Primitives
     Badge --> UI_Primitives
 
     style Frontend fill:#412991,color:#fff
+    style Dashboard fill:#39594D,color:#fff
     style Shared fill:#8B7CF6,color:#fff
     style UI_Primitives fill:#F2A93B,color:#fff
 ```
@@ -256,11 +304,13 @@ Prompt-AI/
 ├── data/               Python LLM and ML layer, model serving only (Render)
 ├── docs/               Architecture notes, guides, and pattern library docs
 ├── .github/            CI workflows and issue and PR templates
+├── .githooks/          Commit hooks, enable with git config core.hooksPath .githooks
 ├── SECURITY.md
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 ├── ARCHITECTURE.md
 ├── WIKI.md
+├── story.txt
 └── README.md
 ```
 
@@ -268,46 +318,51 @@ Each folder is independently runnable and has its own dependency management, env
 
 ## Tech Stack
 
-### `/app` — Frontend
+### `/app` - Frontend
 
 | Concern | Technology | Notes |
 |---|---|---|
-| Framework | Next.js 15 | App Router, SSR + Client Components |
-| Language | TypeScript 5 | Strict mode, full type coverage |
-| Styling | Tailwind CSS 3 | Custom design tokens, JIT |
+| Framework | Next.js | App Router, SSR + Client Components |
+| Language | TypeScript | Strict mode, full type coverage |
+| Styling | Tailwind CSS | Custom design tokens, JIT |
 | Auth client | Supabase SSR | Session cookies, PKCE OAuth flow |
 | Icons | Lucide React | Consistent icon set |
 | Animations | Framer Motion | Page transitions, scroll animations |
 | Validation | Zod | End-to-end type-safe form schemas |
+| Rich text | react-markdown + remark | Replies render as formatted text, raw HTML is never rendered |
 | Font | Geist / Geist Mono | Variable fonts, system fallback |
 | Deploy | Vercel | Edge network, auto-deploy from `main` |
 
-### `/api` — Backend
+### `/api` - Backend
 
 | Concern | Technology | Notes |
 |---|---|---|
-| Framework | Express.js 4 | TypeScript, modular routes |
-| Language | TypeScript 5 | Compiled via `tsc`, strict mode |
-| ORM | Prisma 5 | Type-safe queries, `db push` schema sync |
+| Framework | Express.js | TypeScript, modular routes |
+| Language | TypeScript | Compiled via `tsc`, strict mode |
+| ORM | Prisma | Schema and migrations for auth tables |
 | Database | PostgreSQL | Hosted on Supabase |
-| Auth | JWT + bcrypt | 15 min access / 30 day refresh token pair |
+| Auth | Supabase token verification | Every chat request carries a Supabase access token that `/api` verifies |
+| Sign up | Email one time codes | HMAC-SHA256 hashed with a pepper, 10 minute expiry, single use |
 | OAuth | Supabase Auth | GitHub + Google, redirect-based PKCE |
 | Email | Nodemailer | OTP + transactional email via SMTP |
 | Security | Helmet + express-rate-limit | Security headers, per-route IP rate limits |
 | Validation | Zod | Schema-driven, fails fast on bad input |
-| AI | OpenAI SDK | GPT-4o for structured prompt generation |
+| AI relay | fetch + server-sent events | Sends context to `/data` and relays its stream unchanged, never calls a model provider |
+| Memory | Supabase Postgres | Automatic saving with guards against secrets, repeats and overwriting manual entries |
 | File storage | Supabase Storage | Avatars, image, video, PDF attachments |
 | Deploy | Vercel | Separate project from `/app` |
 
-### `/data` — AI / ML Layer *(planned)*
+### `/data` - Intelligence Layer
 
 | Concern | Technology | Notes |
 |---|---|---|
-| Framework | FastAPI | Python, async, internal-only |
-| Inference | OpenAI API | GPT-4o via service account |
-| Classification | scikit-learn | Intent routing, prompt category detection |
-| Embeddings | pgvector (Supabase) | Known effective prompt pattern retrieval |
-| Data | pandas + NumPy | Feature engineering, scoring inputs |
+| Framework | FastAPI | Python, async, internal only, stateless |
+| Config | pydantic-settings | Validated at startup, refuses to run on a missing or malformed key |
+| Model access | OpenAI API behind a provider interface | Chat, vision, embeddings, web search and transcription, in one implementation |
+| Memory retrieval | Embeddings + cosine similarity | Selects relevant stored memory, keyword fallback if embeddings fail |
+| Documents | pypdf + python-docx | PDF and Word text extraction |
+| Prompts | Versioned templates | Active version selected in one place, every result traceable to its wording |
+| Quality | pytest + evaluation harness | Unit tests, plus an eval set with decision, content, filler and judged scoring |
 | Deploy | Render | Long-running Python processes |
 
 ### Infrastructure and Tooling
@@ -315,18 +370,25 @@ Each folder is independently runnable and has its own dependency management, env
 | Concern | Technology |
 |---|---|
 | Version control | GitHub |
-| CI | GitHub Actions (lint, typecheck, build) |
-| Containerisation | Docker (for `/data`) |
+| CI | GitHub Actions (keep alive, commit trailer check) |
+| Commit hygiene | `.githooks/commit-msg` + CI check | Strips and rejects AI co-author trailers |
 | Code style | ESLint + Prettier |
 
 ## Core Features
 
-- **Conversational prompt building.** Describe your goal in natural language and get follow up questions when critical context is missing.
-- **Structured prompt output.** Every generated prompt follows a consistent, proven structure: role, context, constraints, format, and examples where relevant.
+- **Conversational prompt building.** Describe your goal in natural language and get follow up questions when critical context is missing. Questions come one at a time, with quick options for choices. A single choice advances the moment you pick it.
+- **Structured prompt output.** Every generated prompt is shaped by the request instead of copied from a template, with the role, constraints and output format the task needs. It appears in its own card with a copy button, apart from the conversational reply around it.
+- **Lightweight by default.** Prompts are written as clean plain text so they paste anywhere. Markdown or tagged sections are used only when the destination calls for them.
 - **Completeness scoring.** Each prompt is scored against a clarity and specificity rubric, with a visible breakdown of the score.
-- **Assumption transparency.** Prompt AI shows a clear diff between what the user actually said and what was inferred or added, so users can accept or reject assumptions before using the prompt.
-- **Tool aware routing.** Prompts are tailored to the target AI category, and Prompt AI can suggest which tool the prompt is best suited for.
-- **Prompt history.** Every generated prompt is saved to the user's account for reuse and iteration.
+- **Assumption transparency.** A visible breakdown of what you stated, what was found in your files or on the web, and what was inferred, so you can see exactly where each part of the prompt came from.
+- **Reads your material.** Attach a PDF, a Word document or an image. Text is extracted, images are read with vision, and what is found shapes the prompt. Every source is listed.
+- **Web search when it matters.** When a request depends on current information, Prompt AI searches the web and shows what it searched and found.
+- **Memory that works for you.** Stable facts about you are saved automatically as you chat, with a quiet notice and nothing to approve, and secrets are never stored. The memory that bears on each message is selected before every reply, and you can see which details informed it. A memory page in settings lets you add, edit and remove anything.
+- **Natural conversation.** Casual, off topic and personal messages get a real reply that uses your name when it fits, your stored context, and your conversation, instead of forcing every message into prompt construction.
+- **Honest about what it knows.** Asked what it knows about you, it answers only from what is stored, and says so plainly when it has nothing.
+- **Voice input.** Speak a message, review the transcript, then send it.
+- **Prompt history and library.** Every conversation is saved, with saved prompts, favorites, shareable read only links, and export to PDF, Markdown, text and JSON.
+- **Model aware formatting.** The output style is chosen per destination, and the provider layer is built so more target models can be added without touching the pipeline.
 
 ## Edge Cases We Actively Handle
 
@@ -336,15 +398,20 @@ Each folder is independently runnable and has its own dependency management, env
 - Prompt injection attempts embedded inside the user's own input
 - Non-English input
 - Extremely long input, such as a pasted document
-- `/data` downtime, timeouts, or rate limit responses from external AI providers
+- `/data` downtime, timeouts, or rate limit responses from external AI providers, reported honestly with a retry instead of a fabricated answer
+- Attachments that cannot be read, such as scanned PDFs, password protected files or unsupported types, reported as unreadable rather than silently skipped
+- Instructions hidden inside attached files or search results, which are treated as content and never followed
+- Secrets and long digit runs offered for memory, which are never stored
+- A failed search or an embeddings outage, which degrades quietly instead of blocking the reply
+- A message asked mid way through a clarifying sequence, answered without losing the pending question
 - Versioning of prompt pattern templates, so previously generated prompts remain reproducible even as the pattern library evolves
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20 or later
-- Python 3.11 or later (for `/data` only)
+- A current LTS release of Node.js
+- A current Python 3 release (for `/data` only, which pins its own runtime in `runtime.txt`)
 - npm (used across `/app` and `/api`)
 - A Supabase project (PostgreSQL and storage)
 - An OpenAI API key
@@ -360,27 +427,25 @@ cd Prompt-AI
 
 Each service has its own `.env.example` file. Copy it and fill in the values before running that service.
 
-**`/api/.env`** — copy from `api/.env.example`
+**`/api/.env`** - copy from `api/.env.example`
 
 ```
 DATABASE_URL=
 DATABASE_DIRECT_URL=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
-JWT_ACCESS_SECRET=
-JWT_REFRESH_SECRET=
 OTP_PEPPER=
-SMTP_HOST=          # optional — OTP emails degrade gracefully without this
+SMTP_HOST=          # optional, OTP emails degrade gracefully without this
 SMTP_PORT=
 SMTP_USER=
 SMTP_PASS=
 DATA_SERVICE_URL=   # required, the deployed /data service
 API_SHARED_SECRET=  # required, must match /data
 APP_URL=
-ALLOWED_ORIGINS=
+ALLOWED_ORIGINS=    # must include the /app origin
 ```
 
-**`/app/.env.local`** — copy from `app/.env.local.example`
+**`/app/.env.local`** - copy from `app/.env.local.example`
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
@@ -389,7 +454,7 @@ NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_SITE_URL=
 ```
 
-**`/data/.env`**
+**`/data/.env`** - copy from `data/.env.example`
 
 ```
 OPENAI_API_KEY=       # the only OpenAI key in the system
@@ -397,7 +462,9 @@ API_SHARED_SECRET=    # must match /api, min 16 chars
 PORT=
 ```
 
-All environment variables are validated at startup using Zod schemas on `/api`. Missing or malformed variables stop the service from starting instead of failing later at request time. `DATA_SERVICE_API_KEY` on `/api` and `API_SHARED_SECRET` on `/data` must match, since `/data` rejects any request that doesn't carry this shared secret.
+`/data` also accepts optional overrides for the model names, the embeddings model and the request timeout, listed in `data/.env.example`.
+
+Environment variables are validated at startup: with Zod on `/api` and pydantic-settings on `/data`. A missing or malformed variable stops the service from starting instead of failing later at request time, and a malformed model provider key is rejected rather than repaired. `API_SHARED_SECRET` must be identical on `/api` and `/data`, since `/data` rejects any request that does not carry it. The model provider key exists only on `/data`.
 
 ## Authentication
 
@@ -407,48 +474,42 @@ Prompt AI uses a hybrid authentication system combining Supabase OAuth (Google, 
 
 **Email + OTP registration**
 1. User submits email and password on `/signup`
-2. Frontend calls `POST /auth/register` on `/api`
-3. Backend creates a User record with `emailVerified: false`
-4. Backend generates a 6-digit OTP, hashes it with HMAC-SHA256, stores in `OtpToken` table
-5. Backend sends OTP email via Nodemailer
-6. Frontend redirects to `/verify?email=...`
-7. User enters OTP, frontend calls `POST /auth/verify-otp`
-8. Backend verifies OTP, marks user as `emailVerified: true`, mirrors user into Supabase Auth
-9. Backend issues JWT access token and refresh token
-10. Frontend stores tokens and redirects to `/dashboard`
+2. Frontend calls `POST /auth/otp/request-signup` on `/api`
+3. Backend rejects disposable addresses and existing accounts, generates a 6 digit code, hashes it with HMAC-SHA256 and a secret pepper, and stores it
+4. Backend sends the code through Nodemailer using the branded template
+5. User enters the code, frontend calls `POST /auth/otp/verify-signup`
+6. Backend verifies the code and creates the confirmed account in Supabase, then the user signs in
 
 **Email + password login**
 1. User submits email and password on `/login`
-2. Frontend calls `POST /auth/login` on `/api`
-3. Backend verifies password hash, checks `emailVerified`
-4. Backend issues JWT access token and refresh token
-5. Frontend stores tokens and redirects to `/dashboard`
+2. Frontend calls `supabase.auth.signInWithPassword` directly
+3. Supabase issues the session and the frontend redirects to `/dashboard`
 
 **OAuth (Google, GitHub)**
-1. User clicks OAuth button on `/login` or `/signup`
-2. Frontend calls `supabase.auth.signInWithOAuth` with provider
-3. Supabase redirects to provider
-4. Provider redirects back to `/auth/callback`
-5. Frontend callback route exchanges code for Supabase session
-6. Middleware refreshes session on every request
-7. Protected routes (`/dashboard`) require active session
+1. User clicks an OAuth button on `/login` or `/signup`
+2. Frontend calls `supabase.auth.signInWithOAuth` with the provider
+3. Supabase redirects to the provider, which redirects back to `/auth/callback`
+4. The callback exchanges the code for a Supabase session, and `/api` sends a one time welcome email
+5. Middleware refreshes the session on every request and protects `/dashboard` and `/settings`
 
 **Password reset**
 1. User submits email on `/forgot-password`
-2. Frontend calls `POST /auth/forgot-password` on `/api`
-3. Backend sends OTP email if user exists (always returns success to prevent enumeration)
-4. User enters OTP on `/verify` (same flow as registration verification)
-5. On success, user can set new password (password reset form to be implemented)
+2. Frontend calls `POST /auth/otp/request-reset`, which always returns the same response whether or not the account exists
+3. User enters the code and a new password, frontend calls `POST /auth/otp/verify-reset`
+
+**Chat requests**
+1. Every call to `/chat/stream` and `/chat/transcribe` carries the user's Supabase access token as a bearer token
+2. `/api` verifies the token with Supabase before touching any data, and every query is scoped to that user
 
 ### Security
 
-- **OTP tokens**: HMAC-SHA256 hashed with a secret pepper, 10-minute expiry, single-use
-- **Refresh tokens**: UUID hashed with SHA256, rotated on every use, revocation support
-- **JWT access tokens**: 15-minute expiry, stored in localStorage (consider HttpOnly cookies for production)
-- **JWT refresh tokens**: 30-day expiry, stored in localStorage
-- **Rate limiting**: 10 requests per 15 minutes on auth mutations, 60 requests per minute general
-- **Error messages**: Generic to prevent email enumeration
-- **Password reset**: Always returns success regardless of whether email exists
+- **OTP codes**: HMAC-SHA256 hashed with a secret pepper, 10 minute expiry, single use
+- **Sessions**: owned by Supabase Auth, refreshed by middleware
+- **Service boundary**: `/data` accepts only requests carrying the shared secret, compared in constant time, and its docs endpoints are disabled
+- **Rate limiting**: 10 requests per 15 minutes on auth mutations, 20 chat requests per minute per user, 60 requests per minute general
+- **Error messages**: generic where specifics would allow email enumeration
+- **Password reset**: always returns success regardless of whether the email exists
+- **Memory**: secrets, card and account numbers are never stored, and entries a user wrote by hand are never overwritten automatically
 
 ### Setup
 
@@ -461,52 +522,59 @@ Prompt AI uses a hybrid authentication system combining Supabase OAuth (Google, 
 
 ## Running the Project
 
+### `/data`
+
+```bash
+cd data
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt     # macOS and Linux: .venv/bin/pip
+cp .env.example .env                              # then fill in the key and the shared secret
+uvicorn main:app --port 8000
+```
+
 ### `/api`
 
 ```bash
 cd api
-pnpm install
-pnpm prisma migrate dev
-pnpm dev
+npm install
+npm run dev
 ```
 
 ### `/app`
 
 ```bash
 cd app
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
-### `/data`
+Start `/data` first, then `/api`, then `/app`.
+
+### Tests and evaluation
 
 ```bash
-cd data
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload
+cd data && pytest tests                       # unit tests, no network needed
+cd data && python evaluation/run_eval.py      # real model calls against the eval set
+cd api && npm test
 ```
+
+The eval set is a collection of requests with notes on what a good result looks like. It checks decisions, required and forbidden content, formatting, filler phrases and memory behavior, and `--judge` also scores generated prompts with a reviewer model. Run it before and after any change to the prompt templates.
 
 ## Project Roadmap
 
 **Now**
-- [ ] Core chat interface with streaming responses
-- [ ] Intent classification model, first version
-- [ ] Prompt construction engine for a single AI category (code generation as the first vertical)
-- [ ] Completeness scoring rubric, manual version
-- [ ] Prompt history and minimal settings (avatar, username, email)
+- [ ] Stronger prompt craft: keep pushing the eval set and judged scores on specificity and filler
+- [ ] More target model providers behind the existing provider interface
+- [ ] A larger, harder eval set covering more ambiguous and multi step requests
 
 **Next**
-- [ ] Retrieval layer for known effective prompt patterns
-- [ ] `/models` page showing supported target AI models
-- [ ] Multi format export (PDF, txt, md)
-- [ ] `/media` view, filterable by file type, pulled from chat sessions
-- [ ] File upload and voice input
+- [ ] Retrieval of known effective prompt patterns to inform construction
+- [ ] A `/models` page showing supported target AI models
+- [ ] Multi category support (image, video, writing, agents)
+- [ ] Moving attachment storage to cover Word documents
 
 **Later**
-- [ ] Multi-category support (image, video, writing, agents)
-- [ ] Trained scoring model replacing the manual rubric
+- [ ] A trained scoring model replacing the rubric based score
 - [ ] `/rules` for user defined generation preferences
 - [ ] `/community` and `/feedback`
 - [ ] Public API for third party integration
@@ -522,6 +590,7 @@ This project is currently focused on developers as its primary audience. Feature
 - [ARCHITECTURE.md](./ARCHITECTURE.md) for how the three services fit together and how a request flows through the system
 - [SECURITY.md](./SECURITY.md) for how to report a vulnerability
 - [CHANGELOG.md](./CHANGELOG.md) for release history
+- [story.txt](./story.txt) for why this project exists
 - [WIKI.md](./WIKI.md) for the documentation index
 - Folder level READMEs in `/app`, `/api`, `/data`, and `/docs` for service specific setup
 

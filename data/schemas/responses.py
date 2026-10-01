@@ -32,6 +32,21 @@ class ClarifyingQuestionEvent(BaseModel):
     clarify_state: ClarifyState
 
 
+class MemoryCandidate(BaseModel):
+    category: str
+    key: str
+    value: str
+    confidence: Optional[float] = None
+
+
+class MemoryRef(BaseModel):
+    """A stored memory that informed a reply, shown to the user."""
+
+    category: str
+    key: str
+    value: str
+
+
 class AnswerEvent(BaseModel):
     """A direct conversational answer, not a constructed prompt."""
 
@@ -43,6 +58,10 @@ class AnswerEvent(BaseModel):
     pending_question: Optional[ClarifyQuestion] = None
     position: Optional[int] = None
     total: Optional[int] = None
+    # Stable facts the user revealed in this exchange, worth keeping.
+    memory_candidates: list["MemoryCandidate"] = Field(default_factory=list)
+    # The stored memory that informed this reply.
+    memory_used: list[MemoryRef] = Field(default_factory=list)
 
 
 class StructuredPrompt(BaseModel):
@@ -77,15 +96,11 @@ class SourceSummary(BaseModel):
     links: list[SourceLink] = Field(default_factory=list)
 
 
-class MemoryCandidate(BaseModel):
-    category: str
-    key: str
-    value: str
-    confidence: Optional[float] = None
-
-
 class ResultEvent(BaseModel):
     type: Literal["result"] = "result"
+    # The conversational wrapper, kept apart from the deliverable so the
+    # prompt can be copied on its own.
+    message: Optional[str] = None
     content: str
     score: int
     diff: PromptDiff
@@ -94,6 +109,7 @@ class ResultEvent(BaseModel):
     explanation: Optional[str] = None
     memory_candidates: list[MemoryCandidate] = Field(default_factory=list)
     sources: list[SourceSummary] = Field(default_factory=list)
+    memory_used: list[MemoryRef] = Field(default_factory=list)
     format_style: str = "plain"
     template_version: str
 

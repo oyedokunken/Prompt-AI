@@ -75,7 +75,8 @@ interface TerminalData {
   structured?: unknown;
   readiness?: unknown;
   explanation?: string;
-  memory_candidates?: unknown;
+  memory_candidates?: unknown[];
+  memory_used?: unknown[];
   template_version?: string;
   question?: StoredQuestion;
   position?: number;
@@ -89,6 +90,8 @@ interface TerminalData {
 export interface AssistantRecord {
   content: string;
   metadata: Record<string, unknown>;
+  // Facts /data noticed in this exchange. Saved by the route, never stored in the message.
+  memoryCandidates?: unknown[];
 }
 
 const GENERATION_FAILED = "Generation failed. Please try again.";
@@ -127,8 +130,10 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
     const pending = d.pending_question ?? null;
     return {
       content: d.content ?? "",
+      memoryCandidates: d.memory_candidates ?? [],
       metadata: {
         mode: "answer",
+        memoryUsed: d.memory_used ?? [],
         ...(pending
           ? {
               interviewQuestions: [pending],
@@ -144,8 +149,12 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
   if (event === "result") {
     return {
       content: d.content ?? "",
+      memoryCandidates: d.memory_candidates ?? [],
       metadata: {
         mode: "ready",
+        // The conversational wrapper, kept apart so the prompt copies on its own.
+        preamble: d.message ?? null,
+        memoryUsed: d.memory_used ?? [],
         score: d.score,
         // Kept under the names the interface already reads.
         assumptions: d.diff?.inferred ?? [],
@@ -153,7 +162,6 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
         structured: d.structured,
         readiness: d.readiness,
         explanation: d.explanation,
-        memoryCandidates: d.memory_candidates,
         sources: d.sources ?? [],
         formatStyle: d.format_style,
         templateVersion: d.template_version,

@@ -2,6 +2,44 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-10-01
+
+### Added
+
+**Data service (`/data`) rebuilt as the intelligence layer**
+- Stateless FastAPI pipeline: memory selection, attachment reading, intent detection, optional web search, one question at a time clarification, prompt construction and scoring
+- Provider interface with a single OpenAI implementation, the only place in the system that calls a model provider
+- Streamed stage events emitted as each step actually begins, with pools mixing single word and fuller phrasings
+- Startup validation that refuses to run on a missing or malformed key or secret
+- Versioned prompt templates, output format targeting, and an evaluation harness with a judged mode and a recorded baseline
+- Title inference and audio transcription endpoints
+
+**Chat relay (`/api`)**
+- `POST /chat/stream` and `POST /chat/transcribe`, with Supabase token verification, profile, memory and history loading, clarifying question state persistence and unchanged stream relaying
+- Automatic memory saving with guards against secrets, repeats and overwriting entries the user wrote by hand
+
+**Interface (`/app`)**
+- Attachments are read: PDF and Word text, images through vision, each shown as a source
+- Web search findings shown with their links
+- A stated, found and inferred breakdown on every prompt
+- Rich text rendering of replies, and a separate card for the finished prompt with its own copy button
+- Single select clarifying questions advance on selection
+- Memory used for a reply is shown, new memory is announced by a passive notice, and the settings memory page supports adding, editing and removing items
+- `story.txt` at the project root
+
+### Changed
+
+- All model calls moved out of the Next.js route handlers and into `/data`
+- Generated prompts default to lightweight plain text, with markdown or tagged sections only when the destination calls for it
+- Every message, casual ones included, consults relevant stored memory before a reply is produced
+- Documentation rewritten to describe the system as it stands: README without version history, an accurate architecture document with diagrams, and an updated wiki
+
+### Removed
+
+- The silent heuristic fallback that fabricated a prompt and score when generation failed
+- The manual approval step for saving memory
+- Co-author trailers from commit history
+
 ## [0.3.0] - 2026-09-29
 
 ### Added

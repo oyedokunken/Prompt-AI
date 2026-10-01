@@ -1,0 +1,20 @@
+Recently, I've been so curious about how AI models work. I found myself researching into their strengths, limitations, and constraints. So I decided to create a project in that regard.
+
+The question that kept pulling at me was simple on the surface. Why does it take so much effort to get an AI model to actually understand what you mean the first time. You type something short. You get back something generic. You rewrite the same request five different ways until it finally lands. I figured I was not the only developer running into this, so I built Prompt AI, a tool that takes what you actually mean and turns it into a structured, detailed prompt built for the model you are targeting.
+
+Building it taught me something I keep relearning on every project. The hard part was never writing the code. The hard part was deciding where responsibility should live, how the pieces should talk to each other, and what happens when one of them fails.
+
+How much should the frontend know. Where does authentication actually belong. What happens when a request needs real intelligence behind it instead of a simple database read. Those questions shaped the architecture more than any single line of code did.
+
+I split the system into three parts and kept that separation honest. The app is what people actually see, the chat interface and the dashboard, built in Next.js. The api sits behind it, owning authentication, the database, and the business logic that has nothing to do with AI at all. Then there is data, a separate service that holds the actual intelligence layer, the part that takes a request, figures out what is missing, asks the right follow up questions, and constructs a properly engineered prompt before it ever reaches a model like OpenAI's.
+
+Keeping that layer isolated was not just a technical decision. It is what lets the system stay honest about what it knows and what it does not, instead of quietly guessing and hoping nobody notices.
+
+Prompt AI is open source. I built it in public, mistakes included, and there have been plenty. This is my first major AI project, and I am approaching it the way I would want a junior engineer on my team to approach something hard, genuinely open to being told what is wrong with it.
+
+GitHub: https://github.com/oyedokunken/Prompt-AI
+Live project: https://prompt-swe.vercel.app
+
+If you are curious about prompt engineering, system design, or want to see how a project like this comes together from the ground up, I would love for you to take a look. Feedback, suggestions, and contributors are all genuinely welcome.
+
+~ Oyedokun Kehinde

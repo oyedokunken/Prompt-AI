@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw, Pencil, FileText, Globe } from "lucide-react";
-import type { ChatMessage, MemoryCandidate } from "@/lib/types/chat";
+import type { ChatMessage } from "@/lib/types/chat";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { Markdown } from "@/components/dashboard/Markdown";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   onSave?: (message: ChatMessage) => void;
-  onSaveMemories?: (candidates: MemoryCandidate[]) => void;
   onRetry?: () => void;
   onEdit?: (messageId: string, newContent: string) => void;
 }
@@ -54,12 +53,13 @@ function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   );
 }
 
-export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [memoryHandled, setMemoryHandled] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const isUser = message.role === "user";
@@ -70,6 +70,11 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
   const inferredItems = meta.diff?.inferred ?? meta.assumptions ?? [];
   const researchedItems = meta.diff?.researched ?? [];
   const sources = meta.sources ?? [];
+  const memoryUsed = meta.memoryUsed ?? [];
+  const memorySaved = meta.memorySaved ?? [];
+  // A finished prompt is a deliverable, shown apart from the chat text around it.
+  const isDeliverable = !isClarify && meta.mode !== "answer";
+  const styleLabel = meta.formatStyle === "markdown" ? "markdown" : meta.formatStyle === "xml" ? "tagged sections" : "plain text";
   const hasBreakdown = statedItems.length > 0 || inferredItems.length > 0 || researchedItems.length > 0;
   const now = useNow();
 
@@ -85,10 +90,11 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
     setSaved(true);
   };
 
-  const handleSaveMemories = () => {
-    if (!meta.memoryCandidates?.length || !onSaveMemories) return;
-    onSaveMemories(meta.memoryCandidates);
-    setMemoryHandled(true);
+  // Copies only the deliverable, never the conversational wrapper around it.
+  const handleCopyPrompt = async () => {
+    await navigator.clipboard.writeText(message.content);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
   const handleEditSave = () => {
@@ -201,12 +207,42 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
       </div>
 
       <div className="max-w-[85%] sm:max-w-[72%] min-w-0">
-        {/* Bubble */}
-        <div className="rounded-2xl rounded-tl-md bg-base border border-border px-4 py-3">
-          <div className="text-sm text-text-primary">
-            <Markdown>{message.content}</Markdown>
+        {/* The conversational wrapper, a normal chat bubble */}
+        {isDeliverable && meta.preamble && (
+          <div className="rounded-2xl rounded-tl-md bg-base border border-border px-4 py-3 mb-2">
+            <div className="text-sm text-text-primary">
+              <Markdown>{meta.preamble}</Markdown>
+            </div>
           </div>
-        </div>
+        )}
+
+        {isDeliverable ? (
+          /* The deliverable, visually distinct and independently copyable */
+          <div className="rounded-xl border border-accent/25 bg-surface overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-accent/15 bg-accent/5">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-accent">
+                Your prompt <span className="text-text-faint normal-case tracking-normal">, {styleLabel}</span>
+              </p>
+              <button
+                onClick={handleCopyPrompt}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-raised text-[10px] font-medium text-text-muted hover:text-text-primary transition-colors"
+                aria-label="Copy prompt"
+              >
+                {copiedPrompt ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+                {copiedPrompt ? "Copied" : "Copy prompt"}
+              </button>
+            </div>
+            <div className="px-4 py-3 text-sm text-text-primary">
+              <Markdown>{message.content}</Markdown>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl rounded-tl-md bg-base border border-border px-4 py-3">
+            <div className="text-sm text-text-primary">
+              <Markdown>{message.content}</Markdown>
+            </div>
+          </div>
+        )}
 
         {/* Explanation, ready mode only */}
         {!isClarify && meta.explanation && (
@@ -263,6 +299,17 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
             >
               {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {sources.length} source{sources.length > 1 ? "s" : ""}
+            </button>
+          )}
+
+          {/* Which stored details informed this reply */}
+          {memoryUsed.length > 0 && (
+            <button
+              onClick={() => setShowMemory((v) => !v)}
+              className="flex items-center gap-1 text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+            >
+              {showMemory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              <Brain size={9} /> used {memoryUsed.length} from memory
             </button>
           )}
         </div>
@@ -327,34 +374,26 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
           </div>
         )}
 
-        {/* Memory candidates, offered for explicit user approval, never saved silently */}
-        {!memoryHandled && meta.memoryCandidates && meta.memoryCandidates.length > 0 && (
-          <div className="mt-2 px-3 py-2.5 rounded-lg border border-accent/20 bg-accent/5 space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-accent flex items-center gap-1.5">
-              <Brain size={10} /> Worth remembering?
-            </p>
-            <div className="space-y-1">
-              {meta.memoryCandidates.map((c, i) => (
-                <p key={i} className="text-[11px] text-text-muted">
-                  <span className="text-text-primary font-medium">{c.key}:</span> {c.value}
-                </p>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 pt-0.5">
-              <button
-                onClick={handleSaveMemories}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent-fill text-accent-fill-foreground text-[10px] font-semibold hover:bg-accent-fill/90 transition-colors"
-              >
-                <BookmarkPlus size={10} /> Save to memory
-              </button>
-              <button
-                onClick={() => setMemoryHandled(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-faint hover:text-text-muted transition-colors"
-              >
-                <X size={10} /> Not now
-              </button>
-            </div>
+        {/* The stored details this reply drew on */}
+        {showMemory && memoryUsed.length > 0 && (
+          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
+            <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">From your memory</p>
+            {memoryUsed.map((m, i) => (
+              <p key={i} className="text-[10px] text-text-muted">
+                <span className="text-text-primary font-medium">{m.key}:</span> {m.value}
+              </p>
+            ))}
           </div>
+        )}
+
+        {/* Saved automatically, reported quietly, nothing to approve */}
+        {memorySaved.length > 0 && (
+          <p className="mt-2 flex items-center gap-1.5 text-[10px] text-text-faint">
+            <Brain size={10} className="text-accent shrink-0" />
+            <span>
+              {memorySaved.some((m) => m.action === "updated") && memorySaved.every((m) => m.action === "updated") ? "Updated in memory" : "Saved to memory"}: {memorySaved.map((m) => m.key).join(", ")}
+            </span>
+          </p>
         )}
       </div>
     </div>

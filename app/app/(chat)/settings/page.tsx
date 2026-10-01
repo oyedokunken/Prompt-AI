@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile, providerLabel, roleLabel, ROLE_OPTIONS } from "@/lib/hooks/useUserProfile";
 import { useUsageStats } from "@/lib/hooks/useUsageStats";
@@ -21,6 +21,12 @@ export default function SettingsPage() {
   const { theme } = useTheme();
 
   const [tab, setTab] = useState<SettingsTab>("profile");
+
+  // Lets other screens link straight to a tab, such as the memory toast.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested === "memory" || requested === "usage" || requested === "profile") setTab(requested);
+  }, []);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState(false);

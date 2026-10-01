@@ -9,7 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export type StreamEvent =
   | { type: "stage"; stage: string; message: string }
-  | { type: "saved"; userMsg: ChatMessage; aiMsg: ChatMessage; sessionTitle: string | null }
+  | { type: "saved"; userMsg: ChatMessage; aiMsg: ChatMessage; sessionTitle: string | null; memorySaved?: SavedMemory[] }
   | { type: "failure"; message: string };
 
 export interface StreamChatInput {
@@ -21,10 +21,19 @@ export interface StreamChatInput {
   signal?: AbortSignal;
 }
 
+export interface SavedMemory {
+  category: string;
+  key: string;
+  value: string;
+  action: "added" | "updated";
+}
+
 export interface StreamChatResult {
   userMsg: ChatMessage;
   aiMsg: ChatMessage;
   sessionTitle: string | null;
+  // Facts saved to memory automatically while producing this reply.
+  memorySaved: SavedMemory[];
 }
 
 async function accessToken(): Promise<string> {
@@ -107,7 +116,8 @@ export async function streamChat(input: StreamChatInput): Promise<StreamChatResu
   }
 
   if (!saved) throw new Error("The server did not return a complete response.");
-  return saved;
+  const result: StreamChatResult = saved;
+  return { ...result, memorySaved: result.memorySaved ?? [] };
 }
 
 export async function transcribeVoice(blob: Blob): Promise<string> {

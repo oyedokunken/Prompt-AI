@@ -1,36 +1,40 @@
 # Prompt AI Wiki
 
-This file is the index for Prompt AI's documentation. As the project grows, deeper guides live here or in `/docs`, and this page just points to the right place.
+The index for Prompt AI's documentation. Deeper guides live here or next to the code they describe.
 
-## Start Here
+## Start here
 
-- [README.md](./README.md) for what Prompt AI is and how to run it, including system diagrams (architecture, sequence, data flow, activity, component)
-- [ARCHITECTURE.md](./ARCHITECTURE.md) for how `/app`, `/api`, and `/data` fit together
-- [CONTRIBUTING.md](./CONTRIBUTING.md) for how to submit changes
-- [SECURITY.md](./SECURITY.md) for how to report a vulnerability
-- [CHANGELOG.md](./CHANGELOG.md) for release history
+- [README.md](./README.md) what Prompt AI is, what it does, and how to run it
+- [ARCHITECTURE.md](./ARCHITECTURE.md) how `app`, `api` and `data` relate, what each owns, and how a request flows, with diagrams
+- [CONTRIBUTING.md](./CONTRIBUTING.md) how to submit changes
+- [SECURITY.md](./SECURITY.md) how to report a vulnerability
+- [CHANGELOG.md](./CHANGELOG.md) what changed and when
+- [story.txt](./story.txt) why this project exists
 
-## Service Documentation
+## Service documentation
 
-- [`/app/README.md`](./app/README.md) for the frontend
-- [`/api/README.md`](./api/README.md) for the backend
-- [`/data/README.md`](./data/README.md) for the AI and ML layer
-- [`/docs/README.md`](./docs/README.md) for architecture notes and pattern library docs
+- [`app/README.md`](./app/README.md) the interface
+- [`api/README.md`](./api/README.md) the backend
+- [`data/README.md`](./data/README.md) the intelligence layer
+- [`docs/README.md`](./docs/README.md) database schema and operational notes
+- [`OAuth.md`](./OAuth.md) setting up Google and GitHub sign in
 
-## Authentication
+## Working on the prompt pipeline
 
-Prompt AI uses a hybrid authentication system combining Supabase OAuth (Google, GitHub) with a custom email + OTP flow powered by the `/api` service. See the Authentication section in [README.md](./README.md#authentication) for details on flows, security, and setup.
+- **Where things live.** The pipeline steps are in `data/core/pipeline`, the wording the model sees is in `data/core/prompts`, and the output format targeting is in `data/core/prompts/targets.py`.
+- **Changing wording.** Templates are versioned in directories. Add a new version directory, move the active version in `loader.py`, then run the eval set before and after.
+- **The eval set.** `data/evaluation/eval_set.json` holds requests with notes on what a good result looks like. `python evaluation/run_eval.py` checks decisions, required and forbidden content, formatting, filler and memory behavior. Add `--judge` to also score generated prompts with a reviewer model, and `--save-baseline` to record a run. Treat the judge as a signal, not a verdict, since a model grading a model has its own bias.
+- **Adding a model provider.** Implement the interface in `data/core/providers/base.py` and select it in `data/core/providers/__init__.py`. Pipeline code never names a provider.
 
-## Planned Wiki Sections
+## Planned
 
-These sections don't exist yet. They are listed here so contributors know what's coming and can help build them.
+These guides do not exist yet.
 
-- **Prompt Engineering Pattern Library.** The actual patterns Prompt AI uses to construct prompts, documented with examples, so contributors can propose new ones.
-- **Model Integration Guide.** How to add support for a new target AI model in `/data`, including what the routing layer expects.
-- **Scoring Rubric Reference.** The full breakdown of how a generated prompt is scored, so users understand what the number means.
-- **API Reference.** Full endpoint documentation for `/api`, once the surface area stabilizes.
-- **FAQ.** Common questions from users and contributors, added as they come up.
+- A catalogue of the prompt patterns Prompt AI draws on, with examples
+- A scoring reference explaining what the completeness score means
+- A full API reference for `api`
+- An FAQ, added as questions come up
 
-## Where This Lives Long Term
+## Where this lives long term
 
-Once the project has enough contributors, this index may move to a proper GitHub Wiki instead of a root file. Until then, this file and `/docs` are the source of truth.
+Once the project has enough contributors, this index may move to a proper GitHub Wiki instead of a root file. Until then, this file and the service READMEs are the source of truth.

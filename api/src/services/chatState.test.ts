@@ -67,3 +67,24 @@ test("an answer that hands back a pending question stays pending, a plain one do
 test("stage events are not terminal", () => {
   assert.equal(recordFromTerminalEvent("stage", {}), null);
 });
+
+test("a result keeps the conversational wrapper apart from the deliverable and carries what memory informed it", () => {
+  const rec = recordFromTerminalEvent("result", {
+    message: "Built around your Go stack.", content: "Role\nYou review Go code.", score: 80,
+    diff: { stated: [], inferred: [] }, memory_used: [{ category: "skills", key: "Stack", value: "Go" }],
+    memory_candidates: [{ category: "skills", key: "Language", value: "Go", confidence: 0.9 }],
+  });
+  assert.equal(rec?.content, "Role\nYou review Go code.");
+  assert.equal(rec?.metadata.preamble, "Built around your Go stack.");
+  assert.deepEqual(rec?.metadata.memoryUsed, [{ category: "skills", key: "Stack", value: "Go" }]);
+  assert.equal(rec?.memoryCandidates?.length, 1);
+  assert.equal("memoryCandidates" in (rec?.metadata ?? {}), false);
+});
+
+test("a casual answer carries memory used and candidates out of band", () => {
+  const rec = recordFromTerminalEvent("answer", {
+    content: "Rust, huh.", memory_used: [], memory_candidates: [{ category: "skills", key: "Language", value: "Rust" }],
+  });
+  assert.equal(rec?.metadata.mode, "answer");
+  assert.equal(rec?.memoryCandidates?.length, 1);
+});

@@ -45,12 +45,14 @@ class OpenAIProvider(ModelProvider):
         default_model: str,
         fast_model: str,
         transcribe_model: str,
+        embed_model: str,
         timeout_seconds: float,
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=1)
         self._default_model = default_model
         self._fast_model = fast_model
         self._transcribe_model = transcribe_model
+        self._embed_model = embed_model
 
     def resolve_model(self, requested: str, *, fast: bool = False) -> str:
         if fast:
@@ -201,6 +203,19 @@ class OpenAIProvider(ModelProvider):
         if not text:
             raise ProviderResponseError("The search returned nothing")
         return SearchOutcome(summary=text, sources=sources[:5])
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        try:
+            result = await self._client.embeddings.create(model=self._embed_model, input=texts)
+        except APIStatusError as exc:
+            logger.error("OpenAI embeddings error status=%s code=%s", exc.status_code, exc.code)
+            raise ProviderError(exc.message, status=exc.status_code, code=exc.code) from exc
+        except (APITimeoutError, APIConnectionError) as exc:
+            logger.error("OpenAI embeddings connection error: %s", exc)
+            raise ProviderError("Could not reach the model provider", code="connection_error") from exc
+        return [item.embedding for item in result.data]
 
     async def transcribe(self, *, filename: str, content: bytes, content_type: str) -> str:
         try:

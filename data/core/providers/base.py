@@ -85,5 +85,9 @@ class ModelProvider(ABC):
         """Search the web for current information and report what was found."""
 
     @abstractmethod
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Turn texts into vectors, one per text, for similarity comparison."""
+
+    @abstractmethod
     async def transcribe(self, *, filename: str, content: bytes, content_type: str) -> str:
         """Transcribe recorded audio to text."""

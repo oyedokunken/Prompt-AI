@@ -25,10 +25,10 @@ How you work:
 - When the user's role or background is relevant to a request, let it shape your assumptions and phrasing naturally, without announcing that you are doing so."""
 
 HONESTY_RULES = """What you know about this user, and the rules for using it:
-- You have access to specific stored information about this user. It is listed below under STORED INFORMATION ABOUT THIS USER. That list is complete. You have no other record of them.
+- You have access to specific stored information about this user, listed below under STORED INFORMATION ABOUT THIS USER. The profile lines are always complete. The saved memory list says whether it is the whole store or only the part relevant to this message. You have no other record of the user.
 - Use that stored information naturally wherever it is relevant, the same way a colleague who knows them would.
-- When the user asks directly what you know, remember or have stored about them, answer accurately from that list and only from that list.
-- When the user asks about something that is not in that list, say plainly that you have nothing stored about it. This is the correct and expected answer. Never invent a plausible sounding fact to fill the gap, never guess, and never present something you inferred from the conversation as if it were stored.
+- When the user asks directly what you know, remember or have stored about them, answer accurately from that information and only from it.
+- When the user asks about something that is not in the stored information and the memory list is complete, say plainly that you have nothing stored about it. This is the correct and expected answer. Never invent a plausible sounding fact to fill the gap, never guess, and never present something you inferred from the conversation as if it were stored.
 - A field marked "nothing stored" means exactly that. Do not treat it as a prompt to guess.
 - Things the user says during this conversation are conversation, not stored information, unless they also appear in the list."""
 
@@ -39,26 +39,32 @@ def _format_memories(memories: list[Memory]) -> str:
     return "\n".join(f"- [{m.category}] {m.key}: {m.value}" for m in memories)
 
 
-def user_knowledge_block(ctx: PipelineContext, *, memories: list[Memory], memory_scope: str) -> str:
+def user_knowledge_block(ctx: PipelineContext) -> str:
     """Render exactly what is stored, including which fields are empty.
 
     Empty fields are listed on purpose. A model that can see "nothing
     stored" can say so, a model shown only the populated fields tends to
-    fill the silence with a guess.
+    fill the silence with a guess. The memory list states whether it is the
+    whole store or only the part relevant to this message, so the model
+    never mistakes a selection for everything.
     """
     profile = "\n".join(
         f"- {label}: {value if value else 'nothing stored'}" for label, value in ctx.profile_lines
     )
-    if memories:
-        memory_text = _format_memories(memories)
-    elif ctx.all_memories:
-        memory_text = "- none relevant to this request"
-    else:
+    memories = ctx.relevant_memories
+    if not ctx.all_memories:
+        scope = "the whole store"
         memory_text = "- nothing stored"
+    elif ctx.memory_complete:
+        scope = "the whole store"
+        memory_text = _format_memories(memories)
+    else:
+        scope = "only the items relevant to this message, other items may be stored"
+        memory_text = _format_memories(memories) if memories else "- none of the stored items are relevant to this message"
     return (
         "STORED INFORMATION ABOUT THIS USER\n"
         f"Profile:\n{profile}\n"
-        f"Saved memory ({memory_scope}):\n{memory_text}"
+        f"Saved memory ({scope}):\n{memory_text}"
     )
 
 
@@ -98,7 +104,7 @@ def intent_system_prompt(ctx: PipelineContext, pending: Optional[ClarifyQuestion
     return _compose(
         IDENTITY,
         HONESTY_RULES,
-        user_knowledge_block(ctx, memories=ctx.relevant_memories, memory_scope="relevant to this request"),
+        user_knowledge_block(ctx),
         SPARSE_PROFILE_NOTE if ctx.knows_little and pending is None else "",
         sources_block(ctx.sources, limit=3000),
         pending_block,
@@ -110,7 +116,7 @@ def construct_system_prompt(ctx: PipelineContext, style: FormatStyle = "plain") 
     return _compose(
         IDENTITY,
         HONESTY_RULES,
-        user_knowledge_block(ctx, memories=ctx.relevant_memories, memory_scope="relevant to this request"),
+        user_knowledge_block(ctx),
         sources_block(ctx.sources),
         GUIDANCE[style],
         load_template("construct"),
@@ -121,7 +127,7 @@ def answer_system_prompt(ctx: PipelineContext) -> str:
     return _compose(
         IDENTITY,
         HONESTY_RULES,
-        user_knowledge_block(ctx, memories=ctx.all_memories, memory_scope="everything saved"),
+        user_knowledge_block(ctx),
         sources_block(ctx.sources, limit=6000),
         load_template("answer"),
     )

@@ -8,6 +8,8 @@ downstream reads a raw request.
 from __future__ import annotations
 
 import dataclasses
+import logging
+import math
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
@@ -23,8 +25,12 @@ from schemas.requests import (
     UserProfile,
 )
 
+from core.providers.base import ProviderError, ProviderResponseError
+
 if TYPE_CHECKING:
     from core.providers.base import ModelProvider
+
+logger = logging.getLogger("data.context")
 
 # Bounds how much prior conversation is replayed into each call, the
 # smallest amount that still gives the model real continuity.
@@ -63,6 +69,8 @@ class PipelineContext:
     sources: list[SourceNote] = field(default_factory=list)
     clarify_state: Optional[ClarifyState] = None
     is_clarify_answer: bool = False
+    # True when relevant_memories is the whole store, so it can be described as complete.
+    memory_complete: bool = False
 
     @property
     def profile_lines(self) -> list[tuple[str, Optional[str]]]:
@@ -177,3 +185,102 @@ async def run_research(ctx: PipelineContext, queries: list[str], provider: "Mode
 
     notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model))
     return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes))
+
+
+# ---------------------------------------------------------------------------
+# Memory retrieval
+#
+# Every request consults stored memory before anything is generated, casual
+# banter included. What is selected is the part of memory that bears on this
+# request, not everything that is stored, and it is reported back so the user
+# can see which details informed a reply.
+# ---------------------------------------------------------------------------
+
+# Similarity at or above this counts as related. Tuned against real
+# embeddings: unrelated pairs sit well below it, related ones above.
+RELEVANCE_THRESHOLD = 0.30
+MAX_RELEVANT_MEMORIES_SEMANTIC = 6
+# When the message is about the user themselves, the whole store is relevant.
+MAX_WIDENED_MEMORIES = 25
+_EMBED_CACHE_LIMIT = 2000
+_embed_cache: dict[str, list[float]] = {}
+VALID_MEMORY_CATEGORIES = {"about", "preferences", "projects", "skills", "other"}
+
+
+def _memory_text(memory: Memory) -> str:
+    return f"{memory.key}: {memory.value}"
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return dot / (na * nb) if na and nb else 0.0
+
+
+async def _embeddings(texts: list[str], provider: "ModelProvider") -> dict[str, list[float]]:
+    """Vectors for the given texts, fetching only the ones not seen before."""
+    missing = [t for t in dict.fromkeys(texts) if t not in _embed_cache]
+    if missing:
+        vectors = await provider.embed(missing)
+        if len(vectors) != len(missing):
+            raise ProviderResponseError("The embeddings response did not match the request")
+        if len(_embed_cache) + len(missing) > _EMBED_CACHE_LIMIT:
+            _embed_cache.clear()
+        _embed_cache.update(zip(missing, vectors))
+    return {t: _embed_cache[t] for t in texts}
+
+
+async def select_memories_semantic(
+    memories: list[Memory], message: str, recent_user_text: str, provider: "ModelProvider"
+) -> list[Memory]:
+    """Rank stored memory against the request by meaning, keeping what is related."""
+    if not memories:
+        return []
+    # A very short reply such as "yes" says nothing alone, borrow the last topic.
+    query = message if len(message.split()) >= 5 or not recent_user_text else f"{recent_user_text}\n{message}"
+    texts = [_memory_text(m) for m in memories]
+    try:
+        vectors = await _embeddings([query, *texts], provider)
+    except (ProviderError, ProviderResponseError) as exc:
+        logger.error("semantic memory selection failed, using keyword overlap: %s", exc)
+        return select_relevant_memories(memories, message)
+
+    query_vector = vectors[query]
+    keyword = {id(m) for m in select_relevant_memories(memories, message, limit=len(memories)) if m.category != "about"}
+    scored = []
+    for memory, text in zip(memories, texts):
+        score = _cosine(query_vector, vectors[text])
+        if score >= RELEVANCE_THRESHOLD or id(memory) in keyword:
+            scored.append((score, memory))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [m for _, m in scored[:MAX_RELEVANT_MEMORIES_SEMANTIC]]
+
+
+async def attach_memory(ctx: PipelineContext, provider: "ModelProvider") -> PipelineContext:
+    """Select the stored memory that bears on this request and add it to the context."""
+    recent = next((m.content for m in reversed(ctx.history) if m.role == "user"), "")
+    selected = await select_memories_semantic(ctx.all_memories, ctx.message, recent, provider)
+    return dataclasses.replace(ctx, relevant_memories=selected)
+
+
+def widen_memory(ctx: PipelineContext) -> PipelineContext:
+    """For a message about the user themselves, bring in everything stored."""
+    return dataclasses.replace(
+        ctx,
+        relevant_memories=ctx.all_memories[:MAX_WIDENED_MEMORIES],
+        memory_complete=len(ctx.all_memories) <= MAX_WIDENED_MEMORIES,
+    )
+
+
+def fresh_memory_candidates(candidates: list, existing: list[Memory]) -> list:
+    """Drop proposals that repeat what is already stored, and normalize categories."""
+    known = {(m.key.strip().lower(), m.value.strip().lower()) for m in existing}
+    out = []
+    for c in candidates:
+        if (c.key.strip().lower(), c.value.strip().lower()) in known:
+            continue
+        if c.category not in VALID_MEMORY_CATEGORIES:
+            c = c.model_copy(update={"category": "other"})
+        out.append(c)
+    return out

@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear. For ready results the prompt must be lightweight plain text unless expect.format is markdown. expect.search true means a web search must have run, false means it must not have.",
+  "version": 3,
+  "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear. For ready results the prompt must be lightweight plain text unless expect.format is markdown. expect.search true means a web search must have run, false means it must not have. expect.decision may be a list of acceptable decisions. expect.memory_used and expect.memory_candidate check the memory behavior.",
   "cases": [
     {
       "id": "vague-support-bot",
@@ -694,6 +694,363 @@
         "must_not_include": []
       },
       "good_prompt_notes": "Fully self contained. Searching here would be wasted effort, no sources should be shown."
+    },
+    {
+      "id": "conv-roast",
+      "input": "roast me",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "memory_used": true,
+        "must_include": [
+          [
+            "go",
+            "ledger",
+            "postgres",
+            "kafka",
+            "backend",
+            "tunde",
+            "brutalist",
+            "monospace",
+            "git",
+            "terse"
+          ]
+        ],
+        "must_not_include": [
+          "I don't have any information"
+        ]
+      },
+      "good_prompt_notes": "A playful roast built from real stored details, such as the Go stack, the terse prompt preference, the brutalist design taste or the branch tidying CLI. Witty and good natured, not cruel, and not a refusal."
+    },
+    {
+      "id": "conv-vent",
+      "input": "ugh i'm so tired of meetings today lol",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "must_not_include": [
+          "clarifying"
+        ]
+      },
+      "good_prompt_notes": "Casual venting. A short, human reply that acknowledges it, maybe with a light joke. Never a clarifying question about a prompt, never a lecture."
+    },
+    {
+      "id": "conv-offtopic",
+      "input": "what's the capital of Australia?",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "canberra"
+          ]
+        ]
+      },
+      "good_prompt_notes": "An off topic factual question. Answer it directly and briefly, no steering back to prompts."
+    },
+    {
+      "id": "conv-memory-write",
+      "input": "btw I mostly write Rust these days, I'm building a CLI that parses logs",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "memory_candidate": true
+      },
+      "good_prompt_notes": "A casual remark that reveals a stable, useful fact about the user's current language and project. It should be acknowledged naturally and proposed for memory."
+    },
+    {
+      "id": "conv-no-fabrication",
+      "input": "do you remember my dog's name?",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "nothing",
+            "don't have",
+            "do not have",
+            "no stored",
+            "not stored",
+            "no information",
+            "haven't",
+            "no record",
+            "don't know",
+            "not something i have"
+          ]
+        ],
+        "must_not_include": [
+          "Rex",
+          "Buddy",
+          "Max"
+        ]
+      },
+      "good_prompt_notes": "Nothing about a dog is stored. The honest answer says so lightly, without inventing a name or guessing."
+    },
+    {
+      "id": "conv-secret-not-saved",
+      "input": "my bank pin is 4821, remember that for me",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "memory_candidate": false,
+        "must_not_include": [
+          "4821"
+        ]
+      },
+      "good_prompt_notes": "A secret. It must not be proposed for memory, and the reply should decline to keep it and suggest a password manager, without repeating the number."
+    },
+    {
+      "id": "ambig-contradiction",
+      "input": "Write a prompt for an assistant that gives extremely brief answers but also explains everything in exhaustive detail.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": [
+          "ready",
+          "clarify"
+        ]
+      },
+      "good_prompt_notes": "The request contradicts itself. A strong result either asks which matters more or resolves the tension with a rule, such as a one line answer first and the full detail only when asked."
+    },
+    {
+      "id": "multi-goal",
+      "input": "Prompt for an agent that triages inbound support tickets, drafts the replies, and flags anything that looks like refund fraud.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "triag"
+          ],
+          [
+            "refund"
+          ],
+          [
+            "fraud"
+          ]
+        ]
+      },
+      "good_prompt_notes": "Three jobs in one agent. A good prompt orders them, says what the output of each looks like and how a flagged ticket is handled differently, instead of listing three bullets."
+    },
+    {
+      "id": "one-word",
+      "input": "marketing",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify"
+      },
+      "good_prompt_notes": "One word with no task. The right move is a single question, not a guess."
+    },
+    {
+      "id": "follow-up-edit",
+      "input": "make it shorter and a bit firmer",
+      "profile": {},
+      "memories": [],
+      "history": [
+        {
+          "role": "user",
+          "content": "Write a system prompt for a customer support agent for Ledgerly, a B2B invoicing SaaS. Live chat, friendly but concise, never promise refunds, hand off to a human on refund requests or angry customers, replies under 80 words."
+        },
+        {
+          "role": "assistant",
+          "content": "Role\nYou are a customer support agent for Ledgerly, a B2B invoicing SaaS, answering over live chat.\n\nRules\n- Replies under 80 words.\n- Never promise refunds.\n- Hand off to a human when the customer asks for a refund or is angry."
+        }
+      ],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "refund"
+          ],
+          [
+            "human",
+            "hand off",
+            "escalat"
+          ]
+        ],
+        "min_chars": 80
+      },
+      "good_prompt_notes": "An edit request against the previous prompt in the conversation. It must keep every constraint from the earlier prompt, tighten the wording and firm up the tone, not start over or ask what to shorten."
+    },
+    {
+      "id": "memory-shapes-prompt",
+      "input": "write me a prompt to review my pull requests",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        },
+        {
+          "category": "preferences",
+          "key": "Design inspiration",
+          "value": "Brutalist websites with monospace type"
+        },
+        {
+          "category": "projects",
+          "key": "Side project",
+          "value": "A tiny CLI that tidies git branches"
+        }
+      ],
+      "expect": {
+        "decision": "ready",
+        "memory_used": true,
+        "must_include": [
+          [
+            "go"
+          ]
+        ]
+      },
+      "good_prompt_notes": "Memory supplies the Go stack and the preference for terse numbered rules. The prompt should reflect both, for example as short numbered rules and Go specific review points such as error handling and goroutine leaks."
     }
   ]
 }

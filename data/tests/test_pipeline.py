@@ -62,6 +62,20 @@ class FakeProvider(ModelProvider):
     async def complete_text(self, *, model, system, messages, max_tokens, temperature):
         return self._next(kind="text", model=model, system=system, messages=messages)
 
+    async def embed(self, texts):
+        """Deterministic bag of words vectors, so relevance is testable without a network."""
+        import hashlib
+        import re as _re
+
+        vectors = []
+        for text in texts:
+            vec = [0.0] * 64
+            for word in _re.findall(r"[a-z0-9]+", text.lower()):
+                if len(word) > 2:
+                    vec[int(hashlib.md5(word.encode()).hexdigest(), 16) % 64] += 1.0
+            vectors.append(vec)
+        return vectors
+
     async def search(self, *, model, query):
         return self._next(kind="search", model=model, query=query)
 
@@ -355,19 +369,26 @@ def test_knowledge_block_lists_empty_fields_as_nothing_stored():
     prompt = system_prompts.answer_system_prompt(ctx)
     assert "Name: Ada" in prompt
     assert "Role: nothing stored" in prompt
-    assert "Saved memory (everything saved):\n- nothing stored" in prompt
+    assert "Saved memory (the whole store):\n- nothing stored" in prompt
     assert "say plainly that you have nothing stored" in prompt
 
 
-def test_answer_prompt_sees_every_memory_construct_prompt_only_relevant_ones():
+def test_partial_memory_is_labelled_as_partial_and_widened_memory_as_the_whole_store():
+    from core.context import widen_memory
+
     memories = [
         {"category": "preferences", "key": "Coffee", "value": "Flat white"},
         {"category": "skills", "key": "Stack", "value": "Django"},
     ]
     ctx = assemble_context(make_request(message="a prompt for Django code review", memories=memories))
-    assert "Flat white" in system_prompts.answer_system_prompt(ctx)
-    assert "Flat white" not in system_prompts.construct_system_prompt(ctx)
-    assert "Django" in system_prompts.construct_system_prompt(ctx)
+    ctx = __import__("dataclasses").replace(ctx, relevant_memories=ctx.all_memories[1:])
+    partial = system_prompts.construct_system_prompt(ctx)
+    assert "only the items relevant to this message, other items may be stored" in partial
+    assert "Django" in partial and "Flat white" not in partial
+
+    whole = system_prompts.answer_system_prompt(widen_memory(ctx))
+    assert "Saved memory (the whole store)" in whole
+    assert "Flat white" in whole and "Django" in whole
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +445,7 @@ def test_pipeline_full_clarify_sequence_then_result_reflecting_every_answer():
 
 def test_pipeline_direct_question_mid_sequence_keeps_the_pending_question():
     first = collect(assemble_context(make_request()), FakeProvider([TWO_QUESTIONS]))[-1]
-    provider = FakeProvider([{"kind": "conversation"}, "I have your name stored as Ada. Nothing else."])
+    provider = FakeProvider([{"kind": "conversation", "about_user": True}, {"reply": "I have your name stored as Ada. Nothing else.", "memory_candidates": []}])
     ctx = assemble_context(
         make_request(message="what do you know about me?", clarify_state=first.clarify_state, profile={"preferred_name": "Ada"})
     )
@@ -771,3 +792,88 @@ def test_provider_tracking_parameter_is_stripped_but_other_query_parameters_stay
     assert _strip_tracking("https://x.dev/a?utm_source=openai") == "https://x.dev/a"
     assert _strip_tracking("https://x.dev/a?lang=en&utm_source=openai") == "https://x.dev/a?lang=en"
     assert _strip_tracking("https://x.dev/a") == "https://x.dev/a"
+
+
+# ---------------------------------------------------------------------------
+# Memory retrieval, automatic saving and conversation
+# ---------------------------------------------------------------------------
+
+STORE = [
+    {"category": "skills", "key": "Stack", "value": "React TypeScript Next.js frontend"},
+    {"category": "projects", "key": "Product", "value": "Ledgerly invoicing SaaS for finance teams"},
+    {"category": "preferences", "key": "Coffee", "value": "Flat white without sugar"},
+]
+
+
+def test_memory_is_consulted_before_intent_and_only_relevant_items_are_selected():
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    ctx = assemble_context(make_request(message="a prompt for reviewing React TypeScript components", memories=STORE))
+    out = collect(ctx, provider)
+    assert [m.key for m in out[-1].memory_used] == ["Stack"]
+    assert "React TypeScript Next.js frontend" in provider.calls[0]["system"]
+    assert "Flat white" not in provider.calls[0]["system"]
+    assert "Flat white" not in provider.calls[1]["system"]
+
+
+def test_a_casual_message_still_consults_memory_before_replying():
+    provider = FakeProvider([{"kind": "conversation", "about_user": False}, {"reply": "Databases walk into a bar.", "memory_candidates": []}])
+    ctx = assemble_context(make_request(message="tell me a joke about React components", memories=STORE))
+    out = collect(ctx, provider)
+    assert out[-1].type == "answer"
+    assert [m.key for m in out[-1].memory_used] == ["Stack"]
+    assert "Flat white" not in provider.calls[1]["system"]
+
+
+def test_a_message_about_the_user_brings_in_the_whole_store_and_reports_it():
+    provider = FakeProvider([{"kind": "conversation", "about_user": True}, {"reply": "You like React and flat whites.", "memory_candidates": []}])
+    out = collect(assemble_context(make_request(message="roast me", memories=STORE)), provider)
+    assert {m.key for m in out[-1].memory_used} == {"Stack", "Product", "Coffee"}
+    assert "Saved memory (the whole store)" in provider.calls[1]["system"]
+    assert "Flat white" in provider.calls[1]["system"]
+
+
+def test_casual_replies_can_propose_memory_and_repeats_are_dropped():
+    reply = {
+        "reply": "Rust it is.",
+        "memory_candidates": [
+            {"category": "skills", "key": "Language", "value": "Writes Rust day to day", "confidence": 0.9},
+            {"category": "skills", "key": "Stack", "value": "React TypeScript Next.js frontend", "confidence": 0.9},
+            {"category": "weird", "key": "Pet", "value": "Has a cat named Miso", "confidence": 0.7},
+        ],
+    }
+    provider = FakeProvider([{"kind": "conversation", "about_user": False}, reply])
+    out = collect(assemble_context(make_request(message="btw I write Rust these days", memories=STORE)), provider)
+    kept = {(c.key, c.category) for c in out[-1].memory_candidates}
+    assert kept == {("Language", "skills"), ("Pet", "other")}
+
+
+def test_the_conversational_message_travels_apart_from_the_deliverable():
+    built = {**READY_CONSTRUCTION, "message": "Here you go, built around your invoicing work."}
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, built])
+    result = collect(assemble_context(make_request()), provider)[-1]
+    assert result.message == "Here you go, built around your invoicing work."
+    assert "Here you go" not in result.content
+
+
+def test_a_reply_with_no_text_is_an_error_not_an_empty_message():
+    provider = FakeProvider([{"kind": "conversation"}, {"reply": "  ", "memory_candidates": []}])
+    out = collect(assemble_context(make_request(message="hello")), provider)
+    assert out[-1].type == "error"
+
+
+def test_memory_selection_falls_back_to_keywords_when_embeddings_fail():
+    class NoEmbeddings(FakeProvider):
+        async def embed(self, texts):
+            raise ProviderError("down")
+
+    provider = NoEmbeddings([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request(message="a prompt for reviewing React TypeScript components", memories=STORE)), provider)
+    assert out[-1].type == "result"
+    assert [m.key for m in out[-1].memory_used] == ["Stack"]
+
+
+def test_a_follow_up_borrows_the_last_topic_so_a_short_reply_still_finds_memory():
+    history = [{"role": "user", "content": "I need a prompt for reviewing React TypeScript components"}]
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request(message="yes do it", memories=STORE, history=history)), provider)
+    assert [m.key for m in out[-1].memory_used] == ["Stack"]

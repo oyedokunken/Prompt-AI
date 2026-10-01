@@ -12,6 +12,7 @@ import {
   type GenerateRequestBody,
 } from "../lib/dataClient";
 import { isReadable, toDataAttachments } from "../services/attachments";
+import { planMemorySaves, type MemoryCandidate, type SavedMemory, type StoredMemory } from "../services/memory";
 import {
   TERMINAL_EVENTS,
   errorRecord,
@@ -32,6 +33,35 @@ const STATE_LOOKBACK = 40;
 
 function metaString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+// Writes what planMemorySaves decided. A failure here never blocks the reply,
+// it only means nothing is reported as saved.
+async function saveMemories(userId: string, candidates: MemoryCandidate[], existing: StoredMemory[]): Promise<SavedMemory[]> {
+  if (candidates.length === 0) return [];
+  const plan = planMemorySaves(candidates, existing);
+  const saved: SavedMemory[] = [];
+  try {
+    if (plan.inserts.length > 0) {
+      const { error } = await supabaseAdmin
+        .from("user_memories")
+        .insert(plan.inserts.map((m) => ({ user_id: userId, ...m, source: "conversation" })));
+      if (error) throw error;
+      saved.push(...plan.saved.filter((s) => s.action === "added"));
+    }
+    for (const u of plan.updates) {
+      const { error } = await supabaseAdmin
+        .from("user_memories")
+        .update({ category: u.category, key: u.key, value: u.value, confidence: u.confidence, updated_at: new Date().toISOString() })
+        .eq("id", u.id)
+        .eq("user_id", userId);
+      if (error) throw error;
+      saved.push(...plan.saved.filter((s) => s.action === "updated" && s.key === u.key));
+    }
+  } catch (err) {
+    console.error("[chat] automatic memory save failed:", err);
+  }
+  return saved;
 }
 
 // POST /chat/stream
@@ -77,10 +107,10 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
       .limit(STATE_LOOKBACK),
     supabaseAdmin
       .from("user_memories")
-      .select("category, key, value")
+      .select("id, category, key, value, source")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
-      .limit(50),
+      .limit(100),
   ]);
   if (historyResult.error) {
     console.error("[chat] history load failed:", historyResult.error);
@@ -130,7 +160,8 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
       working_on: metaString(meta.working_on),
       primary_use: metaString(meta.primary_use),
     },
-    memories: memoryResult.data ?? [],
+    // /data only needs the content, ids and sources stay here.
+    memories: (memoryResult.data ?? []).map((m) => ({ category: m.category, key: m.key, value: m.value })),
     history,
     attachments: await toDataAttachments(body.attachments ?? [], user.id),
     clarify_state: clarifyState,
@@ -179,6 +210,11 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
     res.write(`event: error\ndata: ${JSON.stringify({ type: "error", code: "upstream_unavailable", message: record.content })}\n\n`);
   }
 
+  // Stable facts the exchange revealed are saved on the spot, no approval
+  // step. What was saved is recorded on the message so the interface can say so.
+  const memorySaved = await saveMemories(user.id, (record.memoryCandidates ?? []) as MemoryCandidate[], (memoryResult.data ?? []) as StoredMemory[]);
+  if (memorySaved.length > 0) record.metadata.memorySaved = memorySaved;
+
   const { data: aiMsg, error: aiMsgError } = await supabaseAdmin
     .from("messages")
     .insert({ session_id: session.id, role: "assistant", content: record.content, metadata: record.metadata })
@@ -206,7 +242,7 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
   }
   await supabaseAdmin.from("chat_sessions").update({ updated_at: new Date().toISOString() }).eq("id", session.id);
 
-  res.write(`event: saved\ndata: ${JSON.stringify({ userMsg, aiMsg, sessionTitle })}\n\n`);
+  res.write(`event: saved\ndata: ${JSON.stringify({ userMsg, aiMsg, sessionTitle, memorySaved })}\n\n`);
   res.end();
 });
 

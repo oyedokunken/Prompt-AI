@@ -7,7 +7,7 @@ import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
 import { useSharedLinks } from "@/lib/hooks/useSharedLinks";
 import { useExportHistory, type ExportRecord } from "@/lib/hooks/useExportHistory";
 import { useMemories } from "@/lib/hooks/useMemories";
-import type { ChatSession, SavedPrompt, SharedLink, MemoryCandidate, ExportFormat, UserMemory } from "@/lib/types/chat";
+import type { ChatSession, SavedPrompt, SharedLink, ExportFormat, UserMemory } from "@/lib/types/chat";
 import type { UploadedAttachment } from "@/lib/attachments";
 
 type PendingDelete =
@@ -51,7 +51,7 @@ interface DashboardContextValue {
 
   // Memory
   memories: UserMemory[];
-  saveMemoryCandidates: (candidates: MemoryCandidate[]) => Promise<void>;
+  refreshMemories: () => Promise<void>;
 
   // Handoff from the welcome page to the newly created chat route
   pendingFirstMessage: PendingFirstMessage | null;
@@ -92,7 +92,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const { savedPrompts, save: savePrompt, remove: removeSavedPrompt, toggleFavorite: toggleSavedFavorite } = useSavedPrompts();
   const { links: sharedLinks, createLink: createShareLink, revoke: revokeShareLink } = useSharedLinks();
   const { records: exportHistory, refresh: refreshExportHistory } = useExportHistory();
-  const { memories, addCandidates: saveMemoryCandidates } = useMemories();
+  const { memories, refresh: refreshMemories } = useMemories();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -104,10 +104,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const loadSessions = useCallback(async () => {
-    const { data, error: loadError } = await supabase
-      .from("chat_sessions")
-      .select("*")
-      .order("updated_at", { ascending: false });
+    const query = () =>
+      supabase.from("chat_sessions").select("*").order("updated_at", { ascending: false });
+    let { data, error: loadError } = await query();
+    // Right after signing in, the database can briefly see a token as issued
+    // a moment in the future when its clock is a few seconds behind the auth
+    // server's. It is transient and harmless, so wait it out once and retry
+    // instead of showing an error.
+    if (loadError && /issued at future/i.test(loadError.message)) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      ({ data, error: loadError } = await query());
+    }
     if (loadError) {
       console.error("[dashboard] loadSessions failed:", loadError);
       setError(`Could not load your chats: ${loadError.message}`);
@@ -226,7 +233,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     exportHistory,
     refreshExportHistory,
     memories,
-    saveMemoryCandidates,
+    refreshMemories,
     pendingFirstMessage,
     setPendingFirstMessage,
     mobileSidebarOpen,

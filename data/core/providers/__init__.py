@@ -17,5 +17,6 @@ def get_provider() -> ModelProvider:
         default_model=settings.openai_model,
         fast_model=settings.openai_fast_model,
         transcribe_model=settings.openai_transcribe_model,
+        embed_model=settings.openai_embed_model,
         timeout_seconds=settings.openai_timeout_seconds,
     )

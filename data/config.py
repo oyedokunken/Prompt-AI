@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     openai_model: str = Field("gpt-4o", alias="OPENAI_MODEL")
     openai_fast_model: str = Field("gpt-4o-mini", alias="OPENAI_FAST_MODEL")
     openai_transcribe_model: str = Field("whisper-1", alias="OPENAI_TRANSCRIBE_MODEL")
+    openai_embed_model: str = Field("text-embedding-3-small", alias="OPENAI_EMBED_MODEL")
     openai_timeout_seconds: float = Field(90.0, alias="OPENAI_TIMEOUT_SECONDS")
 
     @field_validator("openai_api_key", mode="before")

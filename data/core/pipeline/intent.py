@@ -29,6 +29,8 @@ class IntentDecision:
     questions: list[ClarifyQuestion] = field(default_factory=list)
     # Web searches the model decided are worth running, usually none.
     search_queries: list[str] = field(default_factory=list)
+    # A conversational message about the user themselves, so everything stored is relevant.
+    about_user: bool = False
     reason: str = ""
 
     @property
@@ -77,7 +79,7 @@ def parse_intent(raw: dict[str, Any], *, has_pending_question: bool) -> IntentDe
     reason = str(raw.get("reason") or "").strip()
 
     if kind == "conversation":
-        return IntentDecision(kind="conversation", reason=reason)
+        return IntentDecision(kind="conversation", about_user=raw.get("about_user") is True, reason=reason)
     if kind == "answer" and has_pending_question:
         return IntentDecision(kind="answer", reason=reason)
 

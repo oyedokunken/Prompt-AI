@@ -34,6 +34,14 @@ class ConstructedPrompt:
     readiness: Readiness = field(default_factory=Readiness)
     explanation: Optional[str] = None
     memory_candidates: list[MemoryCandidate] = field(default_factory=list)
+    # The conversational wrapper around the deliverable.
+    message: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class AnswerResult:
+    text: str
+    memory_candidates: list[MemoryCandidate] = field(default_factory=list)
 
 
 def build_user_turn(ctx: PipelineContext, state: Optional[ClarifyState]) -> str:
@@ -74,6 +82,29 @@ def _optional_text(raw: Any) -> Optional[str]:
     return raw.strip() or None
 
 
+def parse_memory_candidates(raw: Any) -> list[MemoryCandidate]:
+    """Facts the model proposes to remember, kept only when well formed."""
+    candidates: list[MemoryCandidate] = []
+    if not isinstance(raw, list):
+        return candidates
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        key, value = _optional_text(item.get("key")), _optional_text(item.get("value"))
+        if not key or not value:
+            continue
+        confidence = item.get("confidence")
+        candidates.append(
+            MemoryCandidate(
+                category=_optional_text(item.get("category")) or "other",
+                key=key,
+                value=value,
+                confidence=float(confidence) if isinstance(confidence, (int, float)) else None,
+            )
+        )
+    return candidates
+
+
 def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     content = raw.get("content")
     if not isinstance(content, str) or not content.strip():
@@ -90,25 +121,10 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     known = stated_keys | {r.lower() for r in researched}
     assumptions = [a for a in _string_list(raw.get("assumptions")) if a.lower() not in known]
 
-    candidates: list[MemoryCandidate] = []
-    if isinstance(raw.get("memory_candidates"), list):
-        for item in raw["memory_candidates"]:
-            if not isinstance(item, dict):
-                continue
-            key, value = _optional_text(item.get("key")), _optional_text(item.get("value"))
-            if not key or not value:
-                continue
-            confidence = item.get("confidence")
-            candidates.append(
-                MemoryCandidate(
-                    category=_optional_text(item.get("category")) or "other",
-                    key=key,
-                    value=value,
-                    confidence=float(confidence) if isinstance(confidence, (int, float)) else None,
-                )
-            )
+    candidates = parse_memory_candidates(raw.get("memory_candidates"))
 
     return ConstructedPrompt(
+        message=_optional_text(raw.get("message")),
         content=content.strip(),
         stated=stated,
         researched=researched,
@@ -189,6 +205,7 @@ async def construct(
     name = ctx.profile.preferred_name or ""
     scrub = re.compile(rf"\b{re.escape(name)}(?:'s)?\b", re.IGNORECASE)
     return ConstructedPrompt(
+        message=built.message,
         content=scrub.sub("the user", built.content),
         stated=built.stated,
         researched=built.researched,
@@ -205,14 +222,22 @@ async def construct(
     )
 
 
-async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> str:
-    """Answer a direct question, such as what is stored about the user."""
+async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> AnswerResult:
+    """Reply conversationally: questions about the user, banter, anything that is not a prompt request.
+
+    Returns the reply together with any stable fact the user revealed, so
+    memory can grow from casual conversation too.
+    """
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
     messages.append(ProviderMessage(role="user", text=ctx.message))
-    return await provider.complete_text(
+    raw = await provider.complete_json(
         model=provider.resolve_model(ctx.target_model),
         system=answer_system_prompt(ctx),
         messages=messages,
-        max_tokens=600,
-        temperature=0.2,
+        max_tokens=900,
+        temperature=0.7,
     )
+    reply = _optional_text(raw.get("reply"))
+    if not reply:
+        raise ProviderResponseError("The model returned no reply")
+    return AnswerResult(text=reply, memory_candidates=parse_memory_candidates(raw.get("memory_candidates")))

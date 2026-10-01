@@ -1,0 +1,22 @@
+name: No AI co-author trailers
+
+# Fails when a commit message credits an AI tool as a co-author. The local
+# commit-msg hook in .githooks strips these, this is the backstop.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Look for AI co-author trailers
+        run: |
+          if git log --format=%B | grep -iE '^[[:space:]]*co-authored-by:.*(claude|anthropic|devin|cognition|copilot|openai|chatgpt|gpt|cursor|codex|gemini|windsurf|aider|\[bot\])'; then
+            echo "A commit message credits an AI tool as a co-author."
+            exit 1
+          fi

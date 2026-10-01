@@ -10,6 +10,7 @@ import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ClarifyInterview } from "@/components/dashboard/ClarifyInterview";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
 import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
+import { MemoryToast } from "@/components/dashboard/MemoryToast";
 import { ShareMenu } from "@/components/dashboard/ShareMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
@@ -75,7 +76,7 @@ export default function ChatPage() {
 
   const {
     profile, sessions, setSessions,
-    savePrompt, saveMemoryCandidates,
+    savePrompt, refreshMemories,
     sharedLinks, createShareLink, revokeShareLink,
     refreshExportHistory,
     pendingFirstMessage, setPendingFirstMessage,
@@ -89,6 +90,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [stageMessage, setStageMessage] = useState<string | null>(null);
+  const [memoryToast, setMemoryToast] = useState<{ key: string; action: "added" | "updated" }[] | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<UploadedAttachment[]>([]);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
@@ -182,6 +184,13 @@ export default function ChatPage() {
         payload.userMsg,
         payload.aiMsg,
       ]);
+
+      // Memory was saved on its own while answering. Say so quietly and
+      // refresh the stored list, nothing here waits for the user.
+      if (payload.memorySaved.length > 0) {
+        setMemoryToast(payload.memorySaved.map((m) => ({ key: m.key, action: m.action })));
+        refreshMemories();
+      }
 
       if (payload.sessionTitle) {
         const title = payload.sessionTitle;
@@ -390,7 +399,6 @@ export default function ChatPage() {
                 <MessageBubble
                   message={m}
                   onSave={m.role === "assistant" && m.metadata.mode === "ready" ? handleSaveMessage : undefined}
-                  onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
                   onRetry={
                     m.role === "assistant" && m.metadata.mode === "error"
                       ? () => {
@@ -432,6 +440,8 @@ export default function ChatPage() {
             ))}
           </div>
         )}
+
+        <MemoryToast items={memoryToast} onDismiss={() => setMemoryToast(null)} onManage={() => router.push("/settings?tab=memory")} />
 
         <ChatInput
           ref={chatInputRef}
