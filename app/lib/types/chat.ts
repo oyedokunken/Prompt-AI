@@ -48,6 +48,7 @@ export interface PromptReadiness {
 }
 
 export interface ClarifyQuestion {
+  id?: string;
   text: string;
   // A short list of common answers, when the question has a reasonably
   // enumerable answer set, for example a tech stack. Omitted entirely for
@@ -62,11 +63,26 @@ export interface ClarifyQuestion {
 // absent, for messages generated before this field existed): content is
 // the finished, production-ready prompt. "error": generation genuinely
 // failed, content is an honest failure message, never a fabricated prompt.
+export interface PromptDiff {
+  stated: string[];
+  inferred: string[];
+}
+
+// "answer": a direct conversational reply, for example to a question about
+// what is stored about the user. It may carry a still-pending clarifying
+// question, which keeps waiting for its answer.
 export interface PromptMetadata {
-  mode?: "clarify" | "ready" | "error";
-  // clarify mode, structured questions for the interview UI. May be
-  // absent on older messages, which fall back to plain text content.
+  mode?: "clarify" | "ready" | "error" | "answer";
+  // clarify mode: the single question currently being asked, and the
+  // sequence state /data needs back with the next message. The state is
+  // opaque to the interface, only /api and /data read it.
   interviewQuestions?: ClarifyQuestion[];
+  intro?: string;
+  clarifyPosition?: number;
+  clarifyTotal?: number;
+  clarifyState?: unknown;
+  // ready mode: what the user stated against what was inferred for them.
+  diff?: PromptDiff;
   score?: number;
   assumptions?: string[];
   structured?: {
@@ -118,16 +134,16 @@ export const MEMORY_CATEGORIES = [
 export type ExportFormat = "markdown" | "json" | "txt" | "pdf";
 export type SidebarPanel = "history" | "media" | "exports" | "saved" | "favorites";
 
-// openaiModel is null for targets we cannot actually call yet (no provider
-// key configured) -- the selector disables those rather than silently
-// generating with a different model than the one shown.
+// available is false for targets the data service has no provider for yet --
+// the selector disables those rather than silently generating with a
+// different model than the one shown.
 export const MODELS = [
-  { id: "gpt-4o", label: "GPT-4o", openaiModel: "gpt-4o" },
-  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", openaiModel: null },
-  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", openaiModel: null },
-  { id: "grok-2", label: "Grok 2", openaiModel: null },
-  { id: "llama-3.1-70b", label: "Llama 3.1 70B", openaiModel: null },
-  { id: "o1-mini", label: "o1-mini", openaiModel: null },
+  { id: "gpt-4o", label: "GPT-4o", available: true },
+  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", available: false },
+  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro", available: false },
+  { id: "grok-2", label: "Grok 2", available: false },
+  { id: "llama-3.1-70b", label: "Llama 3.1 70B", available: false },
+  { id: "o1-mini", label: "o1-mini", available: false },
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]["id"];

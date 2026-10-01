@@ -8,9 +8,9 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
-        sync: false          # set in Render dashboard — never committed
-      - key: DATA_SERVICE_API_KEY
-        sync: false          # must match /api DATA_SERVICE_API_KEY
-      - key: PORT
-        value: 8000
+        sync: false          # set in the Render dashboard, never committed
+      - key: API_SHARED_SECRET
+        sync: false          # must match API_SHARED_SECRET in /api
+      - key: PYTHON_VERSION
+        value: 3.11.9
     healthCheckPath: /health

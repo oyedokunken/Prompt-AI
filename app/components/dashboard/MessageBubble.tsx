@@ -90,6 +90,9 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
   const meta = message.metadata;
   const isClarify = meta.mode === "clarify";
   const isError = meta.mode === "error";
+  const statedItems = meta.diff?.stated ?? [];
+  const inferredItems = meta.diff?.inferred ?? meta.assumptions ?? [];
+  const hasBreakdown = statedItems.length > 0 || inferredItems.length > 0;
   const now = useNow();
 
   const handleCopy = async (text: string = message.content) => {
@@ -263,29 +266,41 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
             </button>
           )}
 
-          {/* Toggle assumptions */}
-          {meta.assumptions && meta.assumptions.length > 0 && (
+          {/* Toggle the stated versus inferred breakdown */}
+          {hasBreakdown && (
             <button
               onClick={() => setShowMeta((v) => !v)}
               className="flex items-center gap-1 text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMeta ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-              {meta.assumptions.length} assumption{meta.assumptions.length > 1 ? "s" : ""}
+              {statedItems.length} stated, {inferredItems.length} inferred
             </button>
           )}
         </div>
 
-        {/* Expanded assumptions */}
-        {showMeta && meta.assumptions && meta.assumptions.length > 0 && (
-          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
-            <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">
-              Inferred
-            </p>
-            {meta.assumptions.map((a, i) => (
-              <p key={i} className="text-[10px] text-text-muted flex gap-2">
-                <span className="text-accent shrink-0">·</span> {a}
-              </p>
-            ))}
+        {/* What the user said, against what was filled in for them */}
+        {showMeta && hasBreakdown && (
+          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2">
+            {statedItems.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
+                {statedItems.map((a, i) => (
+                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
+                    <span className="text-green-400 shrink-0">·</span> {a}
+                  </p>
+                ))}
+              </div>
+            )}
+            {inferredItems.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
+                {inferredItems.map((a, i) => (
+                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
+                    <span className="text-accent shrink-0">·</span> {a}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

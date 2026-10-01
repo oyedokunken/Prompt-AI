@@ -1,0 +1,21 @@
+"""Provider selection. Routers depend on `get_provider`, never on a concrete class."""
+
+from __future__ import annotations
+
+from functools import lru_cache
+
+from config import get_settings
+from core.providers.base import ModelProvider
+from core.providers.openai_provider import OpenAIProvider
+
+
+@lru_cache
+def get_provider() -> ModelProvider:
+    settings = get_settings()
+    return OpenAIProvider(
+        api_key=settings.openai_api_key,
+        default_model=settings.openai_model,
+        fast_model=settings.openai_fast_model,
+        transcribe_model=settings.openai_transcribe_model,
+        timeout_seconds=settings.openai_timeout_seconds,
+    )

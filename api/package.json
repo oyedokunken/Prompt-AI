@@ -8,6 +8,7 @@
     "vercel-build": "prisma generate",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
+    "test": "tsx --test src/services/chatState.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

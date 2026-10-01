@@ -374,9 +374,8 @@ SMTP_HOST=          # optional — OTP emails degrade gracefully without this
 SMTP_PORT=
 SMTP_USER=
 SMTP_PASS=
-OPENAI_API_KEY=
-DATA_SERVICE_URL=   # optional — leave blank until /data is deployed
-DATA_SERVICE_API_KEY=
+DATA_SERVICE_URL=   # required, the deployed /data service
+API_SHARED_SECRET=  # required, must match /data
 APP_URL=
 ALLOWED_ORIGINS=
 ```
@@ -388,16 +387,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_SITE_URL=
-OPENAI_API_KEY=     # server-side only, never sent to the browser
 ```
 
 **`/data/.env`**
 
 ```
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-MODEL_PATH=
-API_SHARED_SECRET=
+OPENAI_API_KEY=       # the only OpenAI key in the system
+API_SHARED_SECRET=    # must match /api, min 16 chars
 PORT=
 ```
 

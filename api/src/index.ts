@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env";
 import { authRouter } from "./routes/auth";
+import { chatRouter } from "./routes/chat";
 import { generalLimiter } from "./middleware/rateLimit";
 import { prisma } from "./lib/prisma";
 
@@ -39,6 +40,12 @@ app.use(
 // ---------------------------------------------------------------------------
 // Body parsing
 // ---------------------------------------------------------------------------
+// Chat requests can carry image attachments as data URLs, and voice messages
+// arrive as raw audio. Both get their own, larger parser before the strict
+// global one, body-parser skips a body that is already parsed. Vercel caps a
+// request body at 4.5MB regardless.
+app.use("/chat/stream", express.json({ limit: "4mb" }));
+app.use("/chat/transcribe", express.raw({ type: "audio/*", limit: "4mb" }));
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: false, limit: "16kb" }));
 
@@ -59,6 +66,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/chat", chatRouter);
 
 // ---------------------------------------------------------------------------
 // 404 fallback

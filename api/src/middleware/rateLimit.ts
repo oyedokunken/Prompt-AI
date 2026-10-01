@@ -31,3 +31,20 @@ export const generalLimiter = rateLimit({
     message: "Too many requests. Slow down and try again.",
   },
 });
+
+/**
+ * Per signed in user limiter for the model backed chat endpoints, which are
+ * the expensive ones. Keyed on the bearer token so one user behind a shared
+ * address is not throttled by their neighbours.
+ */
+export const chatLimiter = rateLimit({
+  windowMs: 60 * 1_000,
+  max: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.headers.authorization ?? "anonymous").slice(-64),
+  message: {
+    error: "RATE_LIMITED",
+    message: "You are sending messages too quickly. Wait a moment and try again.",
+  },
+});

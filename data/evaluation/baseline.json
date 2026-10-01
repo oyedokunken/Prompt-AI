@@ -1,0 +1,33 @@
+{
+  "saved_at": "2026-10-01T19:34:11+00:00",
+  "template_version": "v1",
+  "cases": {
+    "vague-support-bot": true,
+    "vague-blog": true,
+    "vague-code-review": true,
+    "vague-email": true,
+    "vague-sales": true,
+    "vague-data": true,
+    "vague-tutor": true,
+    "vague-image": true,
+    "full-support-agent": true,
+    "full-sql-review": true,
+    "full-summarizer": true,
+    "full-python-tests": true,
+    "full-recruiter": true,
+    "full-translation": true,
+    "full-research": true,
+    "full-meeting-notes": true,
+    "profile-fills-gap": true,
+    "profile-no-name-in-prompt": true,
+    "memory-irrelevant": true,
+    "know-about-me-full": true,
+    "know-about-me-empty": true,
+    "unknown-fact": true,
+    "partial-known": true,
+    "greeting": true,
+    "thanks": true,
+    "short-but-complete": true,
+    "long-rambling": true
+  }
+}

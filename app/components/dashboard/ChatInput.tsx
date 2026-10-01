@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
+import { transcribeVoice } from "@/lib/api/chatApi";
 import dynamic from "next/dynamic";
 import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square, ChevronDown } from "lucide-react";
 import type { EmojiClickData } from "emoji-picker-react";
@@ -49,10 +50,10 @@ function ModelSelector({
               <button
                 key={m.id}
                 type="button"
-                disabled={!m.openaiModel}
+                disabled={!m.available}
                 onClick={() => { onSelect(m); setOpen(false); }}
                 className={`w-full flex items-center justify-between px-3 py-2 text-[11px] transition-colors ${
-                  !m.openaiModel
+                  !m.available
                     ? "text-text-faint cursor-not-allowed"
                     : m.id === model.id
                     ? "text-accent bg-accent/10"
@@ -60,7 +61,7 @@ function ModelSelector({
                 }`}
               >
                 <span>{m.label}</span>
-                {!m.openaiModel && (
+                {!m.available && (
                   <span className="text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
                     Coming soon
                   </span>
@@ -154,14 +155,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setIsTranscribing(true);
         try {
-          const audioForm = new FormData();
-          audioForm.append("audio", blob, "voice-message.webm");
-          const res = await fetch("/api/transcribe", { method: "POST", body: audioForm });
-          const payload = await res.json();
-          if (!res.ok) throw new Error(payload.error ?? "Transcription failed");
-          if (payload.text) {
+          const text = await transcribeVoice(blob);
+          if (text) {
             const current = valueRef.current;
-            onChange(current ? `${current} ${payload.text}`.trim() : payload.text);
+            onChange(current ? `${current} ${text}`.trim() : text);
           }
         } catch (err) {
           setVoiceError(err instanceof Error ? err.message : "Could not transcribe audio");

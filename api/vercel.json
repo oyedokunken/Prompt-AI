@@ -5,7 +5,11 @@
       "src": "src/index.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["src/**", "prisma/**"]
+        "includeFiles": [
+          "src/**",
+          "prisma/**"
+        ],
+        "maxDuration": 60
       }
     }
   ],

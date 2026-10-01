@@ -1,0 +1,630 @@
+{
+  "version": 1,
+  "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear.",
+  "cases": [
+    {
+      "id": "vague-support-bot",
+      "input": "write me a prompt for a customer support bot",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "A good prompt here cannot be written without knowing the product and the support channel. Once known, it should define the agent's role, the product scope, tone, what it may and may not promise, and a clear escalation path to a human."
+    },
+    {
+      "id": "vague-blog",
+      "input": "I need a prompt for a blog post",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Topic and audience are critical and unknown. A good result names the topic, the reader, the angle, target length, tone, and an outline format."
+    },
+    {
+      "id": "vague-code-review",
+      "input": "make a prompt for code review",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Language or stack and the review focus (security, style, performance) change the prompt materially. A good result sets a reviewer role, review criteria, severity levels, and an output format per finding."
+    },
+    {
+      "id": "vague-email",
+      "input": "prompt for writing emails",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The kind of email and the recipient are unknown. A good result specifies purpose, audience, tone, length limits and a subject line plus body format."
+    },
+    {
+      "id": "vague-sales",
+      "input": "sales agent prompt",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Product, buyer and channel are missing. A good result defines qualification rules, objection handling, what the agent must never claim, and a handoff trigger."
+    },
+    {
+      "id": "vague-data",
+      "input": "help me analyze data",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The dataset and the question being asked of it are unknown. A good result states the data shape, the decision the analysis supports, methods allowed, and the form of the findings."
+    },
+    {
+      "id": "vague-tutor",
+      "input": "a tutor prompt",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Subject and learner level are critical. A good result defines the teaching approach, how to check understanding, when to give answers versus hints, and session structure."
+    },
+    {
+      "id": "vague-image",
+      "input": "prompt for generating a logo",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "clarify",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Brand name, industry and visual style are needed. A good result describes subject, style, palette, composition and what to avoid, in the form an image model expects."
+    },
+    {
+      "id": "full-support-agent",
+      "input": "Write a system prompt for a customer support agent for Ledgerly, a B2B invoicing SaaS. It answers over live chat, in a friendly but concise tone, can explain billing, invoices and plan limits, must never promise refunds, and must hand off to a human when the customer asks for a refund or is angry. Replies should be under 80 words in plain text.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "ledgerly"
+          ],
+          [
+            "refund"
+          ],
+          [
+            "human",
+            "hand off",
+            "handoff",
+            "escalat"
+          ],
+          [
+            "80"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Should carry every stated constraint through: the product name, live chat, friendly and concise tone, the refund prohibition, the two handoff triggers and the 80 word plain text limit. Few assumptions needed, score should be high."
+    },
+    {
+      "id": "full-sql-review",
+      "input": "Create a prompt for an AI that reviews PostgreSQL migration scripts before deploy. It should flag table locks, missing indexes on foreign keys, and non reversible changes, rate each finding as blocker, warning or note, and output a markdown table with columns finding, severity, line, fix.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "postgres"
+          ],
+          [
+            "lock"
+          ],
+          [
+            "index"
+          ],
+          [
+            "blocker"
+          ],
+          [
+            "table"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Role is a database reviewer. All three checks, the three severity levels and the four column markdown table must appear exactly as stated."
+    },
+    {
+      "id": "full-summarizer",
+      "input": "I want a prompt that summarizes weekly engineering standup notes for executives. Input is raw notes pasted in. Output must be five bullet points max, no jargon, each bullet starts with the team name, and it ends with one line listing blockers that need executive action.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "five",
+            "5"
+          ],
+          [
+            "blocker"
+          ],
+          [
+            "team"
+          ],
+          [
+            "jargon"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Audience is executives, input is pasted raw notes. The five bullet cap, team name prefix, no jargon rule and the closing blockers line are all stated and must be present."
+    },
+    {
+      "id": "full-python-tests",
+      "input": "Prompt for an AI coding assistant that writes pytest unit tests for Python 3.11 functions I paste in. Use plain pytest with no extra plugins, cover edge cases and error paths, use parametrize where it reduces repetition, never modify the function under test, and return only one code block.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "pytest"
+          ],
+          [
+            "parametriz"
+          ],
+          [
+            "edge"
+          ],
+          [
+            "code block"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Should set a test engineer role, restate the no plugins and do not modify constraints, require edge and error coverage, and fix the output to a single code block."
+    },
+    {
+      "id": "full-recruiter",
+      "input": "Write a prompt for screening software engineer resumes against a job description. The model gets the JD and one resume, scores fit from 1 to 10 against must have requirements only, lists the evidence for each requirement with a direct quote, flags anything it could not verify, and must not consider name, age, gender or school prestige.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "10"
+          ],
+          [
+            "quote"
+          ],
+          [
+            "gender"
+          ],
+          [
+            "verif"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "A fair screening prompt: inputs are JD plus one resume, scoring is against must haves only, evidence must be quoted, unverifiable claims flagged, and the listed protected attributes explicitly excluded."
+    },
+    {
+      "id": "full-translation",
+      "input": "A prompt to translate product UI strings from English to Brazilian Portuguese. Keep placeholders like {name} and %d untouched, keep strings under the original length plus 20 percent, use informal 'você', and return JSON mapping each key to its translation.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "portuguese"
+          ],
+          [
+            "placeholder",
+            "{name}"
+          ],
+          [
+            "json"
+          ],
+          [
+            "você",
+            "voce"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Localization prompt that protects placeholders, enforces the length limit, uses the informal register and returns key to translation JSON."
+    },
+    {
+      "id": "full-research",
+      "input": "Build a prompt for a research assistant that compares three vector databases, Pinecone, Weaviate and pgvector, for a team of four running under 10 million embeddings on a tight budget. It should compare cost, operational burden and query latency, cite sources for every claim, say clearly when it is unsure, and end with one recommendation.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "pinecone"
+          ],
+          [
+            "weaviate"
+          ],
+          [
+            "pgvector"
+          ],
+          [
+            "cite",
+            "source"
+          ],
+          [
+            "recommend"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Comparison across exactly the three named systems and three named criteria, sized to the stated team and scale, with sourcing, explicit uncertainty and a single closing recommendation."
+    },
+    {
+      "id": "full-meeting-notes",
+      "input": "Prompt that turns a meeting transcript into action items. Each action item needs an owner, a due date if one was said, and the exact sentence it came from. If no owner was named, write 'unassigned'. Output a numbered list, nothing else.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "owner"
+          ],
+          [
+            "unassigned"
+          ],
+          [
+            "due"
+          ],
+          [
+            "numbered"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Extraction prompt with owner, optional due date and source sentence per item, the unassigned fallback, and a numbered list as the only output."
+    },
+    {
+      "id": "profile-fills-gap",
+      "input": "write a prompt for reviewing pull requests on my service",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        }
+      ],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "go"
+          ],
+          [
+            "ledger",
+            "payment"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The stored profile and memory supply the stack (Go, Postgres, Kafka) and the domain (ledger service), so no question is needed. The prompt should use them, and should follow the stored preference for terse numbered rules."
+    },
+    {
+      "id": "profile-no-name-in-prompt",
+      "input": "Create a prompt for an agent that writes release notes from a list of merged pull requests, grouped into features, fixes and breaking changes, in markdown, for external customers.",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        }
+      ],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "breaking"
+          ],
+          [
+            "markdown"
+          ]
+        ],
+        "must_not_include": [
+          "Tunde"
+        ]
+      },
+      "good_prompt_notes": "Release notes prompt with the three groups, markdown output and a customer facing tone. The user's name must never appear inside the generated prompt, it is addressed to another AI."
+    },
+    {
+      "id": "memory-irrelevant",
+      "input": "A prompt for writing a wedding toast for my sister. Warm and funny, two minutes spoken, mention that she taught me to ride a bike, no inside jokes the guests would not get.",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        }
+      ],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "toast"
+          ],
+          [
+            "bike"
+          ],
+          [
+            "two minute",
+            "2 minute",
+            "two-minute",
+            "2-minute"
+          ]
+        ],
+        "must_not_include": [
+          "Kafka",
+          "Postgres"
+        ]
+      },
+      "good_prompt_notes": "Personal writing prompt. The stored engineering stack is irrelevant and must not leak into it. Warm and funny tone, two minute length, the bike detail and the no inside jokes rule must be present."
+    },
+    {
+      "id": "know-about-me-full",
+      "input": "what do you know about me?",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "tunde"
+          ],
+          [
+            "backend engineer"
+          ],
+          [
+            "go"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Not a prompt request. The answer should list what is actually stored: the name, role, what they do, what they are working on, and the two saved memories. Nothing beyond that."
+    },
+    {
+      "id": "know-about-me-empty",
+      "input": "what do you know about me?",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "nothing",
+            "don't have",
+            "do not have",
+            "no stored",
+            "not stored",
+            "no information",
+            "haven't",
+            "no record"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "With an empty profile and no memory, the only honest answer is that nothing is stored. It must not invent a role, a stack or a project."
+    },
+    {
+      "id": "unknown-fact",
+      "input": "what's my favorite programming language and where do I live?",
+      "profile": {
+        "preferred_name": "Ada",
+        "role": "Product designer"
+      },
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "nothing",
+            "don't have",
+            "do not have",
+            "no stored",
+            "not stored",
+            "no information",
+            "haven't",
+            "no record"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Neither a language nor a location is stored. The answer must say so plainly and must not guess from the role."
+    },
+    {
+      "id": "partial-known",
+      "input": "do you remember what stack I use and what my company is called?",
+      "profile": {
+        "preferred_name": "Tunde",
+        "role": "Backend engineer",
+        "about": "Builds payment APIs in Go",
+        "working_on": "A ledger service for a fintech startup"
+      },
+      "memories": [
+        {
+          "category": "skills",
+          "key": "Stack",
+          "value": "Go, Postgres, Kafka"
+        },
+        {
+          "category": "preferences",
+          "key": "Prompt style",
+          "value": "Prefers terse prompts with numbered rules"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [
+          [
+            "go"
+          ],
+          [
+            "nothing",
+            "don't have",
+            "do not have",
+            "no stored",
+            "not stored",
+            "no information",
+            "haven't",
+            "no record"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The stack is stored (Go, Postgres, Kafka) and should be reported. A company name is not stored, and the answer must say so rather than inventing one."
+    },
+    {
+      "id": "greeting",
+      "input": "hey, how does this work?",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "A direct question about the product, not a prompt request. A short explanation that the user describes what they need and gets an engineered prompt back, with questions asked only when something critical is missing."
+    },
+    {
+      "id": "thanks",
+      "input": "thanks, that was helpful",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "must_include": [],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Conversation, not a request. A brief, natural acknowledgement. No prompt, no questions."
+    },
+    {
+      "id": "short-but-complete",
+      "input": "Prompt to fix grammar in English text I paste, change nothing else, return only the corrected text.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "grammar"
+          ],
+          [
+            "only"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Short but fully specified: task, the change nothing else constraint and the output format are all there. Asking questions here would be wrong."
+    },
+    {
+      "id": "long-rambling",
+      "input": "ok so basically we have this thing at work where every monday someone has to go through all the support tickets from last week and figure out what the top problems were and honestly it takes forever, there's like 300 tickets, they come out of zendesk as a csv with subject, body, tag and csat, and my boss wants a one pager with the top 5 themes and how many tickets each had and a couple of example quotes and whether csat was worse for that theme. can you make a prompt that does that",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "must_include": [
+          [
+            "csv"
+          ],
+          [
+            "5",
+            "five"
+          ],
+          [
+            "csat"
+          ],
+          [
+            "quote"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The request is messy but complete. A good prompt extracts the real spec: CSV input with the four named columns, top five themes with counts, example quotes and a CSAT comparison per theme, as a one page summary."
+    }
+  ]
+}

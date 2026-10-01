@@ -13,6 +13,7 @@ import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
 import { ShareMenu } from "@/components/dashboard/ShareMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
+import { streamChat } from "@/lib/api/chatApi";
 import { exportSession } from "@/lib/export";
 import type { ChatSession, ChatMessage, ExportFormat } from "@/lib/types/chat";
 import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION } from "@/lib/types/chat";
@@ -87,6 +88,7 @@ export default function ChatPage() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [stageMessage, setStageMessage] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<UploadedAttachment[]>([]);
   const [copiedMarkdown, setCopiedMarkdown] = useState(false);
 
@@ -138,7 +140,7 @@ export default function ChatPage() {
     document.title = session && session.title !== "New Chat" ? `${session.title} | Prompt AI` : "Prompt AI";
   }, [session]);
 
-  const handleSend = useCallback(async (override?: string, overrideAttachments?: UploadedAttachment[]) => {
+  const handleSend = useCallback(async (override?: string, overrideAttachments?: UploadedAttachment[], isClarifyAnswer = false) => {
     const content = (override ?? inputValue).trim();
     const attachments = overrideAttachments ?? pendingAttachments;
     if ((!content && attachments.length === 0) || isLoading || !session) return;
@@ -146,6 +148,7 @@ export default function ChatPage() {
     setInputValue("");
     setPendingAttachments([]);
     setIsLoading(true);
+    setStageMessage(null);
     setError(null);
 
     const tempId = `temp-${Date.now()}`;
@@ -164,33 +167,20 @@ export default function ChatPage() {
     ]);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: session.id,
-          content,
-          attachments: attachments.length
-            ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl }))
-            : undefined,
-        }),
+      const payload = await streamChat({
+        sessionId: session.id,
+        content,
+        isClarifyAnswer,
+        attachments: attachments.length
+          ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl }))
+          : undefined,
+        onStage: (stage) => setStageMessage(stage.message),
       });
-
-      let payload: { error?: string; userMsg?: ChatMessage; aiMsg?: ChatMessage; sessionTitle?: string };
-      try {
-        payload = await res.json();
-      } catch (parseErr) {
-        console.error("[chat page] response was not valid JSON:", parseErr);
-        throw new Error(`Server returned an unreadable response (status ${res.status}).`);
-      }
-
-      if (!res.ok) throw new Error(payload.error ?? `Request failed with status ${res.status}`);
-      if (!payload.userMsg || !payload.aiMsg) throw new Error("The server did not return a complete response.");
 
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== tempId),
-        payload.userMsg as ChatMessage,
-        payload.aiMsg as ChatMessage,
+        payload.userMsg,
+        payload.aiMsg,
       ]);
 
       if (payload.sessionTitle) {
@@ -206,6 +196,7 @@ export default function ChatPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
+      setStageMessage(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue, pendingAttachments, isLoading, session]);
@@ -370,48 +361,58 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-5 flex flex-col gap-5">
           {messages.map((m, i) => {
             const isLastMessage = i === messages.length - 1;
-            const isPendingInterview =
+            const pendingQuestion =
               m.role === "assistant" &&
-              m.metadata.mode === "clarify" &&
-              !!m.metadata.interviewQuestions?.length &&
+              (m.metadata.mode === "clarify" || m.metadata.mode === "answer") &&
               isLastMessage &&
-              !isLoading;
+              !isLoading
+                ? m.metadata.interviewQuestions?.[0]
+                : undefined;
 
-            if (isPendingInterview) {
-              // m.content is "intro\n\nnumbered question list", built server
-              // side for clients that don't render the interactive UI (e.g.
-              // the shared read-only view); only the intro sentence belongs
-              // here since the questions render one at a time below it.
-              const intro = m.content.split("\n\n")[0] ?? m.content;
+            // A clarify turn renders as the interactive card alone. A direct
+            // answer renders as a normal reply, with the question that is
+            // still waiting shown beneath it.
+            if (pendingQuestion && m.metadata.mode === "clarify") {
               return (
                 <ClarifyInterview
                   key={m.id}
-                  intro={intro}
-                  questions={m.metadata.interviewQuestions!}
-                  onComplete={(answerText) => handleSend(answerText)}
+                  intro={m.metadata.intro}
+                  question={pendingQuestion}
+                  position={m.metadata.clarifyPosition ?? 1}
+                  total={m.metadata.clarifyTotal ?? 1}
+                  onAnswer={(answer) => handleSend(answer, undefined, true)}
                 />
               );
             }
 
             return (
-              <MessageBubble
-                key={m.id}
-                message={m}
-                onSave={m.role === "assistant" ? handleSaveMessage : undefined}
-                onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
-                onRetry={
-                  m.role === "assistant" && m.metadata.mode === "error"
-                    ? () => {
-                        const precedingUser = [...messages.slice(0, i)].reverse().find((p) => p.role === "user");
-                        if (precedingUser) handleSend(precedingUser.content);
-                      }
-                    : undefined
-                }
-                onEdit={m.role === "user" ? handleEditMessage : undefined}
-              />
+              <div key={m.id} className="flex flex-col gap-5">
+                <MessageBubble
+                  message={m}
+                  onSave={m.role === "assistant" && m.metadata.mode === "ready" ? handleSaveMessage : undefined}
+                  onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
+                  onRetry={
+                    m.role === "assistant" && m.metadata.mode === "error"
+                      ? () => {
+                          const precedingUser = [...messages.slice(0, i)].reverse().find((p) => p.role === "user");
+                          if (precedingUser) handleSend(precedingUser.content);
+                        }
+                      : undefined
+                  }
+                  onEdit={m.role === "user" ? handleEditMessage : undefined}
+                />
+                {pendingQuestion && (
+                  <ClarifyInterview
+                    question={pendingQuestion}
+                    position={m.metadata.clarifyPosition ?? 1}
+                    total={m.metadata.clarifyTotal ?? 1}
+                    onAnswer={(answer) => handleSend(answer, undefined, true)}
+                  />
+                )}
+              </div>
             );
           })}
-          {isLoading && <GenerationStatus />}
+          {isLoading && <GenerationStatus message={stageMessage} />}
           <div ref={bottomRef} />
         </div>
 

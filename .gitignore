@@ -43,3 +43,11 @@ coverage/
 
 # Local notes / credentials scratch files
 db.txt
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Eval run output, the baseline is committed, individual runs are not
+data/evaluation/results/

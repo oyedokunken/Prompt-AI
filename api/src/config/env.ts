@@ -36,6 +36,13 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default("noreply@prompt.ai"),
   EMAIL_FROM_NAME: z.string().default("Prompt AI"),
 
+  // Data service (the only service that calls a model provider)
+  DATA_SERVICE_URL: z.string().url("DATA_SERVICE_URL must be a valid URL"),
+  API_SHARED_SECRET: z
+    .string()
+    .min(16, "API_SHARED_SECRET must be at least 16 characters")
+    .transform((v) => v.trim()),
+
   // App
   APP_URL: z.string().url("APP_URL must be a valid URL").default("http://localhost:3000"),
   API_URL: z.string().url("API_URL must be a valid URL").default("http://localhost:3001"),

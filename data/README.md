@@ -6,49 +6,36 @@ This service is deployed on Render, chosen because it suits long running Python 
 
 ## Responsibilities
 
-- Intent classification: identifying what the user wants and which AI category the request belongs to
-- Prompt construction: applying prompt engineering patterns to build a structured, complete prompt from user input
-- Prompt scoring: grading a generated prompt against a clarity and specificity rubric
-- Retrieval: pulling known effective prompt patterns and examples from a vector store to inform generation
-- Abstraction over external LLM providers, so `/api` never needs to know which provider is being used
+- A stateless orchestration service. It has no database and no Supabase access. /api sends every request the user's profile, memory and conversation history, and /data builds a prompt from what it is given.
+- Intent detection, the one-question-at-a-time clarifying flow, prompt construction, completeness scoring and the stated versus inferred diff.
+- Title inference and audio transcription.
+- The only place in the whole system that calls a model provider, behind `core/providers/base.py`.
 
-## What this service does NOT do
+## Endpoints
 
-- No authentication or user session handling. Every request is authenticated at the `/api` layer before it reaches here, using a shared service level secret.
-- No storage of user data beyond what is strictly needed for a single inference request.
-- No email, no billing, no business logic unrelated to model inference.
+All except `/health` require `Authorization: Bearer <API_SHARED_SECRET>`.
 
-## Tech Stack
+| Route | Purpose |
+|---|---|
+| `GET /health` | Liveness, no auth |
+| `POST /generate` | Streams stage events, then one clarifying question, a direct answer, a result or an error |
+| `POST /title` | Short inferred conversation title |
+| `POST /transcribe` | Audio to text |
 
-- Python
-- FastAPI, exposing internal endpoints consumed only by `/api`
-- scikit-learn, for the intent classification and scoring models
-- pgvector via Supabase, as the vector store for prompt pattern retrieval
-- pandas and NumPy, for data preparation and feature engineering
-- Jupyter, for experimentation only, never imported by production code
+Clarifying state travels in the request and response, /api stores it between a user's answers.
 
-## Folder Structure (planned)
+## Layout
+
+`routers/` HTTP endpoints, `core/pipeline/` intent, clarify, construct and score, `core/prompts/` system prompt and versioned templates, `core/providers/` model provider abstraction, `schemas/` request and response models, `evaluation/` eval set and runner, `tests/` unit tests.
+
+## Running
 
 ```
-data/
-├── main.py                 FastAPI entrypoint
-├── providers/                Abstraction layer over LLM APIs
-├── models/                    Trained model artifacts
-├── pipelines/                  Training scripts
-├── prompts/                     Versioned prompt templates
-├── retrieval/                   Embedding and vector search logic
-├── evaluation/                   Eval harness and test cases
-├── schemas/                       Pydantic request and response models
-├── tests/
-├── notebooks/                      Experimentation, not used in production
-├── requirements.txt
-└── .env.example
+python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+cp .env.example .env     # fill in OPENAI_API_KEY and API_SHARED_SECRET
+uvicorn main:app --port 8000
+pytest tests
+python evaluation/run_eval.py     # real model calls, run before and after any template change
 ```
 
-## Environment Variables
-
-This service expects a Supabase connection for the vector store, AI provider API keys, a shared secret used to authenticate requests coming from `/api`, and a model path or model registry location.
-
-## Status
-
-Scaffolding stage. No implementation yet.
+The service refuses to start if a required setting is missing or malformed.
