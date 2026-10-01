@@ -265,11 +265,37 @@ async function generateTurn(
         ],
         response_format: { type: "json_object" },
         temperature: 0.4,
-        max_tokens: 2000,
+        // A comprehensive, production-ready prompt (many sections, real
+        // operating rules, edge cases) can legitimately run long. 2000 was
+        // tight enough that detailed requests got cut off mid-JSON and
+        // silently fell back to the heuristic generator below, 6000 gives
+        // real headroom before that happens again.
+        max_tokens: 6000,
       });
 
-      const raw = completion.choices[0]?.message?.content ?? "{}";
-      const result = JSON.parse(raw) as GeneratedTurn;
+      const choice = completion.choices[0];
+      const raw = choice?.message?.content ?? "{}";
+
+      if (choice?.finish_reason === "length") {
+        console.error("[chat] OpenAI response was truncated by the token limit before falling back:", {
+          rawLength: raw.length,
+          rawTail: raw.slice(-200),
+        });
+      }
+
+      let result: GeneratedTurn;
+      try {
+        result = JSON.parse(raw) as GeneratedTurn;
+      } catch (parseErr) {
+        console.error("[chat] OpenAI response was not valid JSON, falling back:", {
+          parseErr,
+          finishReason: choice?.finish_reason,
+          rawLength: raw.length,
+          rawHead: raw.slice(0, 200),
+          rawTail: raw.slice(-200),
+        });
+        throw parseErr;
+      }
 
       if (result.mode === "clarify" && (result.message || (result.questions && result.questions.length))) {
         return result;
@@ -279,7 +305,19 @@ async function generateTurn(
       }
       console.error("[chat] OpenAI returned an incomplete turn, falling back:", result);
     } catch (err) {
-      console.error("[chat] OpenAI error, falling back to local generator:", err);
+      // OpenAI SDK errors carry a status code and error type that a plain
+      // `console.error(err)` tends to bury, surface them explicitly so a
+      // future fallback is diagnosable from logs alone, not a guess.
+      if (err instanceof OpenAI.APIError) {
+        console.error("[chat] OpenAI API error, falling back to local generator:", {
+          status: err.status,
+          code: err.code,
+          type: err.type,
+          message: err.message,
+        });
+      } else {
+        console.error("[chat] OpenAI error, falling back to local generator:", err);
+      }
     }
   }
 
