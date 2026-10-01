@@ -2,8 +2,9 @@
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import dynamic from "next/dynamic";
-import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square } from "lucide-react";
+import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square, ChevronDown } from "lucide-react";
 import type { EmojiClickData } from "emoji-picker-react";
+import { MODELS } from "@/lib/types/chat";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -14,6 +15,63 @@ interface ChatInputProps {
   onAttach?: (files: File[]) => void;
   disabled?: boolean;
   placeholder?: string;
+  model: (typeof MODELS)[number];
+  onModelChange: (m: (typeof MODELS)[number]) => void;
+}
+
+// Lives here, not the header, model selection happens in the same place
+// the user is actually composing the request. Opens upward since this
+// control sits at the bottom of the screen.
+function ModelSelector({
+  model, onSelect,
+}: {
+  model: (typeof MODELS)[number];
+  onSelect: (m: (typeof MODELS)[number]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-signal" />
+        <span className="font-mono text-[10px] text-text-muted">{model.label}</span>
+        <ChevronDown size={10} className="text-text-faint" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 bottom-full mb-1 w-52 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
+            {MODELS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                disabled={!m.openaiModel}
+                onClick={() => { onSelect(m); setOpen(false); }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-[11px] transition-colors ${
+                  !m.openaiModel
+                    ? "text-text-faint cursor-not-allowed"
+                    : m.id === model.id
+                    ? "text-accent bg-accent/10"
+                    : "text-text-muted hover:bg-raised"
+                }`}
+              >
+                <span>{m.label}</span>
+                {!m.openaiModel && (
+                  <span className="text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
+                    Coming soon
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export interface ChatInputHandle {
@@ -27,6 +85,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   onAttach,
   disabled = false,
   placeholder = "Describe what you need, plain language works best",
+  model,
+  onModelChange,
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const valueRef = useRef(value);
@@ -127,6 +187,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   return (
     <div className="px-4 sm:px-6 pb-4 pt-2">
+      <div className="flex items-center mb-1.5">
+        <ModelSelector model={model} onSelect={onModelChange} />
+      </div>
       {voiceError && (
         <p className="text-[10px] text-red-400 mb-1.5">{voiceError}</p>
       )}

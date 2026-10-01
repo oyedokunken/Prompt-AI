@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson, Menu } from "lucide-react";
+import { Zap, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson, Menu } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/Logo";
+import { cn } from "@/lib/utils";
 import { useUserProfile, roleLabel } from "@/lib/hooks/useUserProfile";
 import { useExportHistory } from "@/lib/hooks/useExportHistory";
 import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
@@ -24,57 +26,6 @@ import type {
 } from "@/lib/types/chat";
 import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION } from "@/lib/types/chat";
 
-// ─── Model selector ────────────────────────────────────────────────────────
-
-function ModelSelector({
-  model, onSelect,
-}: {
-  model: (typeof MODELS)[number];
-  onSelect: (m: (typeof MODELS)[number]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-raised cursor-pointer hover:border-border/60 transition-colors"
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-signal" />
-        <span className="font-mono text-[10px] text-text-muted">{model.label}</span>
-        <ChevronDown size={10} className="text-text-faint" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
-            {MODELS.map((m) => (
-              <button
-                key={m.id}
-                disabled={!m.openaiModel}
-                onClick={() => { onSelect(m); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-[11px] transition-colors ${
-                  !m.openaiModel
-                    ? "text-text-faint cursor-not-allowed"
-                    : m.id === model.id
-                    ? "text-accent bg-accent/10"
-                    : "text-text-muted hover:bg-raised"
-                }`}
-              >
-                <span>{m.label}</span>
-                {!m.openaiModel && (
-                  <span className="text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
-                    Coming soon
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ─── Export menu (per conversation, lives in the chat header) ──────────────
 
@@ -316,12 +267,13 @@ export default function DashboardPage() {
     return data as ChatSession;
   };
 
-  const handleNewChat = async () => {
+  // Does not create a row or touch the sidebar at all, a chat with no
+  // messages is a draft, not a saved session. The real row is created
+  // lazily in handleSend, the moment there is an actual first message to
+  // attach it to.
+  const handleNewChat = () => {
     setError(null);
-    const session = await createSession();
-    if (!session) return;
-    setSessions((prev) => [session, ...prev]);
-    setActiveSession(session);
+    setActiveSession(null);
     setMessages([]);
     setPendingAttachments([]);
   };
@@ -491,15 +443,16 @@ export default function DashboardPage() {
         payload.aiMsg as ChatMessage,
       ]);
 
-      // Update session title in sidebar
+      // Update the title in both the sidebar list and the active session,
+      // the header and tab title read from activeSession specifically, a
+      // title that only reached the sidebar never actually reached the
+      // user looking at the open conversation.
       if (payload.sessionTitle) {
+        const title = payload.sessionTitle;
         setSessions((prev) =>
-          prev.map((s) =>
-            s.id === session!.id
-              ? { ...s, title: payload.sessionTitle as string, updated_at: new Date().toISOString() }
-              : s
-          )
+          prev.map((s) => (s.id === session!.id ? { ...s, title, updated_at: new Date().toISOString() } : s))
         );
+        setActiveSession((prev) => (prev && prev.id === session!.id ? { ...prev, title } : prev));
       }
     } catch (err) {
       console.error("[chat] send failed:", err);
@@ -508,6 +461,28 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Editing a user message branches the conversation from that point
+  // forward: the edited message and everything after it (its old self
+  // included) is removed, then the new content is sent as a fresh turn.
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+
+    const idsToDelete = messages.slice(idx).map((m) => m.id).filter((id) => !id.startsWith("temp-"));
+    setMessages((prev) => prev.slice(0, idx));
+
+    if (idsToDelete.length > 0) {
+      const { error: deleteError } = await supabase.from("messages").delete().in("id", idsToDelete);
+      if (deleteError) {
+        console.error("[dashboard] handleEditMessage: failed to delete superseded messages:", deleteError);
+        setError("Could not update that message. Try again.");
+        return;
+      }
+    }
+
+    await handleSend(newContent);
   };
 
   const handleStarterClick = (text: string) => {
@@ -609,9 +584,18 @@ export default function DashboardPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
           </div>
+          {/* On mobile, the general dashboard view (no open chat) shows the
+              logo here, the limited header space is spent on the chat
+              title instead once a conversation is actually open. */}
+          {!activeSession && <Logo variant="color" size={16} className="md:hidden" />}
         </div>
 
-        <span className="font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 hidden sm:block max-w-[40%] truncate">
+        <span
+          className={cn(
+            "font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 max-w-[40%] truncate",
+            activeSession ? "block" : "hidden sm:block"
+          )}
+        >
           {activeSession && activeSession.title !== "New Chat" ? activeSession.title : "Prompt AI"}
         </span>
 
@@ -630,7 +614,6 @@ export default function DashboardPage() {
               onCopyMarkdown={handleCopyMarkdown}
               copied={copiedMarkdown}
             />
-            <ModelSelector model={selectedModel} onSelect={handleModelChange} />
           </div>
           <ThemeToggle size={13} className="w-7 h-7" />
           <button
@@ -714,6 +697,7 @@ export default function DashboardPage() {
                           }
                         : undefined
                     }
+                    onEdit={m.role === "user" ? handleEditMessage : undefined}
                   />
                 ))}
                 {isLoading && <GenerationStatus />}
@@ -750,6 +734,8 @@ export default function DashboardPage() {
             onSend={() => handleSend()}
             onAttach={handleAttach}
             disabled={isLoading}
+            model={selectedModel}
+            onModelChange={handleModelChange}
           />
         </main>
       </div>
