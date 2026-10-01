@@ -48,7 +48,7 @@ export function summarizeConversation(messages: ChatMessage[]): ConversationSumm
   };
 
   const latestReady = ready[ready.length - 1];
-  for (const fact of latestReady?.metadata.diff?.stated ?? []) add(`You said: ${fact}`);
+  for (const fact of latestReady?.metadata.diff?.stated ?? []) add(`Noted: ${fact}`);
   for (const fact of latestReady?.metadata.diff?.researched ?? []) add(`Found: ${fact}`);
   for (const m of assistant) {
     for (const s of m.metadata.sources ?? []) {

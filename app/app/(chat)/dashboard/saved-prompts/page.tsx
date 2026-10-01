@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BookOpen, Check, Copy, Star, Trash2 } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard/DashboardContext";
 import { SimplePageHeader } from "@/components/dashboard/SimplePageHeader";
+import { copyText } from "@/lib/clipboard";
 import { SavedPromptModal } from "@/components/dashboard/SavedPromptModal";
 import type { SavedPrompt } from "@/lib/types/chat";
 
@@ -13,7 +14,7 @@ export default function SavedPromptsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyQuick = async (p: SavedPrompt) => {
-    await navigator.clipboard.writeText(p.content);
+    if (!(await copyText(p.content))) return;
     setCopiedId(p.id);
     setTimeout(() => setCopiedId(null), 1800);
   };

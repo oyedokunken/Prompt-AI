@@ -5,6 +5,7 @@ import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain
 import type { ChatMessage } from "@/lib/types/chat";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { Markdown } from "@/components/dashboard/Markdown";
+import { copyText } from "@/lib/clipboard";
 import { AttachmentCard } from "@/components/dashboard/AttachmentCard";
 import { createClient } from "@/lib/supabase/client";
 
@@ -95,7 +96,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback }: 
   const now = useNow();
 
   const handleCopy = async (text: string = message.content) => {
-    await navigator.clipboard.writeText(text);
+    if (!(await copyText(text))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -108,7 +109,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback }: 
 
   // Copies only the deliverable, never the conversational wrapper around it.
   const handleCopyPrompt = async () => {
-    await navigator.clipboard.writeText(message.content);
+    if (!(await copyText(message.content))) return;
     setCopiedPrompt(true);
     setTimeout(() => setCopiedPrompt(false), 2000);
   };

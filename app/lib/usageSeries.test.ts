@@ -1,3 +1,5 @@
+process.env.TZ = "UTC";
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { RANGES, buildSeries, describeSeries, formatValue, metricValue, type UsageMessage } from "./usageSeries";
@@ -17,12 +19,29 @@ test("each range has the right number of buckets", () => {
   assert.deepEqual(counts, { "1d": 24, "3d": 12, "7d": 7, "1m": 30, "3m": 13 });
 });
 
-test("messages land in the right bucket and outside the window they are ignored", () => {
+test("messages land in the bucket that contains them and outside the window they are ignored", () => {
   const s = buildSeries([ready(30 * 60_000), ready(5 * HOUR), ready(2 * DAY)], "1d", NOW);
   assert.equal(s.totals.prompts, 2);
-  assert.equal(s.buckets[23]?.prompts, 1);
-  assert.equal(s.buckets[19]?.prompts, 1);
+  const at = (ms: number) => s.buckets.find((b) => NOW - ms >= b.start && NOW - ms < b.end);
+  assert.equal(at(30 * 60_000)?.prompts, 1);
+  assert.equal(at(5 * HOUR)?.prompts, 1);
   assert.equal(buildSeries([ready(2 * DAY)], "3d", NOW).totals.prompts, 1);
+});
+
+test("daily buckets are real calendar days and the last one is today", () => {
+  const s = buildSeries([ready(HOUR)], "7d", NOW);
+  const today = s.buckets[s.buckets.length - 1]!;
+  assert.equal(new Date(today.start).toISOString(), "2026-10-01T00:00:00.000Z");
+  assert.equal(new Date(today.end).toISOString(), "2026-10-02T00:00:00.000Z");
+  assert.equal(today.prompts, 1);
+  assert.equal(s.buckets[0]!.label, new Date(s.buckets[0]!.start).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  for (let i = 1; i < s.buckets.length; i++) assert.equal(s.buckets[i]!.start, s.buckets[i - 1]!.end);
+});
+
+test("hourly buckets are real hours", () => {
+  const s = buildSeries([], "1d", NOW);
+  assert.equal(new Date(s.buckets[s.buckets.length - 1]!.start).toISOString(), "2026-10-01T12:00:00.000Z");
+  assert.equal(s.buckets[0]!.end - s.buckets[0]!.start, HOUR);
 });
 
 test("tokens add input and output, and only counted messages are tracked", () => {

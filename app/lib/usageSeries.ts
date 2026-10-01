@@ -85,15 +85,44 @@ export function bucketLabel(range: RangeId, start: number, locale?: string): str
   return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
+// Bucket edges are aligned to the clock, so a daily bucket is a real calendar
+// day and an hourly one a real hour, and its label says what it covers. The last
+// bucket is the current one and ends in the future.
+function alignedBoundaries(range: RangeId, now: number, count: number): number[] {
+  const d = new Date(now);
+  const stepHours = range === "1d" ? 1 : range === "3d" ? 6 : 0;
+  const stepDays = range === "3m" ? 7 : stepHours ? 0 : 1;
+  const edges: number[] = [];
+
+  if (stepHours) {
+    d.setMinutes(0, 0, 0);
+    d.setHours(d.getHours() - (d.getHours() % stepHours) + stepHours);
+    const end = d.getTime();
+    for (let i = count; i >= 0; i--) edges.push(end - i * stepHours * HOUR);
+    return edges;
+  }
+
+  // Daily and weekly buckets end at the end of today, in local time.
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  const end = new Date(d);
+  for (let i = count; i >= 0; i--) {
+    const edge = new Date(end);
+    edge.setDate(edge.getDate() - i * stepDays);
+    edges.push(edge.getTime());
+  }
+  return edges;
+}
+
 export function buildSeries(messages: UsageMessage[], range: RangeId, now: number = Date.now(), locale?: string): Series {
   const cfg = RANGES.find((r) => r.id === range)!;
   const count = Math.round(cfg.windowMs / cfg.bucketMs);
-  const windowStart = now - cfg.windowMs;
+  const edges = alignedBoundaries(range, now, count);
+  const windowStart = edges[0] as number;
 
-  const buckets: Bucket[] = Array.from({ length: count }, (_, i) => {
-    const start = windowStart + i * cfg.bucketMs;
-    return emptyBucket(start, start + cfg.bucketMs, bucketLabel(range, start, locale));
-  });
+  const buckets: Bucket[] = Array.from({ length: count }, (_, i) =>
+    emptyBucket(edges[i] as number, edges[i + 1] as number, bucketLabel(range, edges[i] as number, locale))
+  );
   const totals = emptyBucket(windowStart, now, "Total");
   let tracked = 0;
   let assistant = 0;
@@ -102,8 +131,9 @@ export function buildSeries(messages: UsageMessage[], range: RangeId, now: numbe
     if (m.role !== "assistant") continue;
     const t = new Date(m.created_at).getTime();
     if (Number.isNaN(t) || t < windowStart || t > now) continue;
-    const index = Math.min(Math.floor((t - windowStart) / cfg.bucketMs), count - 1);
+    const index = buckets.findIndex((x) => t >= x.start && t < x.end);
     const b = buckets[index];
+    if (!b) continue;
     assistant++;
 
     const mode = m.metadata?.mode ?? "ready";

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Copy, MessageSquare } from "lucide-react";
 import { Modal } from "@/components/Modal";
+import { copyText } from "@/lib/clipboard";
 import { Markdown } from "@/components/dashboard/Markdown";
 import type { SavedPrompt } from "@/lib/types/chat";
 
@@ -20,7 +21,7 @@ export function SavedPromptModal({ prompt, onClose }: SavedPromptModalProps) {
 
   const copy = async () => {
     if (!prompt) return;
-    await navigator.clipboard.writeText(prompt.content);
+    if (!(await copyText(prompt.content))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
