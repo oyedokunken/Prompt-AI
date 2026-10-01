@@ -4,6 +4,7 @@ export interface ChatSession {
   title: string;
   model: string;
   is_favorite: boolean;
+  title_is_custom: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,16 @@ export interface PromptReadiness {
   notes?: string;
 }
 
+export interface ClarifyQuestion {
+  text: string;
+  // A short list of common answers, when the question has a reasonably
+  // enumerable answer set, for example a tech stack. Omitted entirely for
+  // genuinely open-ended questions, which fall back to a text input.
+  options?: string[];
+  // Whether more than one option can apply at once, meaningless without options.
+  multiple?: boolean;
+}
+
 // "clarify": the AI needs a little more context before it can produce a
 // real prompt, content is a short conversational question. "ready" (or
 // absent, for messages generated before this field existed): content is
@@ -53,6 +64,9 @@ export interface PromptReadiness {
 // failed, content is an honest failure message, never a fabricated prompt.
 export interface PromptMetadata {
   mode?: "clarify" | "ready" | "error";
+  // clarify mode, structured questions for the interview UI. May be
+  // absent on older messages, which fall back to plain text content.
+  interviewQuestions?: ClarifyQuestion[];
   score?: number;
   assumptions?: string[];
   structured?: {

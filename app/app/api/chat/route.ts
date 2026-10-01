@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
 import { openai } from "@/lib/ai/openaiClient";
-import { MODELS } from "@/lib/types/chat";
+import { MODELS, type ClarifyQuestion } from "@/lib/types/chat";
 import { buildSystemPrompt, buildErrorTurn, type GeneratedTurn } from "@/lib/ai/systemPrompt";
 import { selectRelevantMemories } from "@/lib/ai/memoryRelevance";
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   // Verify the session belongs to this user
   const { data: session, error: sessionError } = await supabase
     .from("chat_sessions")
-    .select("id, title, model")
+    .select("id, title, model, title_is_custom")
     .eq("id", session_id)
     .eq("user_id", user.id)
     .single();
@@ -141,12 +141,17 @@ export async function POST(req: NextRequest) {
 
   console.log("[api/chat] generation complete", { mode: turn.mode, hasTitle: !!turn.title });
 
-  // If title generation didn't produce anything this turn (including every
-  // error turn, which never sets a title), the session stays "New Chat"
-  // rather than settling for a worse fallback, so the next successful turn
-  // can still retitle it properly.
+  // Title the session on its first turn, then retitle once more the first
+  // time a turn actually resolves to "ready", since that is the first
+  // point the model has the full picture rather than a first guess made
+  // while it was still asking questions. Never overwrites a title the
+  // user set themselves. If title generation didn't produce anything this
+  // turn (including every error turn, which never sets one), the session
+  // stays "New Chat" rather than settling for a worse fallback, so the
+  // next successful turn can still retitle it properly.
   let sessionTitle: string | null = null;
-  if (session.title === "New Chat" && turn.title?.trim()) {
+  const shouldRetitle = !session.title_is_custom && (session.title === "New Chat" || turn.mode === "ready");
+  if (shouldRetitle && turn.title?.trim()) {
     sessionTitle = turn.title.trim();
     await supabase
       .from("chat_sessions")
@@ -173,6 +178,8 @@ export async function POST(req: NextRequest) {
       content: assistantContent,
       metadata: turn.mode === "error"
         ? { mode: "error" }
+        : turn.mode === "clarify"
+        ? { mode: "clarify", interviewQuestions: turn.questions ?? [] }
         : {
             mode: turn.mode,
             score,
@@ -201,10 +208,13 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ userMsg, aiMsg, sessionTitle });
 }
 
-function formatClarifyMessage(message: string | undefined, questions: string[] | undefined): string {
+// Plain-text fallback representation of a clarify turn, used as the
+// message's stored content for copy/export purposes, the interactive
+// interview itself renders from metadata.interviewQuestions instead.
+function formatClarifyMessage(message: string | undefined, questions: ClarifyQuestion[] | undefined): string {
   const intro = message?.trim() || "I can build this for you. A little more context would help:";
   if (!questions || questions.length === 0) return intro;
-  const list = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
+  const list = questions.map((q, i) => `${i + 1}. ${q.text}`).join("\n");
   return `${intro}\n\n${list}`;
 }
 

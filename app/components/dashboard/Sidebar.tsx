@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Search, MessageSquare, Settings, LogOut, X,
   PanelLeftClose, PanelLeftOpen, Paperclip, Download, History,
-  BookOpen, Star, Trash2,
+  BookOpen, Star, Trash2, Pencil,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import type { ChatSession } from "@/lib/types/chat";
@@ -27,6 +27,7 @@ interface SidebarProps {
   preferredName?: string | null;
   roleDisplay?: string;
   onToggleSessionFavorite?: (id: string, next: boolean) => void;
+  onRenameSession?: (id: string, title: string) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
@@ -57,6 +58,141 @@ function AnimatedSessionTitle({ title }: { title: string }) {
     >
       {title}
     </motion.span>
+  );
+}
+
+// A real top-level component, not a closure defined inside Sidebar's
+// render, so React can track its identity and local edit state across
+// re-renders instead of remounting it, and losing that state, every time
+// something unrelated in the sidebar changes.
+function SessionItem({
+  session, isActive, onToggleFavorite, onDelete, onRename, onNavigate,
+}: {
+  session: ChatSession;
+  isActive: boolean;
+  onToggleFavorite?: (id: string, next: boolean) => void;
+  onDelete: (id: string) => void;
+  onRename?: (id: string, title: string) => void;
+  onNavigate: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(session.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const startEditing = () => {
+    setDraft(session.title);
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== session.title && onRename) {
+      onRename(session.id, trimmed);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 bg-raised">
+        <MessageSquare size={10} className="shrink-0 text-text-faint" />
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+            if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
+          }}
+          className="flex-1 w-0 bg-transparent text-[10px] text-text-primary outline-none"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <motion.div layout initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+      <Link
+        href={`/dashboard/chats/${session.id}`}
+        onClick={onNavigate}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 transition-colors ${
+          isActive ? "bg-raised text-text-primary" : "text-text-faint hover:text-text-muted hover:bg-raised/50"
+        }`}
+      >
+        <MessageSquare size={10} className="shrink-0" />
+        <AnimatedSessionTitle title={session.title} />
+        {hovered && onRename && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); startEditing(); }}
+            className="p-0.5 text-text-faint hover:text-text-muted transition-colors"
+            aria-label="Rename chat"
+          >
+            <Pencil size={9} />
+          </button>
+        )}
+        {(hovered || session.is_favorite) && onToggleFavorite && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(session.id, !session.is_favorite); }}
+            className={`p-0.5 transition-colors ${session.is_favorite ? "text-accent" : "text-text-faint hover:text-accent"}`}
+            aria-label={session.is_favorite ? "Remove from favorites" : "Add to favorites"}
+          >
+            <Star size={9} fill={session.is_favorite ? "currentColor" : "none"} />
+          </button>
+        )}
+        {hovered && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(session.id); }}
+            className="p-0.5 text-text-faint hover:text-red-400 transition-colors"
+            aria-label="Delete chat"
+          >
+            <Trash2 size={9} />
+          </button>
+        )}
+      </Link>
+    </motion.div>
+  );
+}
+
+function SessionGroup({
+  label, items, activeSessionId, onToggleFavorite, onDelete, onRename, onNavigate,
+}: {
+  label: string;
+  items: ChatSession[];
+  activeSessionId: string | undefined;
+  onToggleFavorite?: (id: string, next: boolean) => void;
+  onDelete: (id: string) => void;
+  onRename?: (id: string, title: string) => void;
+  onNavigate: () => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className="mb-2">
+      <p className="px-2 mb-1 font-mono text-[9px] uppercase tracking-widest text-text-faint">
+        {label}
+      </p>
+      {items.map((s) => (
+        <SessionItem
+          key={s.id}
+          session={s}
+          isActive={s.id === activeSessionId}
+          onToggleFavorite={onToggleFavorite}
+          onDelete={onDelete}
+          onRename={onRename}
+          onNavigate={onNavigate}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -203,6 +339,7 @@ export function Sidebar({
   preferredName,
   roleDisplay,
   onToggleSessionFavorite,
+  onRenameSession,
   mobileOpen = false,
   onMobileClose = () => {},
 }: SidebarProps) {
@@ -211,7 +348,6 @@ export function Sidebar({
 
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const displayName = preferredName || username;
 
   // Closing the mobile drawer on these is harmless on desktop too -- it is
@@ -223,54 +359,6 @@ export function Sidebar({
   );
   const { today, yesterday, older } = groupSessions(filtered);
 
-  const SessionItem = ({ s }: { s: ChatSession }) => (
-    <motion.div key={s.id} layout initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <Link
-        href={`/dashboard/chats/${s.id}`}
-        onClick={onMobileClose}
-        onMouseEnter={() => setHoveredId(s.id)}
-        onMouseLeave={() => setHoveredId(null)}
-        className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 transition-colors ${
-          s.id === activeSessionId
-            ? "bg-raised text-text-primary"
-            : "text-text-faint hover:text-text-muted hover:bg-raised/50"
-        }`}
-      >
-        <MessageSquare size={10} className="shrink-0" />
-        <AnimatedSessionTitle title={s.title} />
-        {(hoveredId === s.id || s.is_favorite) && onToggleSessionFavorite && (
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSessionFavorite(s.id, !s.is_favorite); }}
-            className={`p-0.5 transition-colors ${s.is_favorite ? "text-accent" : "text-text-faint hover:text-accent"}`}
-            aria-label={s.is_favorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            <Star size={9} fill={s.is_favorite ? "currentColor" : "none"} />
-          </button>
-        )}
-        {hoveredId === s.id && (
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteSession(s.id); }}
-            className="p-0.5 text-text-faint hover:text-red-400 transition-colors"
-            aria-label="Delete chat"
-          >
-            <Trash2 size={9} />
-          </button>
-        )}
-      </Link>
-    </motion.div>
-  );
-
-  const SessionGroup = ({ label, items }: { label: string; items: ChatSession[] }) => {
-    if (!items.length) return null;
-    return (
-      <div className="mb-2">
-        <p className="px-2 mb-1 font-mono text-[9px] uppercase tracking-widest text-text-faint">
-          {label}
-        </p>
-        {items.map((s) => <SessionItem key={s.id} s={s} />)}
-      </div>
-    );
-  };
 
   const sidebarBody = (
     <>
@@ -323,9 +411,21 @@ export function Sidebar({
           <p className="text-[10px] text-text-faint text-center mt-6">No chats yet</p>
         ) : (
           <>
-            <SessionGroup label="Today" items={today} />
-            <SessionGroup label="Yesterday" items={yesterday} />
-            <SessionGroup label="Older" items={older} />
+            <SessionGroup
+              label="Today" items={today} activeSessionId={activeSessionId}
+              onToggleFavorite={onToggleSessionFavorite} onDelete={onDeleteSession}
+              onRename={onRenameSession} onNavigate={onMobileClose}
+            />
+            <SessionGroup
+              label="Yesterday" items={yesterday} activeSessionId={activeSessionId}
+              onToggleFavorite={onToggleSessionFavorite} onDelete={onDeleteSession}
+              onRename={onRenameSession} onNavigate={onMobileClose}
+            />
+            <SessionGroup
+              label="Older" items={older} activeSessionId={activeSessionId}
+              onToggleFavorite={onToggleSessionFavorite} onDelete={onDeleteSession}
+              onRename={onRenameSession} onNavigate={onMobileClose}
+            />
           </>
         )}
 

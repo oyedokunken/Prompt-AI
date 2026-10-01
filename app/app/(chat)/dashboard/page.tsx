@@ -121,7 +121,7 @@ export default function DashboardWelcomePage() {
         <ThemeToggle size={13} className="w-7 h-7" />
       </header>
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {error && (
           <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-red-400/30 bg-red-400/10 text-xs text-red-400">
             {error}

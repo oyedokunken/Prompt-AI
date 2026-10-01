@@ -36,8 +36,8 @@ export function GenerationStatus() {
       <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30 bg-signal/10">
         <span className="font-mono text-[10px] text-signal">P</span>
       </div>
-      <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-tl-md bg-base border border-border min-w-[220px]">
-        <div className="flex gap-1" aria-hidden="true">
+      <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-tl-md bg-base border border-border max-w-[260px]">
+        <div className="flex gap-1 shrink-0" aria-hidden="true">
           {[0, 1, 2].map((i) => (
             <span
               key={i}
@@ -46,7 +46,7 @@ export function GenerationStatus() {
             />
           ))}
         </div>
-        <div className="relative h-4 overflow-hidden flex-1">
+        <div className="relative flex-1 min-w-0">
           <AnimatePresence mode="wait">
             <motion.span
               key={index}
@@ -54,7 +54,7 @@ export function GenerationStatus() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="absolute inset-0 text-xs text-text-muted whitespace-nowrap"
+              className="block text-xs text-text-muted leading-snug"
             >
               {STAGES[index]}
             </motion.span>

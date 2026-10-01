@@ -20,6 +20,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     sessions,
     requestDeleteSession,
     toggleSessionFavorite,
+    renameSession,
     sidebarCollapsed,
     setSidebarCollapsed,
     mobileSidebarOpen,
@@ -65,11 +66,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         preferredName={profile?.preferredName}
         roleDisplay={roleLabel(profile?.role ?? null)}
         onToggleSessionFavorite={toggleSessionFavorite}
+        onRenameSession={renameSession}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">{children}</div>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">{children}</div>
 
       <ConfirmModal
         open={showLogoutConfirm}

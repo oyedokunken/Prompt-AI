@@ -175,6 +175,27 @@ async function logExport(session: ChatSession, format: ExportFormat): Promise<vo
   }
 }
 
+// Regenerates an export's content for the library preview modal, without
+// downloading or logging a new history entry, since the export already
+// happened, this is just showing what that file contained.
+export async function previewExportContent(
+  session: ChatSession,
+  messages: ChatMessage[],
+  format: ExportFormat
+): Promise<{ kind: "text"; content: string } | { kind: "pdf"; blob: Blob }> {
+  if (format === "pdf") {
+    const blob = await buildPdf(session, messages);
+    return { kind: "pdf", blob };
+  }
+  const content =
+    format === "json"
+      ? JSON.stringify({ session, messages }, null, 2)
+      : format === "txt"
+      ? buildText(messages)
+      : buildMarkdown(session, messages);
+  return { kind: "text", content };
+}
+
 // Builds the requested export format from a real session + its messages,
 // and either downloads it or (markdown-from-sidebar-copy) returns the text.
 export async function exportSession(

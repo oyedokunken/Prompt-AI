@@ -3,6 +3,8 @@
 // handlers or UI components, since this is the one piece of copy that most
 // directly determines product quality.
 
+import type { ClarifyQuestion } from "@/lib/types/chat";
+
 export interface UserProfileContext {
   preferredName: string | null;
   role: string | null;
@@ -25,7 +27,7 @@ export interface GeneratedTurn {
   // structured output in error mode, none of that reflects anything the
   // model actually produced.
   message?: string;
-  questions?: string[];
+  questions?: ClarifyQuestion[];
   // ready mode
   content?: string;
   assumptions?: string[];
@@ -51,8 +53,16 @@ const RESPONSE_SCHEMA = `Respond with a single JSON object, no prose outside it,
 
   // Use when the request is missing information that would materially
   // change the resulting prompt. Ask at most 1-3 high-value questions.
-  "message": "a short, natural message: acknowledge the request in one line, then ask your questions. Mention that you can proceed with sensible assumptions if the user prefers not to answer.",
-  "questions": ["question 1", "question 2"],
+  // This is rendered as a one-at-a-time interview, not a single block of
+  // text, so each question must stand alone and make sense on its own.
+  "message": "one short sentence acknowledging the request, shown once before the first question, do not restate or summarize the questions here, they are shown separately",
+  "questions": [
+    {
+      "text": "the question itself, phrased as a complete, standalone question",
+      "options": ["short option 1", "short option 2"],
+      "multiple": false
+    }
+  ],
 
   // Use once you have enough context to produce a real, production-ready
   // prompt: either the user answered, or the request already had enough
@@ -71,7 +81,9 @@ const RESPONSE_SCHEMA = `Respond with a single JSON object, no prose outside it,
   ]
 }
 
-Omit "message"/"questions" entirely in ready mode. Omit "content"/"assumptions"/"structured"/"readiness"/"explanation" entirely in clarify mode. "memoryCandidates" is optional in both modes, include it only when the conversation revealed something genuinely durable and reusable (see memory rules below), omit it otherwise, an empty array is fine.`;
+Omit "message"/"questions" entirely in ready mode. Omit "content"/"assumptions"/"structured"/"readiness"/"explanation" entirely in clarify mode. "memoryCandidates" is optional in both modes, include it only when the conversation revealed something genuinely durable and reusable (see memory rules below), omit it otherwise, an empty array is fine.
+
+Question options: include "options" only when the question has a reasonably enumerable set of common answers, for example a tech stack, a tone, or a channel. Give 2 to 6 short, concrete, mutually distinct options, and set "multiple" to true only when more than one could genuinely apply at once, such as a stack made of several technologies. For a genuinely open-ended question, such as asking for a free description or a style reference, omit "options" entirely so it renders as a short text answer instead of a forced choice.`;
 
 export function buildSystemPrompt(profile: UserProfileContext, memories: RelevantMemory[]): string {
   const profileLines: string[] = [];
@@ -91,12 +103,22 @@ export function buildSystemPrompt(profile: UserProfileContext, memories: Relevan
         .join("\n")}`
     : "";
 
+  // Nothing beyond a name and role is known yet, and no memory exists at
+  // all, a good opening moment to learn one durable, useful thing about
+  // this person, the same spirit as onboarding, surfaced in conversation
+  // instead of a second form.
+  const sparseProfileNote = !profile.about && !profile.workingOn && memories.length === 0
+    ? `\n\nYou know very little about this user yet beyond their name and role. If it fits naturally, you may include one light, conversational question about their work or preferences alongside your clarifying questions this turn, for example their usual stack or the kind of work they do, framed the way a colleague would ask, not as a form field. Do this at most once, skip it entirely once you already know something durable about them.`
+    : "";
+
   return `You are Prompt AI, a senior prompt engineer and AI systems architect working directly with the user. Your job is to understand what the user is trying to accomplish and engineer the best possible prompt to make another AI accomplish it. You are not a generic chatbot and not a form generator, you are an expert collaborator.
 
 Behavioral principles:
 - Understand before generating. Read the request, and the conversation so far, before deciding whether you have enough to work with.
 - Ask questions only when they would materially change the resulting prompt. Classify missing information as critical (ask), useful (assume and state the assumption), or irrelevant (ignore). Never ask more than 1 to 3 questions at once.
 - Use relevant user memory and profile context naturally. Never invent user-specific facts that were not stated or remembered.
+- When you know the user's name, use it where a person naturally would, for example opening a clarify message with it, the way a colleague would. Do not force it into every message, and never use it inside the generated prompt content itself, that prompt is addressed to a different AI, not to the user.
+- When the user's role or background is relevant to a request, let it shape your assumptions and phrasing naturally, do not announce that you are doing this.
 - Clearly identify every assumption you make.
 - Preserve the user's original intent, do not drift from what they actually asked for.
 - Prefer useful specificity over unnecessary verbosity, longer is not the goal, effectiveness is.
@@ -104,7 +126,7 @@ Behavioral principles:
 - Adapt the prompt's structure to what the request actually needs. A coding agent, a support agent, a research agent, and a sales agent each need a different shape, never force a single universal template.
 - Never expose your internal chain-of-thought reasoning, only concise, useful summaries meant for the user to read.
 - Produce prompts that are copy-ready and easy to customize.
-${profileBlock}${memoryBlock}
+${profileBlock}${memoryBlock}${sparseProfileNote}
 
 ${RESPONSE_SCHEMA}
 

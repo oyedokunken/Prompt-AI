@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "@/lib/dashboard/DashboardContext";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
+import { ClarifyInterview } from "@/components/dashboard/ClarifyInterview";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
 import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
 import { ShareMenu } from "@/components/dashboard/ShareMenu";
@@ -358,7 +359,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {error && (
           <div className="mx-4 mt-3 px-3 py-2 rounded-lg border border-red-400/30 bg-red-400/10 text-xs text-red-400">
             {error}
@@ -367,23 +368,49 @@ export default function ChatPage() {
         )}
 
         <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-5 flex flex-col gap-5">
-          {messages.map((m, i) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              onSave={m.role === "assistant" ? handleSaveMessage : undefined}
-              onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
-              onRetry={
-                m.role === "assistant" && m.metadata.mode === "error"
-                  ? () => {
-                      const precedingUser = [...messages.slice(0, i)].reverse().find((p) => p.role === "user");
-                      if (precedingUser) handleSend(precedingUser.content);
-                    }
-                  : undefined
-              }
-              onEdit={m.role === "user" ? handleEditMessage : undefined}
-            />
-          ))}
+          {messages.map((m, i) => {
+            const isLastMessage = i === messages.length - 1;
+            const isPendingInterview =
+              m.role === "assistant" &&
+              m.metadata.mode === "clarify" &&
+              !!m.metadata.interviewQuestions?.length &&
+              isLastMessage &&
+              !isLoading;
+
+            if (isPendingInterview) {
+              // m.content is "intro\n\nnumbered question list", built server
+              // side for clients that don't render the interactive UI (e.g.
+              // the shared read-only view); only the intro sentence belongs
+              // here since the questions render one at a time below it.
+              const intro = m.content.split("\n\n")[0] ?? m.content;
+              return (
+                <ClarifyInterview
+                  key={m.id}
+                  intro={intro}
+                  questions={m.metadata.interviewQuestions!}
+                  onComplete={(answerText) => handleSend(answerText)}
+                />
+              );
+            }
+
+            return (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                onSave={m.role === "assistant" ? handleSaveMessage : undefined}
+                onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
+                onRetry={
+                  m.role === "assistant" && m.metadata.mode === "error"
+                    ? () => {
+                        const precedingUser = [...messages.slice(0, i)].reverse().find((p) => p.role === "user");
+                        if (precedingUser) handleSend(precedingUser.content);
+                      }
+                    : undefined
+                }
+                onEdit={m.role === "user" ? handleEditMessage : undefined}
+              />
+            );
+          })}
           {isLoading && <GenerationStatus />}
           <div ref={bottomRef} />
         </div>

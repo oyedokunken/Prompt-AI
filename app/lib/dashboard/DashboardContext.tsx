@@ -32,6 +32,7 @@ interface DashboardContextValue {
   createSession: (modelId: string) => Promise<ChatSession | null>;
   requestDeleteSession: (id: string) => void;
   toggleSessionFavorite: (id: string, next: boolean) => Promise<void>;
+  renameSession: (id: string, title: string) => Promise<void>;
 
   // Saved prompts
   savedPrompts: SavedPrompt[];
@@ -167,6 +168,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A title the user set themselves, marked custom so the auto-title logic
+  // in /api/chat never overwrites it on a later turn.
+  const renameSession = useCallback(async (id: string, title: string) => {
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title, title_is_custom: true } : s)));
+    const { error: renameError } = await supabase
+      .from("chat_sessions")
+      .update({ title, title_is_custom: true })
+      .eq("id", id);
+    if (renameError) {
+      console.error("[dashboard] renameSession failed:", renameError);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cancelPendingDelete = useCallback(() => setPendingDelete(null), []);
 
   const confirmPendingDelete = useCallback(async () => {
@@ -200,6 +215,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     createSession,
     requestDeleteSession,
     toggleSessionFavorite,
+    renameSession,
     savedPrompts,
     savePrompt,
     requestDeleteSavedPrompt,

@@ -44,7 +44,7 @@ export default function SharedSessionPage() {
 
   const handleExport = async (format: ExportFormat) => {
     if (!payload) return;
-    const session: ChatSession = { ...payload.session, user_id: "", is_favorite: false };
+    const session: ChatSession = { ...payload.session, user_id: "", is_favorite: false, title_is_custom: false };
     await exportSession(session, payload.messages, format);
     setExportOpen(false);
   };
