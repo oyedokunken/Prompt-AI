@@ -18,9 +18,12 @@ export interface RelevantMemory {
 }
 
 export interface GeneratedTurn {
-  mode: "clarify" | "ready";
+  mode: "clarify" | "ready" | "error";
   title?: string;
-  // clarify mode
+  // clarify mode: the question text. error mode: a short, honest,
+  // user-facing explanation. Never carries a score, assumptions, or
+  // structured output in error mode, none of that reflects anything the
+  // model actually produced.
   message?: string;
   questions?: string[];
   // ready mode
@@ -108,51 +111,14 @@ ${RESPONSE_SCHEMA}
 Memory rules: only propose a memory candidate for information that is useful, stable across future conversations, and appropriate to remember, such as the user's stack, domain, or a stated preference. Never propose one-off requests, temporary instructions, or sensitive information as memory. When genuinely uncertain whether something is worth remembering, leave it out, the user can always add it themselves.`;
 }
 
-export function buildFallbackTurn(userInput: string): GeneratedTurn {
-  const words = userInput.split(/\s+/).filter(Boolean);
-  const hasTarget = /\b(for|using|with|in|to)\b/i.test(userInput);
-  const hasFormat = /\b(format|markdown|json|list|table|bullet|step)\b/i.test(userInput);
-  const hasRole = /\b(senior|junior|expert|beginner|developer|designer|engineer|manager)\b/i.test(userInput);
-  const hasConstraint = /\b(must|should|need|require|only|never|always)\b/i.test(userInput);
-
-  const assumptions: string[] = [];
-  if (!hasRole) assumptions.push("Role and expertise level inferred from context");
-  if (!hasTarget) assumptions.push("Target tool or platform assumed from common usage patterns");
-  if (!hasFormat) assumptions.push("Output format defaulted to structured text");
-  if (!hasConstraint) assumptions.push("No explicit constraints detected, sensible defaults applied");
-
-  const structured = {
-    role: hasRole ? "Domain expert (as referenced in your input)" : "Expert assistant in the relevant domain",
-    context: userInput,
-    constraints: hasConstraint
-      ? ["Follow explicit requirements stated in the input", "Be precise and production-ready"]
-      : ["Be precise and specific", "Provide actionable, production-ready output", "Clearly state any remaining assumptions"],
-    format: hasFormat ? "As specified in input" : "Structured text with clear sections",
-  };
-
-  const content = `## Structured Prompt
-
-**Role:** ${structured.role}
-
-**Context:** ${userInput}
-
-**Task:** Complete the objective described above with precision and depth. Where the intent is ambiguous, choose the most professional interpretation and state the assumption explicitly.
-
-**Constraints:**
-${structured.constraints.map((c) => `- ${c}`).join("\n")}
-
-**Output format:** ${structured.format}`;
-
+// Generation genuinely failed, this turn is never dressed up as a real
+// model response: no score, no assumptions, no structured output, nothing
+// that implies reasoning happened when it did not. The UI renders this
+// mode as a visible error state with a retry action, not a chat bubble
+// that looks like a normal answer.
+export function buildErrorTurn(): GeneratedTurn {
   return {
-    mode: "ready",
-    content,
-    assumptions,
-    structured,
-    readiness: {
-      status: words.length > 12 ? "ready" : "needs_context",
-      missing: words.length > 12 ? [] : ["More detail on the target use case would sharpen this prompt"],
-      notes: "Generated without live AI assistance, a heuristic best-effort prompt.",
-    },
-    explanation: "Built from keyword patterns in your request since live AI generation was unavailable for this response.",
+    mode: "error",
+    message: "Generation failed. Please try again.",
   };
 }

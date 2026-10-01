@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import OpenAI from "openai";
+import { openai } from "@/lib/ai/openaiClient";
 import { MODELS } from "@/lib/types/chat";
-import { buildSystemPrompt, buildFallbackTurn, type GeneratedTurn } from "@/lib/ai/systemPrompt";
+import { buildSystemPrompt, buildErrorTurn, type GeneratedTurn } from "@/lib/ai/systemPrompt";
 import { selectRelevantMemories } from "@/lib/ai/memoryRelevance";
 
 interface IncomingAttachment {
@@ -24,12 +25,6 @@ interface IncomingAttachment {
 //   2. DATA_SERVICE_URL set          -> proxy to Python /data service
 //   3. Fallback                      -> local heuristic builder
 // ---------------------------------------------------------------------------
-
-// .trim() guards against a trailing newline in the Vercel env var value,
-// which OpenAI's SDK rejects outright when building the Bearer header.
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() })
-  : null;
 
 // Bounds how much prior conversation gets replayed into each call, the
 // smallest amount that still gives the model real continuity.
@@ -146,9 +141,10 @@ export async function POST(req: NextRequest) {
 
   console.log("[api/chat] generation complete", { mode: turn.mode, hasTitle: !!turn.title });
 
-  // If title generation didn't produce anything this turn, the session
-  // stays "New Chat" rather than settling for a worse fallback, so the
-  // next successful turn can still retitle it properly.
+  // If title generation didn't produce anything this turn (including every
+  // error turn, which never sets a title), the session stays "New Chat"
+  // rather than settling for a worse fallback, so the next successful turn
+  // can still retitle it properly.
   let sessionTitle: string | null = null;
   if (session.title === "New Chat" && turn.title?.trim()) {
     sessionTitle = turn.title.trim();
@@ -159,10 +155,13 @@ export async function POST(req: NextRequest) {
   }
 
   const assistantContent =
-    turn.mode === "clarify"
-      ? formatClarifyMessage(turn.message, turn.questions)
-      : turn.content ?? "";
+    turn.mode === "clarify" ? formatClarifyMessage(turn.message, turn.questions) :
+    turn.mode === "error" ? (turn.message ?? "Generation failed. Please try again.") :
+    turn.content ?? "";
 
+  // An error turn never carries a score, assumptions, or structured
+  // output, none of that would reflect anything the model actually
+  // produced.
   const score = turn.mode === "ready" ? deriveReadinessScore(turn) : undefined;
 
   // Persist the AI message
@@ -172,15 +171,17 @@ export async function POST(req: NextRequest) {
       session_id,
       role: "assistant",
       content: assistantContent,
-      metadata: {
-        mode: turn.mode,
-        score,
-        assumptions: turn.assumptions,
-        structured: turn.structured,
-        readiness: turn.readiness,
-        explanation: turn.explanation,
-        memoryCandidates: turn.memoryCandidates,
-      },
+      metadata: turn.mode === "error"
+        ? { mode: "error" }
+        : {
+            mode: turn.mode,
+            score,
+            assumptions: turn.assumptions,
+            structured: turn.structured,
+            readiness: turn.readiness,
+            explanation: turn.explanation,
+            memoryCandidates: turn.memoryCandidates,
+          },
     })
     .select()
     .single();
@@ -309,14 +310,14 @@ async function generateTurn(
       // `console.error(err)` tends to bury, surface them explicitly so a
       // future fallback is diagnosable from logs alone, not a guess.
       if (err instanceof OpenAI.APIError) {
-        console.error("[chat] OpenAI API error, falling back to local generator:", {
+        console.error("[chat] OpenAI API error:", {
           status: err.status,
           code: err.code,
           type: err.type,
           message: err.message,
         });
       } else {
-        console.error("[chat] OpenAI error, falling back to local generator:", err);
+        console.error("[chat] OpenAI error:", err);
       }
     }
   }
@@ -339,10 +340,12 @@ async function generateTurn(
       }
       console.error("[chat] DATA_SERVICE returned an error status:", res.status);
     } catch (err) {
-      console.error("[chat] DATA_SERVICE error, falling back to local generator:", err);
+      console.error("[chat] DATA_SERVICE error:", err);
     }
   }
 
-  // 3: Local heuristic fallback
-  return buildFallbackTurn(userInput);
+  // 3: Every generation path failed. Never fabricate a prompt, a score, or
+  // an assumptions list to paper over that, an honest error is the only
+  // acceptable outcome here.
+  return buildErrorTurn();
 }

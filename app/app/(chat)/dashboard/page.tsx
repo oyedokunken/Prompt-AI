@@ -700,12 +700,20 @@ export default function DashboardPage() {
               <EmptyState onStarter={handleStarterClick} name={profile?.preferredName ?? undefined} />
             ) : (
               <>
-                {messages.map((m) => (
+                {messages.map((m, i) => (
                   <MessageBubble
                     key={m.id}
                     message={m}
                     onSave={m.role === "assistant" ? handleSaveMessage : undefined}
                     onSaveMemories={m.role === "assistant" ? saveMemoryCandidates : undefined}
+                    onRetry={
+                      m.role === "assistant" && m.metadata.mode === "error"
+                        ? () => {
+                            const precedingUser = [...messages.slice(0, i)].reverse().find((p) => p.role === "user");
+                            if (precedingUser) handleSend(precedingUser.content);
+                          }
+                        : undefined
+                    }
                   />
                 ))}
                 {isLoading && <GenerationStatus />}

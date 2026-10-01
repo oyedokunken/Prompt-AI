@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw } from "lucide-react";
 import type { ChatMessage, MemoryCandidate } from "@/lib/types/chat";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   onSave?: (message: ChatMessage) => void;
   onSaveMemories?: (candidates: MemoryCandidate[]) => void;
+  onRetry?: () => void;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -64,7 +65,7 @@ function formatContent(raw: string) {
   });
 }
 
-export function MessageBubble({ message, onSave, onSaveMemories }: MessageBubbleProps) {
+export function MessageBubble({ message, onSave, onSaveMemories, onRetry }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -72,6 +73,7 @@ export function MessageBubble({ message, onSave, onSaveMemories }: MessageBubble
   const isUser = message.role === "user";
   const meta = message.metadata;
   const isClarify = meta.mode === "clarify";
+  const isError = meta.mode === "error";
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -101,6 +103,34 @@ export function MessageBubble({ message, onSave, onSaveMemories }: MessageBubble
             </p>
           </div>
           <p className="text-[10px] text-text-faint mt-1 font-mono text-right">You</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Generation genuinely failed: a distinct, honest error state, never a
+  // chat bubble dressed up to look like a real answer.
+  if (isError) {
+    return (
+      <div className="flex gap-3">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-red-400/30 bg-red-400/10">
+          <AlertTriangle size={12} className="text-red-400" />
+        </div>
+        <div className="max-w-[85%] sm:max-w-[72%] min-w-0">
+          <div className="rounded-2xl rounded-tl-md border border-red-400/30 bg-red-400/5 px-4 py-3">
+            <p className="text-sm text-red-400 leading-relaxed">{message.content}</p>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <p className="font-mono text-[10px] text-text-faint">Prompt AI, generation failed</p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-accent hover:text-accent/80 transition-colors"
+              >
+                <RefreshCw size={10} /> Try again
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -49,9 +49,10 @@ export interface PromptReadiness {
 // "clarify": the AI needs a little more context before it can produce a
 // real prompt, content is a short conversational question. "ready" (or
 // absent, for messages generated before this field existed): content is
-// the finished, production-ready prompt.
+// the finished, production-ready prompt. "error": generation genuinely
+// failed, content is an honest failure message, never a fabricated prompt.
 export interface PromptMetadata {
-  mode?: "clarify" | "ready";
+  mode?: "clarify" | "ready" | "error";
   score?: number;
   assumptions?: string[];
   structured?: {
