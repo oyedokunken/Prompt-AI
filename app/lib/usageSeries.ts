@@ -202,6 +202,6 @@ export function describeSeries(series: Series, rangeLabel: string): string {
   if (t.scoreSamples) parts[0] += ` at an average completeness of ${Math.round(t.scoreSum / t.scoreSamples)} out of 100`;
   parts[0] += ".";
   if (t.questions) parts.push(`It asked ${t.questions} clarifying question${t.questions === 1 ? "" : "s"} along the way.`);
-  if (t.tokenMessages) parts.push(`That used about ${t.tokens.toLocaleString()} tokens across ${t.tokenMessages} replies.`);
+  if (t.tokenMessages) parts.push(`That used about ${t.tokens.toLocaleString()} tokens across ${t.tokenMessages} ${t.tokenMessages === 1 ? "reply" : "replies"}.`);
   return parts.join(" ");
 }
