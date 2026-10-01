@@ -7,6 +7,7 @@ import {
   DATA_GENERATE_TIMEOUT_MS,
   DataServiceError,
   inferTitle,
+  summarizeMemory,
   openGenerateStream,
   transcribeAudio,
   type GenerateRequestBody,
@@ -138,7 +139,7 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
       role: "user",
       content,
       metadata: body.attachments?.length
-        ? { attachments: body.attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: isReadable(a) })) }
+        ? { attachments: body.attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: isReadable(a), size: a.size })) }
         : {},
     })
     .select()
@@ -244,6 +245,46 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
 
   res.write(`event: saved\ndata: ${JSON.stringify({ userMsg, aiMsg, sessionTitle, memorySaved })}\n\n`);
   res.end();
+});
+
+// GET /chat/memory-summary
+// A short prose description of what is stored about the signed in user, written
+// by /data from the same profile and memory the chat uses. Nothing is stored,
+// the interface caches it against a hash of the details it was written from.
+chatRouter.get("/memory-summary", chatLimiter, requireUser, async (req: Request, res: Response): Promise<void> => {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: "UNAUTHORIZED", message: "Sign in to continue." });
+    return;
+  }
+  const { data, error } = await supabaseAdmin
+    .from("user_memories")
+    .select("category, key, value")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(100);
+  if (error) {
+    console.error("[chat/memory-summary] memory load failed:", error);
+    res.status(500).json({ error: "INTERNAL_ERROR", message: "Could not load your memory." });
+    return;
+  }
+  const meta = user.user_metadata ?? {};
+  try {
+    const summary = await summarizeMemory(
+      {
+        preferred_name: metaString(meta.preferred_name),
+        role: metaString(meta.role),
+        about: metaString(meta.about),
+        working_on: metaString(meta.working_on),
+        primary_use: metaString(meta.primary_use),
+      },
+      data ?? []
+    );
+    res.json({ summary });
+  } catch (err) {
+    console.error("[chat/memory-summary] failed:", err);
+    res.status(502).json({ error: "SUMMARY_FAILED", message: "Could not write the summary." });
+  }
 });
 
 // POST /chat/transcribe

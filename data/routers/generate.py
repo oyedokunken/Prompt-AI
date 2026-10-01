@@ -16,6 +16,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core import events, usage
+from config import get_settings
+from core import patterns as pattern_library
 from core.context import (
     PipelineContext,
     assemble_context,
@@ -37,6 +39,7 @@ from schemas.responses import (
     MemoryRef,
     ResultEvent,
     SourceSummary,
+    UsageSummary,
 )
 
 logger = logging.getLogger("data.generate")
@@ -48,7 +51,7 @@ router = APIRouter()
 GENERATION_FAILED_MESSAGE = "Generation failed. Please try again."
 
 
-def _question_event(state: ClarifyState) -> ClarifyingQuestionEvent:
+def _question_event(state: ClarifyState, meter: usage.UsageMeter) -> ClarifyingQuestionEvent:
     pending = clarify.pending_question(state)
     assert pending is not None
     position, total = clarify.position(state)
@@ -58,6 +61,7 @@ def _question_event(state: ClarifyState) -> ClarifyingQuestionEvent:
         total=total,
         intro=state.intro or None if position == 1 else None,
         clarify_state=state,
+        usage=UsageSummary(**meter.snapshot()),
     )
 
 
@@ -125,6 +129,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
                 content=answered.text,
                 memory_candidates=fresh_memory_candidates(answered.memory_candidates, ctx.all_memories),
                 memory_used=_memory_used(ctx),
+                usage=UsageSummary(**meter.snapshot()),
                 clarify_state=state if pending else None,
                 pending_question=pending,
                 position=position,
@@ -138,7 +143,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             if not clarify.is_complete(state):
                 position, total = clarify.position(state)
                 yield events.clarifying_question(position, total)
-                yield _question_event(state)
+                yield _question_event(state, meter)
                 return
             queries = state.search_queries
         elif decision.needs_clarification:
@@ -152,7 +157,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
                 [] if searched_early else decision.search_queries,
             )
             yield events.clarifying_question(1, len(state.questions))
-            yield _question_event(state)
+            yield _question_event(state, meter)
             return
         else:
             # A fresh request with enough detail, any earlier unfinished
@@ -166,7 +171,13 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             ctx = await run_research(ctx, queries, provider)
 
         yield events.constructing(len(state.answers) if state else 0)
-        built = await construct.construct(ctx, state, provider)
+        # Retrieve the known effective patterns that fit this request, by meaning.
+        matches = (
+            await pattern_library.retrieve(construct.pattern_query(ctx, state), provider)
+            if get_settings().patterns_enabled
+            else []
+        )
+        built = await construct.construct(ctx, state, provider, matches)
 
         yield events.scoring()
         scored = score.score(built)
@@ -182,6 +193,8 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             explanation=built.explanation,
             memory_candidates=fresh_memory_candidates(built.memory_candidates, ctx.all_memories),
             memory_used=_memory_used(ctx),
+            usage=UsageSummary(**meter.snapshot()),
+            patterns_used=[m.pattern.name for m in matches],
             sources=_summaries(ctx.sources),
             format_style=construct.format_style_for(ctx, state),
             template_version=ACTIVE_VERSION,

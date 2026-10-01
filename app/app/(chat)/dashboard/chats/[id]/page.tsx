@@ -11,6 +11,7 @@ import { ClarifyInterview } from "@/components/dashboard/ClarifyInterview";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
 import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
 import { MemoryToast } from "@/components/dashboard/MemoryToast";
+import { AttachmentCard } from "@/components/dashboard/AttachmentCard";
 import { ShareMenu } from "@/components/dashboard/ShareMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
@@ -166,7 +167,7 @@ export default function ChatPage() {
         role: "user",
         content,
         metadata: attachments.length
-          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl || a.type === "application/pdf" })) }
+          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl || a.type === "application/pdf", size: a.size })) }
           : {},
         created_at: new Date().toISOString(),
       },
@@ -178,7 +179,7 @@ export default function ChatPage() {
         content,
         isClarifyAnswer,
         attachments: attachments.length
-          ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl }))
+          ? attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, dataUrl: a.dataUrl, size: a.size }))
           : undefined,
         onStage: (stage) => setStageMessage(stage.message),
       });
@@ -284,6 +285,35 @@ export default function ChatPage() {
     if (!session) return;
     setSession((prev) => (prev ? { ...prev, model: m.id } : prev));
     await supabase.from("chat_sessions").update({ model: m.id }).eq("id", session.id);
+  };
+
+  // Stores the rating on the response itself, with the request it answered, its
+  // score and the template version, so a person reviewing feedback later has the
+  // full context and does not have to rebuild it from the chat.
+  const handleFeedback = async (message: ChatMessage, rating: "up" | "down" | null) => {
+    const index = messages.findIndex((m) => m.id === message.id);
+    if (index === -1 || message.id.startsWith("temp-")) return;
+    const request = [...messages.slice(0, index)].reverse().find((m) => m.role === "user")?.content ?? "";
+    const metadata = { ...message.metadata };
+    if (rating) {
+      metadata.feedback = {
+        rating,
+        at: new Date().toISOString(),
+        request: request.slice(0, 2000),
+        score: message.metadata.score ?? null,
+        templateVersion: message.metadata.templateVersion ?? null,
+      };
+    } else {
+      delete metadata.feedback;
+    }
+    const previous = messages;
+    setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, metadata } : m)));
+    const { error: updateError } = await supabase.from("messages").update({ metadata }).eq("id", message.id);
+    if (updateError) {
+      console.error("[chat page] feedback failed:", updateError);
+      setMessages(previous);
+      setError("Could not save your feedback. Try again.");
+    }
   };
 
   const handleSaveMessage = (message: ChatMessage) => {
@@ -412,6 +442,7 @@ export default function ChatPage() {
                       : undefined
                   }
                   onEdit={m.role === "user" ? handleEditMessage : undefined}
+                  onFeedback={m.role === "assistant" && m.metadata.mode !== "error" && m.metadata.mode !== "clarify" ? handleFeedback : undefined}
                 />
                 {pendingQuestion && (
                   <ClarifyInterview
@@ -431,16 +462,14 @@ export default function ChatPage() {
         {pendingAttachments.length > 0 && (
           <div className="mx-4 sm:mx-6 mb-2 flex flex-wrap gap-2">
             {pendingAttachments.map((a) => (
-              <div key={a.path || a.name} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted">
-                <span className="truncate max-w-[160px]">{a.name}</span>
-                <button
-                  onClick={() => setPendingAttachments((prev) => prev.filter((p) => p !== a))}
-                  className="text-text-faint hover:text-red-400 transition-colors"
-                  aria-label="Remove attachment"
-                >
-                  <X size={11} />
-                </button>
-              </div>
+              <AttachmentCard
+                key={a.path || a.name}
+                name={a.name}
+                type={a.type}
+                url={a.dataUrl ?? a.publicUrl}
+                size={a.size}
+                onRemove={() => setPendingAttachments((prev) => prev.filter((p) => p !== a))}
+              />
             ))}
           </div>
         )}

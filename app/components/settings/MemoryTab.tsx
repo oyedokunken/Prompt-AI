@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Brain, Pencil, Trash2, Plus, Check, X, Loader2 } from "lucide-react";
+import { Brain, Pencil, Trash2, Plus, Check, X, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useMemories } from "@/lib/hooks/useMemories";
 import { MEMORY_CATEGORIES } from "@/lib/types/chat";
 import type { UserMemory } from "@/lib/types/chat";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { MemorySummary } from "@/components/settings/MemorySummary";
 import { cn } from "@/lib/utils";
 
 function categoryLabel(id: string): string {
@@ -119,6 +120,7 @@ export function MemoryTab() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserMemory | null>(null);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const grouped = MEMORY_CATEGORIES.map((c) => ({
     ...c,
@@ -171,6 +173,17 @@ export function MemoryTab() {
           )}
         </div>
       ) : (
+        <>
+          <MemorySummary memories={memories} />
+          <button
+            onClick={() => setShowDetails((v) => !v)}
+            className="mb-4 inline-flex items-center gap-1.5 text-xs text-text-faint hover:text-text-muted transition-colors"
+            aria-expanded={showDetails}
+          >
+            {showDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {showDetails ? "Hide" : "Edit"} individual details ({memories.length})
+          </button>
+        {showDetails && (
         <div className="space-y-6 mb-6">
           {[...grouped, ...(uncategorized.length ? [{ id: "other", label: "Other", items: uncategorized }] : [])]
             .filter((g) => g.items.length > 0)
@@ -187,6 +200,8 @@ export function MemoryTab() {
               </div>
             ))}
         </div>
+        )}
+        </>
       )}
 
       {/* Add memory */}

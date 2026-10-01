@@ -74,6 +74,10 @@ The defaults did not change, and any step can be moved by configuration alone if
 | Search | one query per turn | `data` |
 | Audio | 15MB, and 4MB through the request body | `data`, `api` |
 
+## Pattern retrieval
+
+Retrieving patterns adds one small embedding call and about 400 to 600 tokens to a construction prompt. On the same 15 prompt-building cases it raised the judge's specificity, fit and value by roughly 0.3 each, at about 6 percent more spend per case. The patterns sit in the per-request part of the prompt, after the cacheable prefix, so they do not disturb caching.
+
 ## Reading the logs
 
 Every model call logs one line, and every request logs a total:

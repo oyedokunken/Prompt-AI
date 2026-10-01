@@ -18,7 +18,6 @@ The index for Prompt AI's documentation. Deeper guides live here or next to the 
 - [`app/README.md`](./app/README.md) the interface
 - [`api/README.md`](./api/README.md) the backend
 - [`data/README.md`](./data/README.md) the intelligence layer
-- [`docs/README.md`](./docs/README.md) database schema and operational notes
 - [`OAuth.md`](./OAuth.md) setting up Google and GitHub sign in
 
 ## Working on the prompt pipeline

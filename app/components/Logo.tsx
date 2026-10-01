@@ -6,6 +6,8 @@ interface LogoProps {
   variant?: "color" | "mono";
   size?: number;
   className?: string;
+  // Just the badge, without the wordmark, for narrow spaces such as a collapsed sidebar.
+  iconOnly?: boolean;
 }
 
 // The icon chip is a fixed brand badge, a small dark square with a glyph
@@ -13,7 +15,7 @@ interface LogoProps {
 // than inverting with the page theme. The wordmark next to it is not part
 // of that fixed badge, so it uses the theme's ink tokens and must stay
 // legible against whichever background it is placed on.
-export function Logo({ variant = "color", size = 32, className }: LogoProps) {
+export function Logo({ variant = "color", size = 32, className, iconOnly = false }: LogoProps) {
   const isMono = variant === "mono";
   const glyphColor = isMono ? "#8B8B93" : "#F2A93B";
 
@@ -69,6 +71,7 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
           opacity="0.7"
         />
       </svg>
+      {!iconOnly && (
       <span
         style={{
           fontFamily: "var(--font-geist)",
@@ -82,6 +85,7 @@ export function Logo({ variant = "color", size = 32, className }: LogoProps) {
         Prompt
         <span className={isMono ? "text-text-muted" : "text-accent"}>AI</span>
       </span>
+      )}
     </span>
   );
 }

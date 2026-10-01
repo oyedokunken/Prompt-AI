@@ -62,6 +62,26 @@ export async function openGenerateStream(body: GenerateRequestBody, signal: Abor
   return res;
 }
 
+export async function summarizeMemory(
+  profile: GenerateRequestBody["profile"],
+  memories: { category: string; key: string; value: string }[]
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(url("/memory-summary"), {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ profile, memories }),
+      signal: AbortSignal.timeout(DATA_TITLE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new DataServiceError(err instanceof Error ? err.message : "Could not reach the data service");
+  }
+  if (!res.ok) throw new DataServiceError("Memory summary failed", res.status);
+  const payload = (await res.json()) as { summary?: string };
+  return payload.summary ?? "";
+}
+
 export async function inferTitle(messages: string[]): Promise<string | null> {
   try {
     const res = await fetch(url("/title"), {

@@ -51,3 +51,7 @@ __pycache__/
 
 # Eval run output, the baseline is committed, individual runs are not
 data/evaluation/results/
+
+# Feedback exports hold real user content and stay on the machine that made them
+data/evaluation/feedback_export.json
+data/evaluation/feedback_candidates.json

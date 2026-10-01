@@ -50,12 +50,11 @@ The long term goal is a system that understands how other AI models think better
 
 ## Architecture Overview
 
-Prompt AI is a monorepo split into four areas, each with a single responsibility.
+Prompt AI is a monorepo split into three services, each with a single responsibility.
 
 - **`/app`** is the Next.js frontend. It owns the chat interface, the dashboard and settings, and everything the user sees.
 - **`/api`** is the backend. It owns authentication, the database, email (via Nodemailer), rate limiting, and all business logic that is not AI. For every chat turn it loads the user's profile, stored memory and conversation history, sends them to `/data`, relays the streamed result unchanged, and persists the outcome. It is the only service allowed to talk to `/data`.
 - **`/data`** is strictly the intelligence layer. It is stateless, with no database and no direct client access. It receives everything it needs from `/api` and runs the pipeline: select relevant memory, read attachments, detect intent, search the web when current information is needed, run the one question at a time clarifying flow, construct the prompt, and score it. It is the only service that calls a model provider, and it does so through a provider interface.
-- **`/docs`** holds the database schema and operational notes that don't belong in code.
 
 Three rules keep these boundaries honest: `/data` is the only caller of a model provider, `/api` is the only caller of `/data`, and `/data` never fetches anything itself. That last rule is what keeps the system from guessing about a user it was never told about. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full request flow and a responsibility table.
 
@@ -302,7 +301,6 @@ Prompt-AI/
 ├── app/               Next.js chat interface and user dashboard (Vercel)
 ├── api/                Auth, business logic, email, and orchestration (Vercel)
 ├── data/               Python LLM and ML layer, model serving only (Render)
-├── docs/               Architecture notes, guides, and pattern library docs
 ├── .github/            CI workflows and issue and PR templates
 ├── .githooks/          Commit hooks, enable with git config core.hooksPath .githooks
 ├── SECURITY.md
@@ -361,6 +359,7 @@ Each folder is independently runnable and has its own dependency management, env
 | Model access | OpenAI API behind a provider interface | Chat, vision, embeddings, web search and transcription, in one implementation |
 | Memory retrieval | Embeddings + cosine similarity | Selects relevant stored memory, keyword fallback if embeddings fail |
 | Documents | pypdf + python-docx | PDF and Word text extraction |
+| Pattern retrieval | In-process vector index | Known effective prompt patterns retrieved by meaning, behind an interface a database store could replace |
 | Prompts | Versioned templates | Active version selected in one place, every result traceable to its wording |
 | Quality | pytest + evaluation harness | Unit tests, plus an eval set with decision, content, filler and judged scoring |
 | Deploy | Render | Long-running Python processes |
@@ -378,16 +377,19 @@ Each folder is independently runnable and has its own dependency management, env
 
 - **Conversational prompt building.** Describe your goal in natural language and get follow up questions when critical context is missing. Questions come one at a time, with quick options for choices. A single choice advances the moment you pick it.
 - **Structured prompt output.** Every generated prompt is shaped by the request instead of copied from a template, with the role, constraints and output format the task needs. It appears in its own card with a copy button, apart from the conversational reply around it.
+- **Known effective patterns.** For each request, the closest proven patterns for that kind of task (a support agent, a code review, an extraction, a speech) are retrieved by meaning and used as craft guidance, and the patterns used are shown on the result.
 - **Lightweight by default.** Prompts are written as clean plain text so they paste anywhere. Markdown or tagged sections are used only when the destination calls for them.
 - **Completeness scoring.** Each prompt is scored against a clarity and specificity rubric, with a visible breakdown of the score.
 - **Assumption transparency.** A visible breakdown of what you stated, what was found in your files or on the web, and what was inferred, so you can see exactly where each part of the prompt came from.
 - **Reads your material.** Attach a PDF, a Word document or an image. Text is extracted, images are read with vision, and what is found shapes the prompt. Every source is listed.
 - **Web search when it matters.** When a request depends on current information, Prompt AI searches the web and shows what it searched and found.
-- **Memory that works for you.** Stable facts about you are saved automatically as you chat, with a quiet notice and nothing to approve, and secrets are never stored. The memory that bears on each message is selected before every reply, and you can see which details informed it. A memory page in settings lets you add, edit and remove anything.
+- **Memory that works for you.** Stable facts about you are saved automatically as you chat, with a quiet notice and nothing to approve, and secrets are never stored. The memory that bears on each message is selected before every reply, and you can see which details informed it. A memory page in settings describes what is stored in a few natural sentences, and lets you add, edit and remove anything.
 - **Natural conversation.** Casual, off topic and personal messages get a real reply that uses your name when it fits, your stored context, and your conversation, instead of forcing every message into prompt construction.
 - **Honest about what it knows.** Asked what it knows about you, it answers only from what is stored, and says so plainly when it has nothing.
 - **Voice input.** Speak a message, review the transcript, then send it.
-- **Prompt history and library.** Every conversation is saved, with saved prompts, favorites, shareable read only links, and export to PDF, Markdown, text and JSON.
+- **Feedback on every response.** A thumbs up or thumbs down is stored with the request, the score and the template version, so a person can review where the system falls short and decide what to change.
+- **Prompt history and library.** Every conversation is saved. History opens a summary of each conversation before you step into it, saved prompts open in full with copy and a link back to their chat, and there are favorites, shareable read only links, and export to PDF, Markdown, text and JSON.
+- **Usage you can read.** A line graph of prompts, tokens, output length, completeness, clarifying questions and how helpful responses were, with 1 day, 3 day, 7 day, 1 month and 3 month ranges and exact values on hover.
 - **Model aware formatting.** The output style is chosen per destination, and the provider layer is built so more target models can be added without touching the pipeline.
 
 ## Edge Cases We Actively Handle
@@ -593,7 +595,7 @@ This project is currently focused on developers as its primary audience. Feature
 - [CHANGELOG.md](./CHANGELOG.md) for release history
 - [story.txt](./story.txt) for why this project exists
 - [WIKI.md](./WIKI.md) for the documentation index
-- Folder level READMEs in `/app`, `/api`, `/data`, and `/docs` for service specific setup
+- Folder level READMEs in `/app`, `/api`, and `/data` for service specific setup
 
 ## License
 

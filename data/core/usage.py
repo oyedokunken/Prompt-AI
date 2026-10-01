@@ -84,6 +84,15 @@ class UsageMeter:
             out[r.step] = out.get(r.step, 0.0) + r.cost_usd
         return out
 
+    def snapshot(self) -> dict[str, float | int]:
+        return {
+            "calls": self.calls,
+            "prompt_tokens": self.prompt_tokens,
+            "cached_tokens": self.cached_tokens,
+            "completion_tokens": self.completion_tokens,
+            "est_cost_usd": round(self.cost_usd, 6),
+        }
+
     def log_summary(self, label: str = "turn_usage") -> None:
         logger.info(
             "%s calls=%d prompt_tokens=%d cached_tokens=%d completion_tokens=%d est_cost_usd=%.6f",

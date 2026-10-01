@@ -1,6 +1,6 @@
 {
-  "saved_at": "2026-10-01T22:13:33+00:00",
-  "template_version": "v4",
+  "saved_at": "2026-10-01T22:43:56+00:00",
+  "template_version": "v5",
   "cases": {
     "vague-support-bot": true,
     "vague-blog": true,
@@ -38,10 +38,25 @@
     "conv-memory-write": true,
     "conv-no-fabrication": true,
     "conv-secret-not-saved": true,
-    "ambig-contradiction": false,
+    "ambig-contradiction": true,
     "multi-goal": true,
     "one-word": true,
     "follow-up-edit": true,
-    "memory-shapes-prompt": true
+    "memory-shapes-prompt": true,
+    "hard-multi-step-onboarding": true,
+    "hard-multi-step-leads": true,
+    "hard-long-paste-warehouse": true,
+    "hard-ambiguous-audience": true,
+    "hard-too-big": true,
+    "hard-underspecified-technical": true,
+    "hard-store-chatbot": true,
+    "hard-conflicting-format": true,
+    "hard-sensitive-support": true,
+    "hard-role-reversal": false,
+    "hard-injection-attempt": true,
+    "hard-non-english": true,
+    "hard-uses-the-conversation": true,
+    "hard-vague-with-memory": true,
+    "hard-product-photo-variants": true
   }
 }

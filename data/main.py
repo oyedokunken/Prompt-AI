@@ -15,9 +15,10 @@ from fastapi import Depends, FastAPI
 from pydantic import ValidationError
 
 from config import get_settings
+from core.patterns import validate_library
 from core.prompts.loader import validate_templates
 from core.security import require_shared_secret
-from routers import generate, health, title, transcribe
+from routers import generate, health, memory, title, transcribe
 from routers.health import SERVICE_VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -35,6 +36,7 @@ except ValidationError as exc:
     sys.exit(1)
 
 validate_templates()
+validate_library()
 
 app = FastAPI(
     title="Prompt AI Data Service",
@@ -51,6 +53,7 @@ protected = [Depends(require_shared_secret)]
 app.include_router(generate.router, dependencies=protected)
 app.include_router(transcribe.router, dependencies=protected)
 app.include_router(title.router, dependencies=protected)
+app.include_router(memory.router, dependencies=protected)
 
 
 if __name__ == "__main__":

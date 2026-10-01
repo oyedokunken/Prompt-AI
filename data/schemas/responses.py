@@ -19,6 +19,16 @@ class StageEvent(BaseModel):
     message: str
 
 
+class UsageSummary(BaseModel):
+    """What producing this reply cost, from the real token counts of its calls."""
+
+    calls: int = 0
+    prompt_tokens: int = 0
+    cached_tokens: int = 0
+    completion_tokens: int = 0
+    est_cost_usd: float = 0.0
+
+
 class ClarifyingQuestionEvent(BaseModel):
     """Exactly one question. The next one is only sent after this is answered."""
 
@@ -30,6 +40,7 @@ class ClarifyingQuestionEvent(BaseModel):
     # A short acknowledgement, only present with the first question.
     intro: Optional[str] = None
     clarify_state: ClarifyState
+    usage: Optional[UsageSummary] = None
 
 
 class MemoryCandidate(BaseModel):
@@ -62,6 +73,7 @@ class AnswerEvent(BaseModel):
     memory_candidates: list["MemoryCandidate"] = Field(default_factory=list)
     # The stored memory that informed this reply.
     memory_used: list[MemoryRef] = Field(default_factory=list)
+    usage: Optional[UsageSummary] = None
 
 
 class StructuredPrompt(BaseModel):
@@ -110,6 +122,8 @@ class ResultEvent(BaseModel):
     memory_candidates: list[MemoryCandidate] = Field(default_factory=list)
     sources: list[SourceSummary] = Field(default_factory=list)
     memory_used: list[MemoryRef] = Field(default_factory=list)
+    usage: Optional[UsageSummary] = None
+    patterns_used: list[str] = Field(default_factory=list)
     format_style: str = "plain"
     template_version: str
 
@@ -118,6 +132,10 @@ class ErrorEvent(BaseModel):
     type: Literal["error"] = "error"
     code: str
     message: str
+
+
+class MemorySummaryResponse(BaseModel):
+    summary: str
 
 
 class TitleResponse(BaseModel):

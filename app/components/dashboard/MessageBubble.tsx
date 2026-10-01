@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw, Pencil, FileText, Globe } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw, Pencil, FileText, Globe, ThumbsUp, ThumbsDown } from "lucide-react";
 import type { ChatMessage } from "@/lib/types/chat";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { Markdown } from "@/components/dashboard/Markdown";
+import { AttachmentCard } from "@/components/dashboard/AttachmentCard";
+import { createClient } from "@/lib/supabase/client";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   onSave?: (message: ChatMessage) => void;
   onRetry?: () => void;
   onEdit?: (messageId: string, newContent: string) => void;
+  // Records a thumbs up or down on this response, or clears it with null.
+  onFeedback?: (message: ChatMessage, rating: "up" | "down" | null) => void;
 }
 
 // Re-renders every minute so a timestamp actually flips from "Today at..."
@@ -23,6 +27,16 @@ function useNow(intervalMs = 60_000): Date {
     return () => clearInterval(id);
   }, [intervalMs]);
   return now;
+}
+
+// Attachments are stored as "<bucket>/<object path>". Word documents are read
+// but never stored, so they have no path and no link.
+function attachmentUrl(path: string): string | null {
+  if (!path) return null;
+  const bucket = path.split("/")[0];
+  const objectPath = path.slice(bucket.length + 1);
+  if (!bucket || !objectPath) return null;
+  return createClient().storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -53,12 +67,13 @@ function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   );
 }
 
-export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
+  const [showPatterns, setShowPatterns] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -71,6 +86,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbl
   const researchedItems = meta.diff?.researched ?? [];
   const sources = meta.sources ?? [];
   const memoryUsed = meta.memoryUsed ?? [];
+  const patternsUsed = meta.patternsUsed ?? [];
   const memorySaved = meta.memorySaved ?? [];
   // A finished prompt is a deliverable, shown apart from the chat text around it.
   const isDeliverable = !isClarify && meta.mode !== "answer";
@@ -139,10 +155,21 @@ export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbl
     return (
       <div className="flex justify-end">
         <div className="max-w-[75%] sm:max-w-[60%] group">
-          <div className="rounded-2xl rounded-br-md bg-raised border border-border px-4 py-2.5">
-            <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
-              {message.content}
-            </p>
+          <div className="rounded-2xl rounded-br-md bg-raised border border-border px-3 py-3">
+            {/* Attachments belong to the bubble, so they sit inside it, above the text */}
+            {(meta.attachments?.length ?? 0) > 0 && (
+              <div className={`flex flex-wrap justify-end gap-2 ${message.content.trim() ? "mb-2.5" : ""}`}>
+                {meta.attachments!.map((a, i) => {
+                  const url = attachmentUrl(a.path);
+                  return <AttachmentCard key={`${a.path || a.name}-${i}`} name={a.name} type={a.type} size={a.size} url={url} href={url} />;
+                })}
+              </div>
+            )}
+            {message.content.trim() && (
+              <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap px-1">
+                {message.content}
+              </p>
+            )}
           </div>
           <div className="flex items-center justify-end gap-2 mt-1">
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -280,6 +307,30 @@ export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbl
             </button>
           )}
 
+          {/* Feedback on this response, stored with the request and score it was given on */}
+          {onFeedback && !isClarify && (
+            <span className="inline-flex items-center gap-0.5" role="group" aria-label="Rate this response">
+              <button
+                onClick={() => onFeedback(message, meta.feedback?.rating === "up" ? null : "up")}
+                aria-pressed={meta.feedback?.rating === "up"}
+                aria-label="Helpful"
+                title="Helpful"
+                className={`p-0.5 transition-colors ${meta.feedback?.rating === "up" ? "text-green-400" : "text-text-faint hover:text-green-400"}`}
+              >
+                <ThumbsUp size={11} fill={meta.feedback?.rating === "up" ? "currentColor" : "none"} />
+              </button>
+              <button
+                onClick={() => onFeedback(message, meta.feedback?.rating === "down" ? null : "down")}
+                aria-pressed={meta.feedback?.rating === "down"}
+                aria-label="Not helpful"
+                title="Not helpful"
+                className={`p-0.5 transition-colors ${meta.feedback?.rating === "down" ? "text-red-400" : "text-text-faint hover:text-red-400"}`}
+              >
+                <ThumbsDown size={11} fill={meta.feedback?.rating === "down" ? "currentColor" : "none"} />
+              </button>
+            </span>
+          )}
+
           {/* Toggle the stated versus inferred breakdown */}
           {hasBreakdown && (
             <button
@@ -299,6 +350,17 @@ export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbl
             >
               {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {sources.length} source{sources.length > 1 ? "s" : ""}
+            </button>
+          )}
+
+          {/* Which known effective patterns informed how this prompt was built */}
+          {patternsUsed.length > 0 && (
+            <button
+              onClick={() => setShowPatterns((v) => !v)}
+              className="flex items-center gap-1 text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+            >
+              {showPatterns ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              {patternsUsed.length} pattern{patternsUsed.length > 1 ? "s" : ""}
             </button>
           )}
 
@@ -371,6 +433,18 @@ export function MessageBubble({ message, onSave, onRetry, onEdit }: MessageBubbl
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {showPatterns && patternsUsed.length > 0 && (
+          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
+            <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Known effective patterns used</p>
+            {patternsUsed.map((name) => (
+              <p key={name} className="text-[10px] text-text-muted flex gap-2">
+                <span className="text-accent shrink-0">&middot;</span> {name}
+              </p>
+            ))}
+            <p className="text-[9px] text-text-faint pt-1">Guidance for this kind of task, adapted to your request.</p>
           </div>
         )}
 

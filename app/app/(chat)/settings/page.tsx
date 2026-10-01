@@ -3,21 +3,19 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile, providerLabel, roleLabel, ROLE_OPTIONS } from "@/lib/hooks/useUserProfile";
-import { useUsageStats } from "@/lib/hooks/useUsageStats";
 import { SimplePageHeader } from "@/components/dashboard/SimplePageHeader";
 import { ProviderIcon } from "@/components/ProviderIcon";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/theme/ThemeProvider";
-import { TrendChart } from "@/components/settings/TrendChart";
+import { UsageTab } from "@/components/settings/UsageTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
-import { Upload, Loader2, X, Pencil, Check, FileText, Paperclip, TrendingUp } from "lucide-react";
+import { Upload, Loader2, X, Pencil, Check } from "lucide-react";
 
 type SettingsTab = "profile" | "memory" | "usage";
 
 export default function SettingsPage() {
   const supabase = createClient();
   const { profile, refresh } = useUserProfile();
-  const usage = useUsageStats();
   const { theme } = useTheme();
 
   const [tab, setTab] = useState<SettingsTab>("profile");
@@ -105,30 +103,6 @@ export default function SettingsPage() {
     }
   };
 
-  const buildSummary = (): string => {
-    if (usage.totalPrompts === 0) {
-      return "You have not generated any prompts yet. Start a conversation to see your usage here.";
-    }
-    const topModel = usage.modelBreakdown[0]?.model;
-    const parts: string[] = [
-      `You have generated ${usage.totalPrompts} structured prompt${usage.totalPrompts === 1 ? "" : "s"}`,
-    ];
-    if (usage.averageScore !== null) {
-      parts.push(`averaging a completeness score of ${usage.averageScore} out of 100`);
-    }
-    if (topModel) {
-      parts.push(`mostly targeting ${topModel}`);
-    }
-    let text = parts.join(", ") + ".";
-    if (usage.reportsExported > 0 || usage.mediaAttached > 0) {
-      const bits: string[] = [];
-      if (usage.reportsExported > 0) bits.push(`exported ${usage.reportsExported} report${usage.reportsExported === 1 ? "" : "s"}`);
-      if (usage.mediaAttached > 0) bits.push(`attached ${usage.mediaAttached} file${usage.mediaAttached === 1 ? "" : "s"} for context`);
-      text += ` You have also ${bits.join(" and ")}.`;
-    }
-    return text;
-  };
-
   if (!profile) {
     return <div className="h-screen bg-base" />;
   }
@@ -184,7 +158,9 @@ export default function SettingsPage() {
                   {profile.avatarUrl && (
                     <button
                       onClick={handleRemoveAvatar}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-text-muted transition-colors"
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-red-400 hover:border-red-400/40 transition-colors"
+                      aria-label="Remove profile picture"
+                      title="Remove picture"
                     >
                       <X size={10} />
                     </button>
@@ -192,34 +168,44 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex-1">
-                  <p className="text-sm text-text-muted mb-3">
-                    Upload a profile picture. This will be visible across the app.
-                  </p>
+                  {profile.avatarUrl ? (
+                    // A picture is set, so the only control is the remove X on the
+                    // picture itself. The upload button is not shown at the same time.
+                    <p className="text-sm text-text-muted">
+                      This picture is visible across the app. Use the X on it to remove it, then you can upload a different one.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm text-text-muted mb-3">
+                        Upload a profile picture. This will be visible across the app.
+                      </p>
 
-                  <div className="flex items-center gap-3">
-                    <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
-                      {uploading ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={12} />
-                          Upload image
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                        disabled={uploading}
-                        className="hidden"
-                      />
-                    </label>
+                      <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
+                          {uploading ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={12} />
+                              Upload image
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            disabled={uploading}
+                            className="hidden"
+                          />
+                        </label>
 
-                    <span className="text-[10px] text-text-faint">Max 2MB</span>
-                  </div>
+                        <span className="text-[10px] text-text-faint">Max 2MB</span>
+                      </div>
+                    </>
+                  )}
 
                   {error && (
                     <p className="text-xs text-red-400 mt-2">{error}</p>
@@ -312,97 +298,7 @@ export default function SettingsPage() {
 
         {tab === "memory" && <MemoryTab />}
 
-        {tab === "usage" && (
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-xl font-semibold text-text-primary mb-1">Usage</h1>
-            <p className="text-sm text-text-muted mb-6">
-              What Prompt AI has actually helped you do so far.
-            </p>
-
-            {usage.loading ? (
-              <div className="flex items-center gap-2 text-sm text-text-muted">
-                <Loader2 size={14} className="animate-spin" />
-                Loading your usage...
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Summary */}
-                <div className="rounded-xl border border-accent/20 bg-accent/5 p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp size={14} className="text-accent" />
-                    <h2 className="text-sm font-medium text-text-primary">Your usage, in plain language</h2>
-                  </div>
-                  <p className="text-sm text-text-muted leading-relaxed">{buildSummary()}</p>
-                </div>
-
-                {/* Stat tiles */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-[10px] text-text-faint uppercase tracking-wide mb-1">Prompts generated</p>
-                    <p className="text-2xl font-semibold text-text-primary">{usage.totalPrompts}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-[10px] text-text-faint uppercase tracking-wide mb-1">Avg completeness</p>
-                    <p className="text-2xl font-semibold text-text-primary">
-                      {usage.averageScore !== null ? `${usage.averageScore}` : "-"}
-                      <span className="text-xs text-text-faint">/100</span>
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-[10px] text-text-faint uppercase tracking-wide mb-1 flex items-center gap-1">
-                      <FileText size={9} /> Reports exported
-                    </p>
-                    <p className="text-2xl font-semibold text-text-primary">{usage.reportsExported}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-[10px] text-text-faint uppercase tracking-wide mb-1 flex items-center gap-1">
-                      <Paperclip size={9} /> Files attached
-                    </p>
-                    <p className="text-2xl font-semibold text-text-primary">{usage.mediaAttached}</p>
-                  </div>
-                </div>
-
-                {/* Trends */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-xs font-medium text-text-primary mb-3">Prompts generated over time</p>
-                    <TrendChart points={usage.promptsTrend} />
-                  </div>
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-xs font-medium text-text-primary mb-3">Completeness score over time</p>
-                    <TrendChart points={usage.scoreTrend} color="#22C55E" />
-                  </div>
-                </div>
-
-                {/* Model breakdown */}
-                <div className="rounded-xl border border-border bg-surface p-4">
-                  <p className="text-xs font-medium text-text-primary mb-3">Target models used</p>
-                  {usage.modelBreakdown.length === 0 ? (
-                    <p className="text-[10px] text-text-faint">No sessions yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {usage.modelBreakdown.map(({ model, count }) => {
-                        const max = usage.modelBreakdown[0].count;
-                        return (
-                          <div key={model} className="flex items-center gap-3">
-                            <span className="text-xs text-text-muted w-32 truncate">{model}</span>
-                            <div className="flex-1 h-2 rounded-full bg-raised overflow-hidden">
-                              <div
-                                className="h-full bg-accent-fill rounded-full"
-                                style={{ width: `${Math.max((count / max) * 100, 6)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-text-faint font-mono w-6 text-right">{count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {tab === "usage" && <UsageTab />}
       </div>
     </div>
   );

@@ -1132,3 +1132,170 @@ def test_a_live_run_needs_an_explicit_flag_a_confirmation_and_a_scope(monkeypatc
     assert run("--live", "--yes") == 2 and "--full" in capsys.readouterr().out
     assert run("--judge") == 2 and "needs --live" in capsys.readouterr().out
     assert run("--save-baseline") == 2
+
+
+# ---------------------------------------------------------------------------
+# Memory summary
+# ---------------------------------------------------------------------------
+
+def test_memory_summary_is_written_from_only_the_stored_details(client):
+    provider = FakeProvider([{"summary": f"You're Kenny{chr(0x2014)}a developer building a prompt tool."}])
+    app.dependency_overrides[get_provider] = lambda: provider
+    body = {
+        "profile": {"preferred_name": "Kenny", "role": "Developer"},
+        "memories": [{"category": "projects", "key": "Current project", "value": "A prompt tool"}],
+    }
+    response = client.post("/memory-summary", json=body, headers=AUTH)
+    assert response.status_code == 200
+    assert response.json()["summary"] == "You're Kenny, a developer building a prompt tool."
+    sent = provider.calls[0]["messages"][0].text
+    assert "- Name: Kenny" in sent and "- [projects] Current project: A prompt tool" in sent
+    assert provider.calls[0]["model"] == "fake-fast"
+    assert "never use he, she or they" in provider.calls[0]["system"].lower().replace("\n", " ")
+
+
+def test_memory_summary_with_nothing_stored_says_so_to_the_model_and_failures_are_502(client):
+    provider = FakeProvider([{"summary": "Nothing yet."}, ProviderError("down")])
+    app.dependency_overrides[get_provider] = lambda: provider
+    assert client.post("/memory-summary", json={}, headers=AUTH).status_code == 200
+    assert "- nothing stored" in provider.calls[0]["messages"][0].text
+    assert client.post("/memory-summary", json={}, headers=AUTH).status_code == 502
+    assert client.post("/memory-summary", json={}).status_code == 401
+
+
+def test_every_terminal_event_carries_what_the_turn_cost():
+    from core import usage
+
+    class Metered(FakeProvider):
+        async def complete_json(self, *, model, system, messages, max_tokens, temperature, step=""):
+            usage.record(step, "gpt-4o", prompt_tokens=1000, cached_tokens=500, completion_tokens=100)
+            return await super().complete_json(model=model, system=system, messages=messages, max_tokens=max_tokens, temperature=temperature, step=step)
+
+    result = collect(assemble_context(make_request()), Metered([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION]))[-1]
+    assert (result.usage.calls, result.usage.prompt_tokens, result.usage.completion_tokens, result.usage.cached_tokens) == (2, 2000, 200, 1000)
+    assert result.usage.est_cost_usd > 0
+
+    question = collect(assemble_context(make_request()), Metered([TWO_QUESTIONS]))[-1]
+    assert question.usage.calls == 1
+
+    answer = collect(assemble_context(make_request(message="hello")), Metered([{"kind": "conversation"}, {"reply": "hi", "memory_candidates": []}]))[-1]
+    assert answer.usage.calls == 2
+
+
+# ---------------------------------------------------------------------------
+# Feedback review loop
+# ---------------------------------------------------------------------------
+
+def _load_feedback_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("feedback_review_under_test", Path(__file__).resolve().parent.parent / "evaluation" / "feedback_review.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+FEEDBACK_ROWS = [
+    {"content": "Role\nOne", "created_at": "2026-10-01T10:00:00Z", "metadata": {"mode": "ready", "score": 80, "templateVersion": "v3", "feedback": {"rating": "up", "request": "a support bot", "score": 80, "templateVersion": "v3", "at": "2026-10-01T10:01:00Z"}}},
+    {"content": "Role\nTwo generic text", "created_at": "2026-10-01T11:00:00Z", "metadata": {"mode": "ready", "score": 60, "feedback": {"rating": "down", "request": "A Prompt For Sales", "score": 60, "templateVersion": "v4", "at": "2026-10-01T11:01:00Z"}}},
+    {"content": "dup", "created_at": "2026-10-01T12:00:00Z", "metadata": {"mode": "ready", "feedback": {"rating": "down", "request": "a prompt for sales", "score": None, "templateVersion": "v4"}}},
+    {"content": "lol", "created_at": "2026-10-01T13:00:00Z", "metadata": {"mode": "answer", "feedback": {"rating": "down", "request": "roast me", "score": None, "templateVersion": "v4"}}},
+    {"content": "ignored, malformed", "metadata": {"feedback": {"rating": "maybe"}}},
+    {"content": "ignored, no feedback", "metadata": {"mode": "ready"}},
+    {"content": "ignored, no metadata", "metadata": None},
+]
+
+
+def test_feedback_rows_are_parsed_and_malformed_ones_skipped():
+    module = _load_feedback_module()
+    items = module.parse_rows(FEEDBACK_ROWS)
+    assert [i.rating for i in items] == ["up", "down", "down", "down"]
+    assert items[0].template_version == "v3" and items[1].score == 60
+
+
+def test_the_summary_breaks_ratings_down_by_template_version():
+    module = _load_feedback_module()
+    summary = module.summarize(module.parse_rows(FEEDBACK_ROWS))
+    assert summary["overall"]["total"] == 4 and summary["overall"]["helpful_rate"] == 25
+    assert summary["by_template_version"]["v3"]["helpful_rate"] == 100
+    assert summary["by_template_version"]["v4"]["down"] == 3
+    assert summary["overall"]["mean_score_when_down"] == 60.0
+
+
+def test_thumbs_down_items_become_reviewable_drafts_never_finished_cases():
+    module = _load_feedback_module()
+    cases = module.to_candidate_cases(module.parse_rows(FEEDBACK_ROWS))
+    assert [c["input"] for c in cases] == ["A Prompt For Sales", "roast me"]
+    assert all(c["needs_review"] and c["id"].startswith("feedback-") for c in cases)
+    assert cases[0]["expect"]["decision"] == "ready" and cases[1]["expect"]["decision"] == "conversation"
+    assert "DRAFT" in cases[0]["good_prompt_notes"] and "Two generic text" in cases[0]["good_prompt_notes"]
+
+
+# ---------------------------------------------------------------------------
+# Pattern retrieval
+# ---------------------------------------------------------------------------
+
+def test_the_pattern_library_is_valid_and_every_pattern_is_substantial():
+    from core import patterns as lib
+
+    library = lib.load_library()
+    assert len(library) >= 20
+    assert len({p.id for p in library}) == len(library)
+    for p in library:
+        assert len(p.craft) >= 3 and all(len(point) > 40 for point in p.craft), p.id
+        assert "\u2014" not in json.dumps(p.craft) and p.summary and p.tags
+
+
+def test_retrieval_ranks_by_meaning_and_returns_nothing_for_an_unrelated_request():
+    from core import patterns as lib
+
+    provider = FakeProvider([])
+    found = asyncio.run(lib.retrieve("a customer support agent in chat that handles billing questions and hands off angry customers to a human", provider))
+    assert found and found[0].pattern.id == "support-agent"
+    assert len(found) <= lib.MAX_PATTERNS
+    assert asyncio.run(lib.retrieve("ok go", provider)) == []
+    assert asyncio.run(lib.retrieve("   ", provider)) == []
+
+
+def test_a_failed_embedding_call_means_no_patterns_not_a_failed_turn():
+    from core import patterns as lib
+
+    class Down(FakeProvider):
+        async def embed(self, texts, *, step=""):
+            raise ProviderError("down")
+
+    assert asyncio.run(lib.retrieve("a customer support agent", Down([]))) == []
+
+
+def test_retrieved_patterns_reach_the_construction_prompt_after_the_static_prefix_and_are_reported():
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    message = "a customer support agent in chat that handles billing questions and hands off angry customers to a human"
+    out = collect(assemble_context(make_request(message=message)), provider)
+    system = provider.calls[1]["system"]
+    assert "KNOWN EFFECTIVE PATTERNS RETRIEVED FOR THIS REQUEST" in system
+    assert system.index("KNOWN EFFECTIVE PATTERNS RETRIEVED") > system.index(system_prompts.REQUEST_CONTEXT_HEADER)
+    assert "Define the handoff in observable terms" in system
+    assert out[-1].patterns_used and out[-1].patterns_used[0] == "Customer support agent"
+    assert "patterns" not in provider.calls[0]["system"].lower().split("known effective")[0][-5:]
+
+
+def test_patterns_can_be_switched_off_for_measurement(monkeypatch):
+    from config import get_settings
+
+    monkeypatch.setenv("PATTERNS_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+        out = collect(assemble_context(make_request(message="a customer support agent in chat that handles billing questions")), provider)
+        assert "KNOWN EFFECTIVE PATTERNS RETRIEVED FOR THIS REQUEST" not in provider.calls[1]["system"]
+        assert out[-1].patterns_used == []
+    finally:
+        monkeypatch.delenv("PATTERNS_ENABLED")
+        get_settings.cache_clear()
+
+
+def test_a_clarified_request_retrieves_on_the_request_and_the_answers_together():
+    state = clarify.record_answer(clarify.start("write a prompt for a bot", "", [ClarifyQuestion(id="q1", text="What kind?")]), "customer support for billing questions")
+    ctx = assemble_context(make_request(message="customer support for billing questions", clarify_state=state, is_clarify_answer=True))
+    assert construct.pattern_query(ctx, state) == "write a prompt for a bot customer support for billing questions"

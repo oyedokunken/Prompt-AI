@@ -81,10 +81,28 @@ test("a result keeps the conversational wrapper apart from the deliverable and c
   assert.equal("memoryCandidates" in (rec?.metadata ?? {}), false);
 });
 
+test("the patterns that informed a prompt are stored on the result", () => {
+  const rec = recordFromTerminalEvent("result", { content: "x", patterns_used: ["Code review"] });
+  assert.deepEqual(rec?.metadata.patternsUsed, ["Code review"]);
+  assert.deepEqual(recordFromTerminalEvent("result", { content: "x" })?.metadata.patternsUsed, []);
+});
+
 test("a casual answer carries memory used and candidates out of band", () => {
   const rec = recordFromTerminalEvent("answer", {
     content: "Rust, huh.", memory_used: [], memory_candidates: [{ category: "skills", key: "Language", value: "Rust" }],
   });
   assert.equal(rec?.metadata.mode, "answer");
   assert.equal(rec?.memoryCandidates?.length, 1);
+});
+
+test("what a turn cost is stored on every kind of reply", () => {
+  const usage = { calls: 2, prompt_tokens: 3000, completion_tokens: 400, cached_tokens: 1200, est_cost_usd: 0.0123 };
+  const expected = { calls: 2, promptTokens: 3000, completionTokens: 400, cachedTokens: 1200, estCostUsd: 0.0123 };
+  assert.deepEqual(recordFromTerminalEvent("result", { content: "x", usage })?.metadata.usage, expected);
+  assert.deepEqual(recordFromTerminalEvent("answer", { content: "x", usage })?.metadata.usage, expected);
+  assert.deepEqual(
+    recordFromTerminalEvent("clarifying_question", { question: { id: "q1", text: "?" }, position: 1, total: 1, usage })?.metadata.usage,
+    expected
+  );
+  assert.equal(recordFromTerminalEvent("result", { content: "x" })?.metadata.usage, undefined);
 });

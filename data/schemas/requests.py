@@ -123,6 +123,11 @@ class GenerateRequest(BaseModel):
     is_clarify_answer: bool = False
 
 
+class MemorySummaryRequest(BaseModel):
+    profile: UserProfile = Field(default_factory=UserProfile)
+    memories: list[Memory] = Field(default_factory=list, max_length=MAX_MEMORIES)
+
+
 class TitleRequest(BaseModel):
     # The first message or two of a conversation, oldest first.
     messages: list[Annotated[str, Field(max_length=4_000)]] = Field(..., min_length=1, max_length=4)

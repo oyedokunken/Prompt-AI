@@ -103,6 +103,14 @@ sequenceDiagram
     P-->>A: Final event with the stored rows and what was saved
 ```
 
+### Pattern retrieval
+
+Before a prompt is constructed, the closest one or two entries in a library of known effective patterns are retrieved by meaning and handed to construction as craft guidance. The library is a file beside the code and its vectors are computed once per process, since `data` has no database. The retrieval sits behind one class, so a database backed vector store could replace it without touching the pipeline. Which patterns were used is returned with the result and shown to the user.
+
+### Feedback
+
+A thumbs up or down is written to the response it was given on, along with the request, the score and the template version. `data/evaluation/feedback_review.py` exports those ratings, summarizes them by template version and drafts eval cases from the thumbs down items. A person reviews the drafts and decides what changes. Nothing retrains or edits a template automatically.
+
 ### Stage events
 
 `data` streams an event as each step actually begins, so the status a user sees describes real work. Stages are: reading attachments, understanding the request, searching, asking, answering, constructing, scoring and finalizing. Each stage has a pool of short and long phrasings, chosen at random. `api` relays every event without changing it and adds one final event of its own that carries the stored messages and anything saved to memory.
@@ -151,6 +159,7 @@ Prompt templates are versioned in directories and one version is active at a tim
 | `POST /auth/send-welcome` | Welcome email after OAuth sign in |
 | `POST /chat/stream` | A chat turn, streamed |
 | `POST /chat/transcribe` | Voice message to text, via `data` |
+| `GET /chat/memory-summary` | A short prose description of what is stored about the signed in user, written by `data` |
 
 ## Data stores
 

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     openai_search_model: Optional[str] = Field(None, alias="OPENAI_SEARCH_MODEL")
     openai_embed_model: str = Field("text-embedding-3-small", alias="OPENAI_EMBED_MODEL")
     openai_timeout_seconds: float = Field(90.0, alias="OPENAI_TIMEOUT_SECONDS")
+    # Retrieval of known effective prompt patterns for construction. On by
+    # default, switchable so its effect can be measured against the eval set.
+    patterns_enabled: bool = Field(True, alias="PATTERNS_ENABLED")
 
     @field_validator("openai_api_key", mode="before")
     @classmethod

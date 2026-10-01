@@ -16,7 +16,7 @@ export interface StreamChatInput {
   sessionId: string;
   content: string;
   isClarifyAnswer: boolean;
-  attachments?: { name: string; type: string; path: string; dataUrl: string | null }[];
+  attachments?: { name: string; type: string; path: string; dataUrl: string | null; size?: number }[];
   onStage: (stage: { stage: string; message: string }) => void;
   signal?: AbortSignal;
 }
@@ -118,6 +118,14 @@ export async function streamChat(input: StreamChatInput): Promise<StreamChatResu
   if (!saved) throw new Error("The server did not return a complete response.");
   const result: StreamChatResult = saved;
   return { ...result, memorySaved: result.memorySaved ?? [] };
+}
+
+export async function fetchMemorySummary(): Promise<string> {
+  const token = await accessToken();
+  const res = await fetch(`${API_URL}/chat/memory-summary`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(await errorMessageFrom(res, "Could not write the summary"));
+  const payload = (await res.json()) as { summary?: string };
+  return payload.summary ?? "";
 }
 
 export async function transcribeVoice(blob: Blob): Promise<string> {

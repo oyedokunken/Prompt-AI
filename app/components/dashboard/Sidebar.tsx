@@ -222,102 +222,133 @@ const LIBRARY_ITEMS = [
   { href: "/dashboard/history", icon: History, label: "All history" },
 ];
 
-// Collapsed rail -- icon-only, every control gets a hover tooltip so the
-// sidebar stays fully usable without expanding it.
+// The collapsed sidebar is a narrower version of the same sidebar, not a
+// reduced one. Top to bottom: the logo mark on its own, the collapse and
+// search controls as icons, then the chat list as compact tiles that keep
+// working, with the library and account controls pinned beneath.
 function CollapsedRail({
-  onNewChat, onToggleCollapse, onSearch, pathname, onSettings, onSignOut, avatarUrl, username,
+  sessions, activeSessionId, onNewChat, onToggleCollapse, onSearch, pathname, onSettings, onSignOut, avatarUrl, username,
 }: {
+  sessions: ChatSession[];
+  activeSessionId: string | undefined;
   onNewChat: () => void;
   onToggleCollapse: () => void;
   onSearch: () => void;
   pathname: string;
 } & Pick<SidebarProps, "onSettings" | "onSignOut" | "avatarUrl" | "username">) {
+  const iconButton = "w-8 h-8 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors";
   return (
-    <aside className="w-12 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
+    <aside className="w-14 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
       <Tooltip id="sidebar-tip" place="right" className="!text-[10px] !py-1 !px-2 !z-50" />
 
-      <div className="flex items-center gap-1 mb-3">
+      <Link href="/dashboard" aria-label="Prompt AI home" className="mb-2">
+        <Logo variant="color" size={26} iconOnly />
+      </Link>
+
+      <div className="flex flex-col items-center gap-0.5 pb-2 mb-2 border-b border-border w-full">
         <button
           data-tooltip-id="sidebar-tip"
           data-tooltip-content="Expand sidebar"
           onClick={onToggleCollapse}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+          className={iconButton}
           aria-label="Expand sidebar"
         >
-          <PanelLeftOpen size={13} />
+          <PanelLeftOpen size={14} />
+        </button>
+        <button
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content="Search chats"
+          onClick={onSearch}
+          className={iconButton}
+          aria-label="Search chats"
+        >
+          <Search size={14} />
+        </button>
+        <button
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content="New chat"
+          onClick={onNewChat}
+          className="w-8 h-8 rounded-md flex items-center justify-center bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 transition-colors mt-0.5"
+          aria-label="New chat"
+        >
+          <Plus size={14} />
         </button>
       </div>
 
-      <button
-        data-tooltip-id="sidebar-tip"
-        data-tooltip-content="Search chats"
-        onClick={onSearch}
-        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors mb-3"
-        aria-label="Search chats"
-      >
-        <Search size={13} />
-      </button>
+      {/* The chat list, still here and still scrollable */}
+      <nav className="flex-1 w-full overflow-y-auto scrollbar-hide flex flex-col items-center gap-1 pb-2" aria-label="Chats">
+        {sessions.map((s) => {
+          const isActive = s.id === activeSessionId;
+          const initial = s.title === "New Chat" ? null : s.title.trim()[0]?.toUpperCase();
+          return (
+            <Link
+              key={s.id}
+              href={`/dashboard/chats/${s.id}`}
+              data-tooltip-id="sidebar-tip"
+              data-tooltip-content={s.title}
+              aria-label={s.title}
+              aria-current={isActive ? "page" : undefined}
+              className={`relative w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-[11px] font-mono transition-colors border ${
+                isActive
+                  ? "bg-accent/15 border-accent/40 text-accent"
+                  : "bg-raised/60 border-transparent text-text-faint hover:text-text-primary hover:border-border"
+              }`}
+            >
+              {initial ?? <MessageSquare size={12} />}
+              {s.is_favorite && <Star size={7} fill="currentColor" className="absolute -top-0.5 -right-0.5 text-accent" />}
+            </Link>
+          );
+        })}
+        {sessions.length === 0 && <span className="text-[9px] text-text-faint mt-2">None</span>}
+      </nav>
 
-      <button
-        data-tooltip-id="sidebar-tip"
-        data-tooltip-content="New chat"
-        onClick={onNewChat}
-        className="w-7 h-7 rounded-md flex items-center justify-center bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 transition-colors mb-3"
-        aria-label="New chat"
-      >
-        <Plus size={13} />
-      </button>
-
-      <div className="flex flex-col gap-1 mb-auto">
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+      <div className="flex flex-col items-center gap-0.5 pt-2 mt-1 border-t border-border w-full">
+        {[...NAV_ITEMS, ...LIBRARY_ITEMS].map(({ href, icon: Icon, label }) => (
           <Link
             key={href}
             href={href}
             data-tooltip-id="sidebar-tip"
             data-tooltip-content={label}
-            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-              pathname === href ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
-            }`}
+            className={`${iconButton} ${pathname === href ? "!text-accent bg-accent/10" : ""}`}
             aria-label={label}
           >
             <Icon size={13} />
           </Link>
         ))}
+        <button
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content="Settings"
+          onClick={onSettings}
+          className={iconButton}
+          aria-label="Settings"
+        >
+          <Settings size={13} />
+        </button>
+        <button
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content="Sign out"
+          onClick={onSignOut}
+          className={`${iconButton} hover:!text-red-400`}
+          aria-label="Sign out"
+        >
+          <LogOut size={13} />
+        </button>
+        <button
+          onClick={onSettings}
+          data-tooltip-id="sidebar-tip"
+          data-tooltip-content={`Settings for @${username}`}
+          aria-label="Open settings"
+          className="mt-1"
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[9px] text-accent font-mono border border-accent/20">
+              {username[0]?.toUpperCase()}
+            </div>
+          )}
+        </button>
       </div>
-
-      <button
-        data-tooltip-id="sidebar-tip"
-        data-tooltip-content="Settings"
-        onClick={onSettings}
-        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors mb-1"
-        aria-label="Settings"
-      >
-        <Settings size={13} />
-      </button>
-      <button
-        data-tooltip-id="sidebar-tip"
-        data-tooltip-content="Sign out"
-        onClick={onSignOut}
-        className="w-7 h-7 rounded-md flex items-center justify-center text-text-faint hover:text-red-400 hover:bg-raised transition-colors mb-3"
-        aria-label="Sign out"
-      >
-        <LogOut size={13} />
-      </button>
-
-      <button
-        onClick={onSettings}
-        data-tooltip-id="sidebar-tip"
-        data-tooltip-content={`Settings for @${username}`}
-        aria-label="Open settings"
-      >
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[9px] text-accent font-mono border border-accent/20">
-            {username[0]?.toUpperCase()}
-          </div>
-        )}
-      </button>
     </aside>
   );
 }
@@ -496,6 +527,8 @@ export function Sidebar({
 
   const desktopSidebar = collapsed ? (
     <CollapsedRail
+      sessions={sessions}
+      activeSessionId={activeSessionId}
       onNewChat={onNewChat}
       onToggleCollapse={onToggleCollapse}
       onSearch={() => { onToggleCollapse(); setSearchOpen(true); }}

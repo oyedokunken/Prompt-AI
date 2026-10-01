@@ -12,6 +12,7 @@ from typing import Optional
 from core.context import PipelineContext
 from core.prompts.loader import load_template
 from core.prompts.targets import GUIDANCE, FormatStyle
+from core.patterns import patterns_block
 from schemas.requests import ClarifyQuestion, Memory, SourceNote
 
 IDENTITY = """You are Prompt AI, a senior prompt engineer and AI systems architect working directly with the user. Your job is to understand what the user is trying to accomplish and engineer the best possible prompt to make another AI accomplish it. You are not a generic chatbot and not a form generator, you are an expert collaborator.
@@ -140,13 +141,14 @@ def intent_system_prompt(ctx: PipelineContext, pending: Optional[ClarifyQuestion
     )
 
 
-def construct_system_prompt(ctx: PipelineContext, style: FormatStyle = "plain") -> str:
+def construct_system_prompt(ctx: PipelineContext, style: FormatStyle = "plain", patterns: Optional[list] = None) -> str:
     return _compose(
         _static_prefix("construct"),
         REQUEST_CONTEXT_HEADER,
         user_knowledge_block(ctx),
         history_digest_block(ctx),
         sources_block(ctx.sources),
+        patterns_block(patterns or []),
         GUIDANCE[style],
     )
 

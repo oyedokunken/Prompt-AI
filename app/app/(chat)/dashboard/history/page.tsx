@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { MessageSquare, Search } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard/DashboardContext";
 import { SimplePageHeader } from "@/components/dashboard/SimplePageHeader";
+import { ConversationModal } from "@/components/dashboard/ConversationModal";
+import type { ChatSession } from "@/lib/types/chat";
 
 export default function HistoryPage() {
   const { sessions } = useDashboard();
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<ChatSession | null>(null);
 
   const filtered = sessions.filter((s) => s.title.toLowerCase().includes(search.toLowerCase()));
   const sorted = [...filtered].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -39,10 +41,11 @@ export default function HistoryPage() {
           ) : (
             <div className="space-y-1.5">
               {sorted.map((s) => (
-                <Link
+                <button
                   key={s.id}
-                  href={`/dashboard/chats/${s.id}`}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-surface hover:border-accent/30 transition-colors"
+                  type="button"
+                  onClick={() => setSelected(s)}
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-surface hover:border-accent/30 transition-colors"
                 >
                   <MessageSquare size={14} className="text-text-faint shrink-0" />
                   <div className="min-w-0 flex-1">
@@ -53,12 +56,13 @@ export default function HistoryPage() {
                       })}
                     </p>
                   </div>
-                </Link>
+                </button>
               ))}
             </div>
           )}
         </div>
       </main>
+      <ConversationModal session={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

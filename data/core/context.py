@@ -255,18 +255,18 @@ def _memory_text(memory: Memory) -> str:
     return f"{memory.key}: {memory.value}"
 
 
-def _cosine(a: list[float], b: list[float]) -> float:
+def cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
     return dot / (na * nb) if na and nb else 0.0
 
 
-async def _embeddings(texts: list[str], provider: "ModelProvider") -> dict[str, list[float]]:
+async def embed_texts(texts: list[str], provider: "ModelProvider", step: str = "memory_embed") -> dict[str, list[float]]:
     """Vectors for the given texts, fetching only the ones not seen before."""
     missing = [t for t in dict.fromkeys(texts) if t not in _embed_cache]
     if missing:
-        vectors = await provider.embed(missing)
+        vectors = await provider.embed(missing, step=step)
         if len(vectors) != len(missing):
             raise ProviderResponseError("The embeddings response did not match the request")
         if len(_embed_cache) + len(missing) > _EMBED_CACHE_LIMIT:
@@ -285,7 +285,7 @@ async def select_memories_semantic(
     query = message if len(message.split()) >= 5 or not recent_user_text else f"{recent_user_text}\n{message}"
     texts = [_memory_text(m) for m in memories]
     try:
-        vectors = await _embeddings([query, *texts], provider)
+        vectors = await embed_texts([query, *texts], provider)
     except (ProviderError, ProviderResponseError) as exc:
         logger.error("semantic memory selection failed, using keyword overlap: %s", exc)
         return select_relevant_memories(memories, message)
@@ -294,7 +294,7 @@ async def select_memories_semantic(
     keyword = {id(m) for m in select_relevant_memories(memories, message, limit=len(memories)) if m.category != "about"}
     scored = []
     for memory, text in zip(memories, texts):
-        score = _cosine(query_vector, vectors[text])
+        score = cosine_similarity(query_vector, vectors[text])
         if score >= RELEVANCE_THRESHOLD or id(memory) in keyword:
             scored.append((score, memory))
     scored.sort(key=lambda pair: pair[0], reverse=True)

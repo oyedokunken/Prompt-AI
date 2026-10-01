@@ -63,6 +63,25 @@ export interface ClarifyQuestion {
 // absent, for messages generated before this field existed): content is
 // the finished, production-ready prompt. "error": generation genuinely
 // failed, content is an honest failure message, never a fabricated prompt.
+// Feedback is stored on the message it was given on. It records the request
+// and the score as they were, so a person reviewing it later has the context
+// without having to reconstruct it.
+export interface ResponseFeedback {
+  rating: "up" | "down";
+  at: string;
+  request: string;
+  score: number | null;
+  templateVersion: string | null;
+}
+
+export interface ResponseUsage {
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+  cachedTokens: number;
+  estCostUsd: number;
+}
+
 export interface PromptDiff {
   stated: string[];
   inferred: string[];
@@ -106,6 +125,14 @@ export interface PromptMetadata {
   };
   readiness?: PromptReadiness;
   explanation?: string;
+  // The template version that produced this prompt, kept so feedback can be traced to the wording behind it.
+  templateVersion?: string;
+  // The user's own verdict on this response, with the context needed to review it later.
+  feedback?: ResponseFeedback;
+  // What this response cost to produce, recorded by the server.
+  usage?: ResponseUsage;
+  // Known effective patterns that informed how this prompt was built.
+  patternsUsed?: string[];
   // The conversational wrapper around a finished prompt, kept apart from it.
   preamble?: string | null;
   // Stored memory that informed this reply.
@@ -117,6 +144,7 @@ export interface PromptMetadata {
     type: string;
     path: string;
     usedAsContext: boolean;
+    size?: number;
   }[];
 }
 

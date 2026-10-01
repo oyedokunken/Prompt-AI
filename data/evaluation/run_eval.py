@@ -46,6 +46,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core import usage  # noqa: E402
+from core import patterns as pattern_lib  # noqa: E402
+from core.patterns import load_library  # noqa: E402
 from core.context import assemble_context  # noqa: E402
 from core.prompts.loader import ACTIVE_VERSION  # noqa: E402
 from core.providers import get_provider  # noqa: E402
@@ -165,6 +167,12 @@ def check_case(case: dict[str, Any], events: list[Any]) -> tuple[bool, list[str]
         detail["memory_used"] = [m.key for m in used]
         if "memory_used" in expect and bool(used) != expect["memory_used"]:
             failures.append(f"memory used: {bool(used)}, expected {expect['memory_used']}")
+    if "patterns_any" in expect and not MOCK:
+        names = {p.id: p.name for p in load_library()}
+        used = set(getattr(final, "patterns_used", []) or [])
+        detail["patterns_used"] = sorted(used)
+        if final.type == "result" and not any(names.get(pid) in used for pid in expect["patterns_any"]):
+            failures.append(f"retrieved {sorted(used) or 'no patterns'}, expected one of {expect['patterns_any']}")
     if "memory_candidate" in expect:
         saved = bool(getattr(final, "memory_candidates", None))
         if saved != expect["memory_candidate"]:
@@ -292,12 +300,32 @@ async def rejudge(path: Path) -> int:
     return 0
 
 
+async def check_retrieval(cases: list[dict[str, Any]]) -> int:
+    """Does each request retrieve the pattern it should? Embeddings only, about a hundredth of a cent."""
+    provider = get_provider()
+    checked = [c for c in cases if c["expect"].get("patterns_any")]
+    index = pattern_lib.PatternIndex(load_library())
+    names = {p.id: p.name for p in load_library()}
+    misses = 0
+    for case in checked:
+        found = await pattern_lib.retrieve(case["input"], provider, index=index)
+        ids = [m.pattern.id for m in found]
+        ok = any(pid in ids for pid in case["expect"]["patterns_any"])
+        misses += 0 if ok else 1
+        top = ", ".join(f"{m.pattern.id} {m.score:.2f}" for m in found) or "nothing"
+        print(f"  {'ok  ' if ok else 'MISS'} {case['id']:34s} -> {top}")
+    print(f"Retrieval: {len(checked) - misses} of {len(checked)} requests retrieved an expected pattern")
+    print_spend()
+    return 1 if misses else 0
+
+
 def estimate_live_cost(cases: int, judge: bool) -> float:
     return cases * (LIVE_COST_PER_CASE_USD + (JUDGE_COST_PER_PROMPT_USD if judge else 0.0))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the Prompt AI eval set. Free mock mode by default.")
+    parser.add_argument("--retrieval", action="store_true", help="check pattern retrieval only, embeddings calls, costs a fraction of a cent")
     parser.add_argument("--live", action="store_true", help="call the real model provider, this costs money")
     parser.add_argument("--full", action="store_true", help="with --live, allow running the whole set")
     parser.add_argument("--yes", action="store_true", help="with --live, confirm the spend (or set EVAL_CONFIRM_SPEND=1)")
@@ -318,6 +346,10 @@ def main() -> int:
     if not cases:
         print("No cases selected")
         return 2
+
+    if args.retrieval:
+        print("RETRIEVAL CHECK: embeddings only, no generation.")
+        return asyncio.run(check_retrieval(cases))
 
     if MOCK:
         for flag, name in ((args.judge, "--judge"), (args.save_baseline, "--save-baseline"), (args.rejudge, "--rejudge"), (args.cheap, "--cheap"), (args.full, "--full")):

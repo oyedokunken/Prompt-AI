@@ -18,6 +18,7 @@ export const chatStreamSchema = z
           name: z.string().max(300),
           type: z.string().max(200).default(""),
           path: z.string().max(1000).default(""),
+          size: z.number().int().nonnegative().optional(),
           // Images and Word documents travel inline. The request body is also capped at 4MB.
           dataUrl: z.string().max(MAX_INLINE_FILE_CHARS, "That file is too large to send.").nullable().default(null),
         })

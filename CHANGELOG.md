@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-01
+
+### Added
+
+- Retrieval of known effective prompt patterns for construction, with a library of 27 patterns, retrieval by meaning, and the patterns used shown on the result. Measured on the eval set, it raised judge scores on specificity, fit and value by about a quarter to a third of a point at about 6 percent more cost per prompt
+- A summary modal for each conversation in All history, with a message count, what Prompt AI gathered, and any feedback, and a Go to chat button
+- A saved prompt modal with the full content, a copy action and a link back to the chat, opened from every saved prompt
+- Thumbs up and thumbs down on responses, stored with the request, score and template version, and a feedback review tool that summarizes ratings and drafts eval cases for a person to review
+- Attachments render inside the message bubble with a thumbnail or type tile and a prominent type badge, in the composer, in sent messages and in the media library
+- A memory page that describes what is stored in natural prose, with the individual details editable beneath it
+- A Usage tab with a hoverable line graph, six tracked metrics and 1 day, 3 day, 7 day, 1 month and 3 month ranges
+- Per-reply token and cost totals stored on messages, which feed the usage graph
+- 15 harder eval cases covering ambiguity, contradiction, long multi constraint input, multi step workflows, a prompt injection attempt, non English input and history dependent requests, and a retrieval check that costs a fraction of a cent
+
+### Changed
+
+- The collapsed sidebar is a narrower version of the same sidebar: logo mark, expand and search icons, then the chat list as compact tiles
+- The avatar shows either the remove control or the upload button, never both
+- The service READMEs describe the system as it stands
+
+### Removed
+
+- The `docs` and `scripts` folders
+- The bar charts on the usage page
+
 ## [0.4.1] - 2026-10-01
 
 ### Added

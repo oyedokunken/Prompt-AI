@@ -157,6 +157,14 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     )
 
 
+def pattern_query(ctx: PipelineContext, state: Optional[ClarifyState]) -> str:
+    """What to retrieve patterns for: the request and, if questions were answered, the answers."""
+    if state is None:
+        return ctx.message
+    answers = " ".join(answer for _, answer in clarify.question_answer_pairs(state))
+    return f"{state.original_message} {answers}".strip()
+
+
 def format_style_for(ctx: PipelineContext, state: Optional[ClarifyState]) -> FormatStyle:
     """Plain by default, markdown or tagged sections only when the destination calls for it."""
     parts = [state.original_message if state else ctx.message]
@@ -191,7 +199,7 @@ NAME_CORRECTION = (
 
 
 async def construct(
-    ctx: PipelineContext, state: Optional[ClarifyState], provider: ModelProvider
+    ctx: PipelineContext, state: Optional[ClarifyState], provider: ModelProvider, patterns: Optional[list] = None
 ) -> ConstructedPrompt:
     messages = build_messages(ctx, state)
     style = format_style_for(ctx, state)
@@ -201,7 +209,7 @@ async def construct(
     for attempt in range(2):
         raw = await provider.complete_json(
             model=provider.resolve_model(ctx.target_model, step="construct"),
-            system=construct_system_prompt(ctx, style),
+            system=construct_system_prompt(ctx, style, patterns),
             messages=messages,
             max_tokens=CONSTRUCT_MAX_TOKENS,
             temperature=0.4,

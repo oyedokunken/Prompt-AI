@@ -77,6 +77,8 @@ interface TerminalData {
   explanation?: string;
   memory_candidates?: unknown[];
   memory_used?: unknown[];
+  patterns_used?: string[];
+  usage?: { calls?: number; prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number; est_cost_usd?: number };
   template_version?: string;
   question?: StoredQuestion;
   position?: number;
@@ -117,6 +119,7 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
       content: intro ? `${intro}\n\n${d.question.text}` : d.question.text,
       metadata: {
         mode: "clarify",
+        usage: usageFrom(d),
         intro,
         interviewQuestions: [d.question],
         clarifyPosition: d.position,
@@ -133,6 +136,7 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
       memoryCandidates: d.memory_candidates ?? [],
       metadata: {
         mode: "answer",
+        usage: usageFrom(d),
         memoryUsed: d.memory_used ?? [],
         ...(pending
           ? {
@@ -152,9 +156,11 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
       memoryCandidates: d.memory_candidates ?? [],
       metadata: {
         mode: "ready",
+        usage: usageFrom(d),
         // The conversational wrapper, kept apart so the prompt copies on its own.
         preamble: d.message ?? null,
         memoryUsed: d.memory_used ?? [],
+        patternsUsed: d.patterns_used ?? [],
         score: d.score,
         // Kept under the names the interface already reads.
         assumptions: d.diff?.inferred ?? [],
@@ -170,6 +176,19 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
   }
 
   return null;
+}
+
+/** What a turn cost, in the shape stored on the message. */
+export function usageFrom(d: { usage?: { calls?: number; prompt_tokens?: number; completion_tokens?: number; cached_tokens?: number; est_cost_usd?: number } }) {
+  const u = d.usage;
+  if (!u) return undefined;
+  return {
+    calls: u.calls ?? 0,
+    promptTokens: u.prompt_tokens ?? 0,
+    completionTokens: u.completion_tokens ?? 0,
+    cachedTokens: u.cached_tokens ?? 0,
+    estCostUsd: u.est_cost_usd ?? 0,
+  };
 }
 
 export const TERMINAL_EVENTS = new Set(["clarifying_question", "answer", "result", "error"]);

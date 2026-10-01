@@ -5,6 +5,7 @@ import { Image as ImageIcon, Film, FileText, Loader2, Play } from "lucide-react"
 import { createClient } from "@/lib/supabase/client";
 import { SimplePageHeader } from "@/components/dashboard/SimplePageHeader";
 import { PreviewModal } from "@/components/dashboard/PreviewModal";
+import { KIND_STYLES, fileKind, fileTypeLabel } from "@/lib/fileTypes";
 
 interface MediaItem {
   name: string;
@@ -125,8 +126,13 @@ export default function MediaPage() {
                           </div>
                         </>
                       ) : (
-                        <FileText size={28} className="text-text-faint" />
+                        <div className={`w-14 h-14 rounded-xl border flex items-center justify-center font-mono text-sm font-bold ${KIND_STYLES[fileKind(item.type, item.name)].tile}`}>
+                          {fileTypeLabel(item.name, item.type).slice(0, 4)}
+                        </div>
                       )}
+                      <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wide shadow ${KIND_STYLES[fileKind(item.type, item.name)].badge}`}>
+                        {fileTypeLabel(item.name, item.type)}
+                      </span>
                     </div>
                     <p className="text-[11px] text-text-muted truncate px-2.5 py-2">{item.name}</p>
                   </button>
