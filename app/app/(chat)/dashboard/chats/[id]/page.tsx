@@ -17,7 +17,7 @@ import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
 import { streamChat } from "@/lib/api/chatApi";
 import { exportSession } from "@/lib/export";
 import type { ChatSession, ChatMessage, ExportFormat } from "@/lib/types/chat";
-import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION } from "@/lib/types/chat";
+import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION, MAX_MESSAGE_CHARS } from "@/lib/types/chat";
 
 function ExportMenu({
   disabled, onExport, onCopyMarkdown, copied,
@@ -146,6 +146,10 @@ export default function ChatPage() {
     const content = (override ?? inputValue).trim();
     const attachments = overrideAttachments ?? pendingAttachments;
     if ((!content && attachments.length === 0) || isLoading || !session) return;
+    if (content.length > MAX_MESSAGE_CHARS) {
+      setError(`That message is ${content.length.toLocaleString()} characters. Messages can be up to ${MAX_MESSAGE_CHARS.toLocaleString()}. Shorten it or attach it as a file.`);
+      return;
+    }
 
     setInputValue("");
     setPendingAttachments([]);

@@ -46,7 +46,7 @@ class FakeProvider(ModelProvider):
         self.responses = list(responses)
         self.calls: list[dict[str, Any]] = []
 
-    def resolve_model(self, requested: str, *, fast: bool = False) -> str:
+    def resolve_model(self, requested: str, *, fast: bool = False, step=None) -> str:
         return "fake-fast" if fast else "fake-main"
 
     def _next(self, **call: Any) -> Any:
@@ -56,13 +56,13 @@ class FakeProvider(ModelProvider):
             raise response
         return response
 
-    async def complete_json(self, *, model, system, messages, max_tokens, temperature):
+    async def complete_json(self, *, model, system, messages, max_tokens, temperature, step=""):
         return self._next(kind="json", model=model, system=system, messages=messages)
 
-    async def complete_text(self, *, model, system, messages, max_tokens, temperature):
+    async def complete_text(self, *, model, system, messages, max_tokens, temperature, step=""):
         return self._next(kind="text", model=model, system=system, messages=messages)
 
-    async def embed(self, texts):
+    async def embed(self, texts, *, step=""):
         """Deterministic bag of words vectors, so relevance is testable without a network."""
         import hashlib
         import re as _re
@@ -76,7 +76,7 @@ class FakeProvider(ModelProvider):
             vectors.append(vec)
         return vectors
 
-    async def search(self, *, model, query):
+    async def search(self, *, model, query, step=""):
         return self._next(kind="search", model=model, query=query)
 
     async def transcribe(self, *, filename, content, content_type):
@@ -146,7 +146,7 @@ def test_context_normalizes_blank_profile_fields_and_bounds_history():
     ctx = assemble_context(make_request(profile={"preferred_name": "  Ada ", "role": "   "}, history=history))
     assert ctx.profile.preferred_name == "Ada"
     assert ctx.profile.role is None
-    assert len(ctx.history) == 20
+    assert len(ctx.history) == 6
     assert ctx.history[-1].content == "m29"
 
 
@@ -615,7 +615,7 @@ def test_images_are_read_with_the_vision_model():
 # ---------------------------------------------------------------------------
 
 def test_search_queries_are_cleaned_deduplicated_and_capped():
-    assert research.clean_queries(["a  b", "A B", "", "c", "d"]) == ["a b", "c"]
+    assert research.clean_queries(["a  b", "A B", "", "c", "d"]) == ["a b"]
     assert research.clean_queries("not a list") == []
 
 
@@ -623,10 +623,15 @@ def test_search_findings_keep_their_sources_and_a_failed_search_is_reported():
     outcome = SearchOutcome(
         summary="FastAPI 0.142 is current. More detail.", sources=[SearchSource("PyPI", "https://pypi.org/p/fastapi")]
     )
-    ok, failed = asyncio.run(research.search(["fastapi latest", "other"], FakeProvider([outcome, ProviderError("x")]), "m"))
+    (ok,) = asyncio.run(research.search(["fastapi latest"], FakeProvider([outcome]), "m"))
     assert ok.summary == "FastAPI 0.142 is current."
     assert ok.links[0].url == "https://pypi.org/p/fastapi"
+    (failed,) = asyncio.run(research.search(["fastapi latest"], FakeProvider([ProviderError("x")]), "m"))
     assert failed.summary.startswith("The search failed") and failed.content == ""
+    # Only one search runs per turn, however many queries were planned.
+    provider = FakeProvider([outcome])
+    assert len(asyncio.run(research.search(["one", "two"], provider, "m"))) == 1
+    assert len(provider.calls) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -772,18 +777,21 @@ def test_time_sensitive_requests_are_detected_and_others_are_not():
     assert not research.looks_time_sensitive("summarize the latest email I pasted")
 
 
-def test_a_time_sensitive_request_gets_a_search_even_if_intent_forgot_to_plan_one():
+def test_a_time_sensitive_request_gets_a_search_without_a_separate_planning_call():
     provider = FakeProvider(
         [
             {"kind": "prompt_request", "sufficient": True},
-            {"search_queries": ["latest stable node.js version"]},
             SearchOutcome(summary="Node 26 is current."),
             READY_CONSTRUCTION,
         ]
     )
-    out = collect(assemble_context(make_request(message="a briefing on the latest stable version of Node.js")), provider)
+    message = "a briefing on the latest stable version of Node.js"
+    out = collect(assemble_context(make_request(message=message)), provider)
     assert [e.stage for e in out[:-1]] == ["intent", "searching", "constructing", "scoring", "finalizing"]
-    assert "Node 26 is current." in provider.calls[3]["system"]
+    assert [c["kind"] for c in provider.calls if c["kind"] != "embed"] == ["json", "search", "json"]
+    assert provider.calls[1]["query"] == message
+    assert "Node 26 is current." in provider.calls[2]["system"]
+
 
 
 def test_provider_tracking_parameter_is_stripped_but_other_query_parameters_stay():
@@ -863,7 +871,7 @@ def test_a_reply_with_no_text_is_an_error_not_an_empty_message():
 
 def test_memory_selection_falls_back_to_keywords_when_embeddings_fail():
     class NoEmbeddings(FakeProvider):
-        async def embed(self, texts):
+        async def embed(self, texts, *, step=""):
             raise ProviderError("down")
 
     provider = NoEmbeddings([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
@@ -895,3 +903,232 @@ def test_em_and_en_dashes_are_replaced_in_every_user_facing_field():
     provider = FakeProvider([{"kind": "conversation"}, {"reply": f"Rust{dash}huh.", "memory_candidates": []}])
     out = collect(assemble_context(make_request(message="hi")), provider)
     assert out[-1].content == "Rust, huh."
+
+
+# ---------------------------------------------------------------------------
+# Usage logging
+# ---------------------------------------------------------------------------
+
+def test_cost_estimate_discounts_cached_tokens_and_prices_output_higher():
+    from core import usage
+
+    plain = usage.estimate_cost("gpt-4o", 1000, 0, 100)
+    cached = usage.estimate_cost("gpt-4o", 1000, 800, 100)
+    assert round(plain, 6) == round((1000 * 2.5 + 100 * 10.0) / 1_000_000, 6)
+    assert cached < plain
+    assert usage.estimate_cost("gpt-4o-mini", 1000, 0, 100) < plain / 10
+    # An unknown model is priced as the expensive one, so a mistake overstates spend.
+    assert usage.estimate_cost("some-new-model", 1000, 0, 100) == plain
+
+
+def test_every_call_logs_one_line_and_the_meter_totals_them(caplog):
+    import logging
+
+    from core import usage
+
+    caplog.set_level(logging.INFO, logger="data.usage")
+    meter = usage.start_meter()
+    usage.record("intent", "gpt-4o", prompt_tokens=2000, cached_tokens=1024, completion_tokens=100)
+    usage.record("search", "gpt-4o", prompt_tokens=500, completion_tokens=100, extra_cost_usd=usage.SEARCH_CALL_USD)
+    meter.log_summary()
+    lines = [r.getMessage() for r in caplog.records]
+    assert lines[0].startswith("usage step=intent model=gpt-4o prompt_tokens=2000 cached_tokens=1024 completion_tokens=100 est_cost_usd=")
+    assert lines[-1].startswith("turn_usage calls=2 prompt_tokens=2500 cached_tokens=1024 completion_tokens=200")
+    assert meter.cost_usd > usage.SEARCH_CALL_USD
+    assert set(meter.by_step()) == {"intent", "search"}
+
+
+def test_the_provider_records_real_usage_from_a_chat_response():
+    from types import SimpleNamespace
+
+    from core import usage
+    from core.providers.openai_provider import OpenAIProvider
+
+    meter = usage.start_meter()
+    fake = SimpleNamespace(usage=SimpleNamespace(prompt_tokens=3000, completion_tokens=200, prompt_tokens_details=SimpleNamespace(cached_tokens=2048)))
+    OpenAIProvider._record_chat_usage("construct", "gpt-4o", fake)
+    rec = meter.records[0]
+    assert (rec.step, rec.prompt_tokens, rec.cached_tokens, rec.completion_tokens) == ("construct", 3000, 2048, 200)
+
+
+def test_a_pipeline_turn_ends_with_a_summary_line(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="data.usage")
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    collect(assemble_context(make_request()), provider)
+    assert any(r.getMessage().startswith("turn_usage calls=") for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Prompt caching
+# ---------------------------------------------------------------------------
+
+def _prefix(system: str) -> str:
+    return system.split(system_prompts.REQUEST_CONTEXT_HEADER)[0]
+
+
+def test_the_static_prefix_is_identical_across_users_and_long_enough_to_be_cached():
+    a = assemble_context(make_request(message="a prompt for a bot", profile={"preferred_name": "Ada"}, memories=STORE))
+    b = assemble_context(make_request(message="something else entirely", profile={"preferred_name": "Grace", "role": "Chef"}))
+    for build in (
+        lambda c: system_prompts.intent_system_prompt(c, None),
+        system_prompts.construct_system_prompt,
+        system_prompts.answer_system_prompt,
+    ):
+        pa, pb = _prefix(build(a)), _prefix(build(b))
+        assert pa == pb
+        assert "Ada" not in pa and "Grace" not in pa and "Flat white" not in pa
+    # The providers cache prefixes of 1024 tokens or more, about 4 characters each.
+    assert len(_prefix(system_prompts.intent_system_prompt(a, None))) > 4096
+    assert len(_prefix(system_prompts.construct_system_prompt(a))) > 4096
+
+
+def test_request_specific_content_comes_after_the_static_prefix():
+    ctx = assemble_context(make_request(message="a prompt for reviewing React TypeScript components", profile={"preferred_name": "Ada"}, memories=STORE))
+    system = system_prompts.construct_system_prompt(ctx)
+    assert system.index("- Name: Ada") > system.index(system_prompts.REQUEST_CONTEXT_HEADER)
+    assert system.index("OUTPUT FORMATTING FOR THE PROMPT YOU WRITE") > system.index(system_prompts.REQUEST_CONTEXT_HEADER)
+
+
+
+# ---------------------------------------------------------------------------
+# Bounded context
+# ---------------------------------------------------------------------------
+
+def test_a_long_chat_costs_the_same_as_a_medium_one():
+    def tokens(n):
+        msgs = [{"role": "user" if i % 2 == 0 else "assistant", "content": ("word " * 200)} for i in range(n)]
+        ctx = assemble_context(make_request(history=msgs))
+        system = system_prompts.construct_system_prompt(ctx)
+        return (len(system) + sum(len(m.content) for m in ctx.history)) // 4
+
+    assert abs(tokens(40) - tokens(25)) < 50
+    assert tokens(40) < 6000
+
+
+def test_older_turns_are_condensed_and_recent_ones_are_clipped():
+    from core.context import MAX_DIGEST_CHARS, MAX_LATEST_ASSISTANT_CHARS, MAX_RECENT_CHARS
+
+    msgs = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"turn {i} " + "x" * 3000} for i in range(30)]
+    ctx = assemble_context(make_request(history=msgs))
+    assert len(ctx.history) == 6
+    assert len(ctx.history_digest) <= MAX_DIGEST_CHARS and "turn" in ctx.history_digest
+    latest_assistant = [m for m in ctx.history if m.role == "assistant"][-1]
+    others = [m for m in ctx.history if m is not latest_assistant]
+    assert len(latest_assistant.content) <= MAX_LATEST_ASSISTANT_CHARS + 20
+    assert all(len(m.content) <= MAX_RECENT_CHARS + 20 for m in others)
+    assert "EARLIER IN THIS CONVERSATION" in system_prompts.intent_system_prompt(ctx, None)
+
+
+def test_the_latest_prompt_keeps_enough_text_to_be_edited():
+    prior = "Role: " + "rule " * 600
+    msgs = [{"role": "user", "content": "make a prompt"}, {"role": "assistant", "content": prior}]
+    ctx = assemble_context(make_request(message="make it shorter", history=msgs))
+    assert len(ctx.history[-1].content) > 2500
+
+
+def test_intent_sees_a_narrower_window_than_construction():
+    msgs = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"m{i}"} for i in range(10)]
+    ctx = assemble_context(make_request(history=msgs))
+    assert len(intent.build_messages(ctx)) == 4 + 1
+    assert len(construct.build_messages(ctx, None)) == 6 + 1
+
+
+def test_only_the_relevant_few_memories_reach_a_model_prompt():
+    many = [{"category": "skills", "key": f"Topic {i}", "value": f"react typescript detail number {i}"} for i in range(60)]
+    ctx = __import__("asyncio").run(__import__("core.context", fromlist=["attach_memory"]).attach_memory(
+        assemble_context(make_request(message="a prompt for reviewing react typescript code", memories=many)), FakeProvider([])))
+    assert len(ctx.all_memories) == 60
+    assert len(ctx.relevant_memories) <= 6
+    assert system_prompts.construct_system_prompt(ctx).count("react typescript detail number") <= 6
+
+
+def test_a_query_is_taken_from_the_message_and_bounded():
+    assert research.query_from_message("  the latest   Node.js version ") == ["the latest Node.js version"]
+    assert research.query_from_message("   ") == []
+    assert len(research.query_from_message("x " * 500)[0]) <= research.MAX_QUERY_CHARS
+
+
+def test_each_step_can_run_on_its_own_model():
+    from core.providers.openai_provider import OpenAIProvider
+
+    provider = OpenAIProvider(
+        api_key="sk-test_aaaaaaaaaaaaaaaaaaaaaaaaaaaa", default_model="gpt-4o", fast_model="gpt-4o-mini",
+        transcribe_model="whisper-1", embed_model="text-embedding-3-small", timeout_seconds=5,
+        step_models={"answer": "gpt-4o-mini", "construct": None, "vision": ""},
+    )
+    assert provider.resolve_model("gpt-4o", step="answer") == "gpt-4o-mini"
+    assert provider.resolve_model("gpt-4o", step="construct") == "gpt-4o"
+    assert provider.resolve_model("gpt-4o", step="vision") == "gpt-4o"
+    assert provider.resolve_model("gpt-4o", step="intent") == "gpt-4o"
+    assert provider.resolve_model("gpt-4o", fast=True, step="answer") == "gpt-4o-mini"
+
+
+# ---------------------------------------------------------------------------
+# Limits on the path to the model
+# ---------------------------------------------------------------------------
+
+def test_data_rejects_oversized_requests_before_any_model_call(client):
+    from schemas.requests import MAX_ATTACHMENTS, MAX_MESSAGE_CHARS
+
+    app.dependency_overrides[get_provider] = lambda: FakeProvider([])
+    send = lambda body: client.post("/generate", json=body, headers=AUTH).status_code
+    assert send({"message": "x" * (MAX_MESSAGE_CHARS + 1)}) == 422
+    assert send({"message": "hi", "history": [{"role": "user", "content": "y"}] * 41}) == 422
+    assert send({"message": "hi", "history": [{"role": "user", "content": "y" * 20_001}]}) == 422
+    assert send({"message": "hi", "attachments": [{"name": "a.png", "data_url": "d" * 6_000_001}]}) == 422
+    assert send({"message": "hi", "attachments": [{"name": "a.pdf", "content_base64": "d" * 14_000_001}]}) == 422
+    assert send({"message": "hi", "attachments": [{"name": f"{i}.png"} for i in range(MAX_ATTACHMENTS + 1)]}) == 422
+    assert send({"message": "hi", "memories": [{"category": "a", "key": "k", "value": "v" * 601}]}) == 422
+
+
+def test_a_message_at_the_limit_is_accepted():
+    from schemas.requests import MAX_MESSAGE_CHARS
+
+    GenerateRequest(message="x" * MAX_MESSAGE_CHARS)
+
+
+def test_reference_text_is_bounded_across_all_sources_together():
+    big = [SourceNote(kind="attachment", label=f"f{i}.pdf", content="word " * 5000) for i in range(3)]
+    block = system_prompts.sources_block(big)
+    assert len(block) < system_prompts.MAX_TOTAL_SOURCE_CHARS + 600
+
+
+def test_output_budgets_are_capped():
+    assert construct.CONSTRUCT_MAX_TOKENS <= 2500
+    assert ingest.MAX_CHARS_PER_SOURCE <= 8000
+
+
+# ---------------------------------------------------------------------------
+# Eval harness, free mock mode
+# ---------------------------------------------------------------------------
+
+def _load_eval_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("run_eval_under_test", Path(__file__).resolve().parent.parent / "evaluation" / "run_eval.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_eval_set_runs_in_free_mock_mode_and_every_case_is_well_formed():
+    module = _load_eval_module()
+    module.MOCK = True
+    cases = json.loads(module.EVAL_SET.read_text(encoding="utf-8"))["cases"]
+    assert len(cases) >= 40
+    results = asyncio.run(module.run_all(cases))
+    failed = [(r["id"], r["failures"]) for r in results if not r["passed"]]
+    assert failed == []
+    assert module.usage.process_meter.cost_usd >= 0
+
+
+def test_a_live_run_needs_an_explicit_flag_a_confirmation_and_a_scope(monkeypatch, capsys):
+    module = _load_eval_module()
+    monkeypatch.delenv("EVAL_CONFIRM_SPEND", raising=False)
+    run = lambda *argv: (monkeypatch.setattr(sys, "argv", ["run_eval.py", *argv]), module.main())[1]
+    assert run("--live", "--full") == 2 and "--yes" in capsys.readouterr().out
+    assert run("--live", "--yes") == 2 and "--full" in capsys.readouterr().out
+    assert run("--judge") == 2 and "needs --live" in capsys.readouterr().out
+    assert run("--save-baseline") == 2

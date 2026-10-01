@@ -1,26 +1,42 @@
-"""Runs the eval set against the current pipeline.
+"""Runs the eval set against the pipeline.
 
-Usage, from the data directory, with OPENAI_API_KEY and API_SHARED_SECRET set:
+THE DEFAULT COSTS NOTHING. With no flags this runs in mock mode: no API key,
+no network, no spend. A scripted provider answers from each case's own
+expectations, so it checks the pipeline's wiring and the check logic after a
+code change, and it says nothing about model quality.
 
-    python evaluation/run_eval.py                  run and compare to the baseline
-    python evaluation/run_eval.py --save-baseline  run and store this run as the baseline
-    python evaluation/run_eval.py --only vague-blog full-sql-review
+Real model calls need a deliberate choice, because a full run costs roughly a
+dollar and the quality questions it answers are only worth asking at a
+checkpoint, before and after a change to the prompts or the models:
 
-Run it before and after any change to core/prompts/templates. A case that
-passed in the baseline and fails now is reported as a regression, and the
-process exits non zero.
+    python evaluation/run_eval.py                                       mock, free, for routine iteration
+    python evaluation/run_eval.py --live --only conv-roast --yes        a few real cases
+    python evaluation/run_eval.py --live --full --yes                   the whole set against OpenAI
+    python evaluation/run_eval.py --live --full --yes --judge           and score each prompt with a reviewer
+    python evaluation/run_eval.py --live --full --yes --save-baseline   record the result as the baseline
+    python evaluation/run_eval.py --live --cheap --only vague-blog --yes  smoke test on the small model
+
+A live run prints an estimated cost first and refuses to start without --yes
+(or EVAL_CONFIRM_SPEND=1), refuses to run the whole set without --full, and
+prints the real spend, from the usage log, when it finishes.
+
+Run live checkpoints before and after any change to core/prompts/templates or
+to a step's model. A case that passed in the baseline and fails now is
+reported as a regression, and the process exits non zero.
 
 Checks are deliberately mechanical: the right decision (clarify, ready or
-conversation), required terms present, forbidden terms absent, and sane
-structure. The good_prompt_notes on each case are for a person reading a
-failure, they are not graded automatically.
+conversation), required terms present, forbidden terms absent, sane
+structure, filler phrases and memory behavior. The good_prompt_notes on each
+case are for a person reading a failure, they are not graded automatically.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -29,10 +45,11 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core import usage  # noqa: E402
 from core.context import assemble_context  # noqa: E402
 from core.prompts.loader import ACTIVE_VERSION  # noqa: E402
 from core.providers import get_provider  # noqa: E402
-from core.providers.base import ProviderMessage  # noqa: E402
+from core.providers.base import ModelProvider, ProviderMessage, SearchOutcome  # noqa: E402
 from routers.generate import run_pipeline  # noqa: E402
 from schemas.requests import GenerateRequest  # noqa: E402
 
@@ -88,6 +105,7 @@ async def judge(case_input: str, output: str) -> dict[str, Any]:
         messages=[ProviderMessage(role="user", text=f"REQUEST:\n{case_input}\n\nPROMPT PRODUCED:\n{output}")],
         max_tokens=300,
         temperature=0.0,
+        step="eval_judge",
     )
     return {k: raw.get(k) for k in ("specificity", "fit", "filler", "value", "weakest_line", "note")}
 
@@ -163,6 +181,69 @@ def check_case(case: dict[str, Any], events: list[Any]) -> tuple[bool, list[str]
     return not failures, failures, detail
 
 
+MOCK = True
+# A typical measured cost of one case against the live API, used only for the
+# estimate printed before a live run. The real spend is printed afterwards.
+LIVE_COST_PER_CASE_USD = 0.013
+JUDGE_COST_PER_PROMPT_USD = 0.003
+
+
+class MockProvider(ModelProvider):
+    """Answers from the case's own expectations. No network, no cost, no quality signal."""
+
+    name = "mock"
+
+    def __init__(self, case: dict[str, Any]) -> None:
+        self.case = case
+        expect = case["expect"]
+        decision = expect["decision"]
+        self.decision = decision[0] if isinstance(decision, list) else decision
+        self.terms = [group[0] for group in expect.get("must_include", []) if group]
+        self.minimum = expect.get("min_chars", 200)
+
+    def resolve_model(self, requested: str, *, fast: bool = False, step: str | None = None) -> str:
+        return "mock"
+
+    async def complete_json(self, *, model, system, messages, max_tokens, temperature, step=""):
+        expect = self.case["expect"]
+        if step == "intent":
+            if self.decision == "clarify":
+                return {"kind": "prompt_request", "sufficient": False, "intro": "Happy to help.",
+                        "questions": [{"text": "Which one do you mean?", "options": ["First", "Second"]}]}
+            if self.decision == "conversation":
+                return {"kind": "conversation", "about_user": bool(self.case.get("memories"))}
+            return {"kind": "prompt_request", "sufficient": True,
+                    "search_queries": ["mock query"] if expect.get("search") else []}
+        if step == "answer":
+            candidates = [{"category": "skills", "key": "Mock fact", "value": "A mock stable fact", "confidence": 0.9}] if expect.get("memory_candidate") else []
+            return {"reply": "Mock reply. " + ", ".join(self.terms), "memory_candidates": candidates}
+        if step == "construct":
+            body = "Role\nMock prompt covering " + ", ".join(self.terms) + ". "
+            body += "Detail. " * max(0, (self.minimum - len(body)) // 8 + 1)
+            return {"message": "Mock message.", "content": body, "stated": [], "assumptions": [],
+                    "structured": {"role": "mock", "format": "mock"}, "readiness": {"status": "ready"}}
+        return {}
+
+    async def complete_text(self, *, model, system, messages, max_tokens, temperature, step=""):
+        return ""
+
+    async def embed(self, texts, *, step=""):
+        out = []
+        for text in texts:
+            vec = [0.0] * 64
+            for word in re.findall(r"[a-z0-9]+", text.lower()):
+                if len(word) > 2:
+                    vec[int(hashlib.md5(word.encode()).hexdigest(), 16) % 64] += 1.0
+            out.append(vec)
+        return out
+
+    async def search(self, *, model, query, step=""):
+        return SearchOutcome(summary="Mock findings.")
+
+    async def transcribe(self, *, filename, content, content_type):
+        return ""
+
+
 async def run_case(case: dict[str, Any], semaphore: asyncio.Semaphore) -> dict[str, Any]:
     request = GenerateRequest(
         message=case["input"],
@@ -171,10 +252,11 @@ async def run_case(case: dict[str, Any], semaphore: asyncio.Semaphore) -> dict[s
         history=case.get("history") or [],
     )
     async with semaphore:
-        events = [event async for event in run_pipeline(assemble_context(request), get_provider())]
+        provider = MockProvider(case) if MOCK else get_provider()
+        events = [event async for event in run_pipeline(assemble_context(request), provider)]
     passed, failures, detail = check_case(case, events)
     result = {"id": case["id"], "passed": passed, "failures": failures, **detail}
-    if JUDGE and events[-1].type == "result":
+    if JUDGE and not MOCK and events[-1].type == "result":
         result["judge"] = await judge(case["input"], detail["output"])
     return result
 
@@ -210,18 +292,25 @@ async def rejudge(path: Path) -> int:
     return 0
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the Prompt AI eval set")
-    parser.add_argument("--save-baseline", action="store_true", help="store this run as the new baseline")
-    parser.add_argument("--only", nargs="*", help="run only these case ids")
-    parser.add_argument("--judge", action="store_true", help="also score each generated prompt with an LLM reviewer")
-    parser.add_argument("--rejudge", metavar="RESULTS_JSON", help="score the stored outputs of an earlier run, no generation")
-    args = parser.parse_args()
-    global JUDGE
-    JUDGE = args.judge
+def estimate_live_cost(cases: int, judge: bool) -> float:
+    return cases * (LIVE_COST_PER_CASE_USD + (JUDGE_COST_PER_PROMPT_USD if judge else 0.0))
 
-    if args.rejudge:
-        return asyncio.run(rejudge(Path(args.rejudge)))
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the Prompt AI eval set. Free mock mode by default.")
+    parser.add_argument("--live", action="store_true", help="call the real model provider, this costs money")
+    parser.add_argument("--full", action="store_true", help="with --live, allow running the whole set")
+    parser.add_argument("--yes", action="store_true", help="with --live, confirm the spend (or set EVAL_CONFIRM_SPEND=1)")
+    parser.add_argument("--cheap", action="store_true", help="with --live, run every step on the small model, a smoke test only")
+    parser.add_argument("--save-baseline", action="store_true", help="store this live run as the new baseline")
+    parser.add_argument("--only", nargs="*", help="run only these case ids")
+    parser.add_argument("--judge", action="store_true", help="with --live, also score each prompt with a reviewer model")
+    parser.add_argument("--rejudge", metavar="RESULTS_JSON", help="with --live, score the stored outputs of an earlier run")
+    args = parser.parse_args()
+
+    global JUDGE, MOCK
+    JUDGE = args.judge
+    MOCK = not args.live
 
     cases = json.loads(EVAL_SET.read_text(encoding="utf-8"))["cases"]
     if args.only:
@@ -230,6 +319,36 @@ def main() -> int:
         print("No cases selected")
         return 2
 
+    if MOCK:
+        for flag, name in ((args.judge, "--judge"), (args.save_baseline, "--save-baseline"), (args.rejudge, "--rejudge"), (args.cheap, "--cheap"), (args.full, "--full")):
+            if flag:
+                print(f"{name} needs --live, because it uses the real model and costs money.")
+                return 2
+        print("MOCK MODE: no model calls and no cost. This checks pipeline wiring only, it says nothing about model quality.")
+        print("Use --live with --only or --full, and --yes, for a real run.\n")
+    else:
+        count = len(cases)
+        if args.rejudge:
+            count = sum(1 for r in json.loads(Path(args.rejudge).read_text(encoding="utf-8"))["results"] if r.get("decision") == "ready")
+        if not args.only and not args.full and not args.rejudge:
+            print(f"Refusing to run all {count} cases against the live API without --full. Pick cases with --only, or add --full.")
+            return 2
+        estimate = estimate_live_cost(count, args.judge or bool(args.rejudge))
+        if args.cheap:
+            estimate /= 10
+        print(f"LIVE MODE: {count} cases against the real API, estimated cost about ${estimate:.2f}.")
+        if not (args.yes or os.environ.get("EVAL_CONFIRM_SPEND") == "1"):
+            print("Not started. Add --yes (or set EVAL_CONFIRM_SPEND=1) to confirm the spend.")
+            return 2
+        if args.cheap:
+            for name in ("OPENAI_MODEL", "OPENAI_INTENT_MODEL", "OPENAI_CONSTRUCT_MODEL", "OPENAI_ANSWER_MODEL", "OPENAI_VISION_MODEL", "OPENAI_SEARCH_MODEL"):
+                os.environ[name] = "gpt-4o-mini"
+            print("Cheap mode: every step on gpt-4o-mini. Results are a smoke test, not comparable with the baseline.")
+        if args.rejudge:
+            code = asyncio.run(rejudge(Path(args.rejudge)))
+            print_spend()
+            return code
+
     results = asyncio.run(run_all(cases))
     passed = [r for r in results if r["passed"]]
     failed = [r for r in results if not r["passed"]]
@@ -237,36 +356,47 @@ def main() -> int:
     baseline: dict[str, bool] = {}
     if BASELINE.is_file():
         baseline = json.loads(BASELINE.read_text(encoding="utf-8")).get("cases", {})
-    regressions = [r["id"] for r in failed if baseline.get(r["id"]) is True]
+    regressions = [r["id"] for r in failed if baseline.get(r["id"]) is True and not MOCK and not args.cheap]
     fixed = [r["id"] for r in passed if baseline.get(r["id"]) is False]
 
     run = {
         "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "mode": "mock" if MOCK else ("live-cheap" if args.cheap else "live"),
         "template_version": ACTIVE_VERSION,
         "passed": len(passed),
         "total": len(results),
         "regressions": regressions,
+        "spend": {
+            "calls": usage.process_meter.calls,
+            "prompt_tokens": usage.process_meter.prompt_tokens,
+            "cached_tokens": usage.process_meter.cached_tokens,
+            "completion_tokens": usage.process_meter.completion_tokens,
+            "est_cost_usd": round(usage.process_meter.cost_usd, 4),
+            "by_step": {k: round(v, 4) for k, v in usage.process_meter.by_step().items()},
+        },
         "results": results,
     }
     RESULTS_DIR.mkdir(exist_ok=True)
     out_path = RESULTS_DIR / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
     out_path.write_text(json.dumps(run, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    if JUDGE:
+    if JUDGE and not MOCK:
         print("Judge: " + summarize_judge([r["judge"] for r in results if "judge" in r]))
-    print(f"Template version: {ACTIVE_VERSION}")
+    print(f"Template version: {ACTIVE_VERSION}  mode: {run['mode']}")
     print(f"Passed {len(passed)} of {len(results)}")
     for result in failed:
         print(f"  FAIL {result['id']}: {'; '.join(result['failures'])}")
-    if baseline:
+    if baseline and not MOCK:
         print(f"Against baseline: {len(regressions)} regressions, {len(fixed)} newly passing")
         for case_id in regressions:
             print(f"  REGRESSION {case_id}")
-    else:
+    elif not MOCK:
         print("No baseline yet, run with --save-baseline to create one")
     print(f"Full results: {out_path}")
+    if not MOCK:
+        print_spend()
 
-    if args.save_baseline and not args.only:
+    if args.save_baseline and not args.only and not args.cheap:
         BASELINE.write_text(
             json.dumps(
                 {
@@ -280,7 +410,18 @@ def main() -> int:
         )
         print(f"Baseline saved: {BASELINE}")
 
-    return 1 if regressions else 0
+    return 1 if regressions or (MOCK and failed) else 0
+
+
+def print_spend() -> None:
+    meter = usage.process_meter
+    print(
+        f"SPEND this run: {meter.calls} calls, {meter.prompt_tokens:,} prompt tokens "
+        f"({meter.cached_tokens:,} cached), {meter.completion_tokens:,} completion tokens, "
+        f"estimated ${meter.cost_usd:.3f}"
+    )
+    for step, cost in sorted(meter.by_step().items(), key=lambda kv: -kv[1]):
+        print(f"  {step:12s} ${cost:.4f}")
 
 
 if __name__ == "__main__":

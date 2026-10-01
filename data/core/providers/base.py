@@ -53,8 +53,12 @@ class ModelProvider(ABC):
     name: str
 
     @abstractmethod
-    def resolve_model(self, requested: str, *, fast: bool = False) -> str:
-        """Map the model a user selected onto one this provider can run."""
+    def resolve_model(self, requested: str, *, fast: bool = False, step: Optional[str] = None) -> str:
+        """Map the model a user selected onto one this provider can run.
+
+        `step` names the pipeline step, so each step can run on the model that
+        suits it, rather than every step defaulting to the most expensive one.
+        """
 
     @abstractmethod
     async def complete_json(
@@ -65,6 +69,7 @@ class ModelProvider(ABC):
         messages: list[ProviderMessage],
         max_tokens: int,
         temperature: float,
+        step: str = "",
     ) -> dict[str, Any]:
         """Run a completion that must return a single JSON object."""
 
@@ -77,15 +82,16 @@ class ModelProvider(ABC):
         messages: list[ProviderMessage],
         max_tokens: int,
         temperature: float,
+        step: str = "",
     ) -> str:
         """Run a completion that returns plain text."""
 
     @abstractmethod
-    async def search(self, *, model: str, query: str) -> SearchOutcome:
+    async def search(self, *, model: str, query: str, step: str = "search") -> SearchOutcome:
         """Search the web for current information and report what was found."""
 
     @abstractmethod
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], *, step: str = "memory_embed") -> list[list[float]]:
         """Turn texts into vectors, one per text, for similarity comparison."""
 
     @abstractmethod

@@ -1,6 +1,6 @@
 {
-  "saved_at": "2026-10-01T21:13:44+00:00",
-  "template_version": "v3",
+  "saved_at": "2026-10-01T22:13:33+00:00",
+  "template_version": "v4",
   "cases": {
     "vague-support-bot": true,
     "vague-blog": true,
@@ -38,10 +38,10 @@
     "conv-memory-write": true,
     "conv-no-fabrication": true,
     "conv-secret-not-saved": true,
-    "ambig-contradiction": true,
+    "ambig-contradiction": false,
     "multi-goal": true,
     "one-word": true,
     "follow-up-edit": true,
-    "memory-shapes-prompt": false
+    "memory-shapes-prompt": true
   }
 }

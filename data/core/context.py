@@ -35,6 +35,19 @@ logger = logging.getLogger("data.context")
 # Bounds how much prior conversation is replayed into each call, the
 # smallest amount that still gives the model real continuity.
 MAX_HISTORY_MESSAGES = 20
+# How a long conversation is kept bounded. The most recent messages are sent
+# in full, clipped to a size, and everything older is condensed into a short
+# digest, so what a request costs does not grow with the length of the chat.
+RECENT_MESSAGES = 6
+MAX_RECENT_CHARS = 1500
+# The latest assistant message is often a prompt the user is about to ask to
+# change ("make it shorter"), so it keeps more of its text.
+MAX_LATEST_ASSISTANT_CHARS = 4000
+DIGEST_OLDER_MESSAGES = 14
+DIGEST_CHARS_PER_MESSAGE = 140
+MAX_DIGEST_CHARS = 1600
+# The intent step only needs enough to follow a short reply or an edit request.
+INTENT_HISTORY_MESSAGES = 4
 MAX_RELEVANT_MEMORIES = 8
 MAX_TITLE_SOURCE_CHARS = 1500
 
@@ -62,6 +75,8 @@ class PipelineContext:
     # The subset relevant to this request, used when constructing a prompt.
     relevant_memories: list[Memory]
     history: list[HistoryMessage]
+    # Older turns condensed to a line each, sent as context instead of in full.
+    history_digest: str = ""
     # Files attached to this message, not yet read.
     attachments: list[Attachment] = field(default_factory=list)
     # Everything read or looked up for this request: attachment text and
@@ -118,6 +133,34 @@ def select_relevant_memories(
     return (always + [m for _, m in scored])[:limit]
 
 
+def _clip(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit].rstrip() + " [clipped]"
+
+
+def bound_history(messages: list[HistoryMessage]) -> tuple[list[HistoryMessage], str]:
+    """Split a conversation into a short recent window and a condensed digest of the rest."""
+    recent = messages[-RECENT_MESSAGES:]
+    older = messages[:-RECENT_MESSAGES][-DIGEST_OLDER_MESSAGES:]
+
+    latest_assistant = max((i for i, m in enumerate(recent) if m.role == "assistant"), default=-1)
+    clipped = [
+        HistoryMessage(
+            role=m.role,
+            content=_clip(m.content, MAX_LATEST_ASSISTANT_CHARS if i == latest_assistant else MAX_RECENT_CHARS),
+        )
+        for i, m in enumerate(recent)
+    ]
+
+    lines = []
+    for m in older:
+        flat = " ".join(m.content.split())
+        lines.append(f"{'User' if m.role == 'user' else 'Assistant'}: {_clip(flat, DIGEST_CHARS_PER_MESSAGE)}")
+    digest = "\n".join(lines)
+    if len(digest) > MAX_DIGEST_CHARS:
+        digest = digest[-MAX_DIGEST_CHARS:]
+    return clipped, digest
+
+
 def assemble_context(request: GenerateRequest) -> PipelineContext:
     profile = UserProfile(
         preferred_name=_clean(request.profile.preferred_name),
@@ -127,7 +170,7 @@ def assemble_context(request: GenerateRequest) -> PipelineContext:
         primary_use=_clean(request.profile.primary_use),
     )
     memories = [m for m in request.memories if m.key.strip() and m.value.strip()]
-    history = [m for m in request.history if m.content.strip()][-MAX_HISTORY_MESSAGES:]
+    history, history_digest = bound_history([m for m in request.history if m.content.strip()][-MAX_HISTORY_MESSAGES:])
     message = request.message.strip()
 
     state = request.clarify_state
@@ -141,6 +184,7 @@ def assemble_context(request: GenerateRequest) -> PipelineContext:
         all_memories=memories,
         relevant_memories=select_relevant_memories(memories, message),
         history=history,
+        history_digest=history_digest,
         attachments=list(request.attachments),
         # Material gathered earlier in an open clarifying sequence.
         sources=list(state.sources) if state else [],
@@ -173,7 +217,7 @@ async def read_attachments(ctx: PipelineContext, provider: "ModelProvider") -> P
         return ctx
     from core.pipeline import ingest
 
-    notes = await ingest.ingest(ctx.attachments, provider, provider.resolve_model(ctx.target_model))
+    notes = await ingest.ingest(ctx.attachments, provider, provider.resolve_model(ctx.target_model, step="vision"))
     return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes), attachments=[])
 
 
@@ -183,7 +227,7 @@ async def run_research(ctx: PipelineContext, queries: list[str], provider: "Mode
         return ctx
     from core.pipeline import research
 
-    notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model))
+    notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model, step="search"))
     return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes))
 
 

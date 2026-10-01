@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
-from core.context import PipelineContext
+from core.context import INTENT_HISTORY_MESSAGES, PipelineContext
 from core.pipeline import clarify, research
 from core.prompts.system_prompts import intent_system_prompt
 from core.providers.base import ModelProvider, ProviderMessage
@@ -101,7 +101,9 @@ def parse_intent(raw: dict[str, Any], *, has_pending_question: bool) -> IntentDe
 
 
 def build_messages(ctx: PipelineContext) -> list[ProviderMessage]:
-    messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
+    # A narrower window than construction gets, intent only has to follow a short reply or an edit.
+    window = ctx.history[-INTENT_HISTORY_MESSAGES:]
+    messages = [ProviderMessage(role=m.role, text=m.content) for m in window]
     messages.append(ProviderMessage(role="user", text=ctx.message))
     return messages
 
@@ -118,10 +120,11 @@ async def detect(ctx: PipelineContext, provider: ModelProvider) -> IntentDecisio
     # questions about details a sensible default would cover, which the
     # eval set measures.
     raw = await provider.complete_json(
-        model=provider.resolve_model(ctx.target_model),
+        model=provider.resolve_model(ctx.target_model, step="intent"),
         system=intent_system_prompt(ctx, pending),
         messages=build_messages(ctx),
-        max_tokens=700,
+        max_tokens=500,
         temperature=0.1,
+        step="intent",
     )
     return parse_intent(raw, has_pending_question=pending is not None)

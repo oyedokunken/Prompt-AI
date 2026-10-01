@@ -6,9 +6,22 @@ the request body, sent by /api.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+# Limits on what a single request may carry. /api enforces the same ones
+# first, these are the last line of defence on the path to the model, so a
+# large paste or a large file cannot balloon the tokens of one request.
+MAX_MESSAGE_CHARS = 12_000
+MAX_HISTORY_ENTRIES = 40
+MAX_HISTORY_ENTRY_CHARS = 20_000
+MAX_MEMORIES = 200
+MAX_ATTACHMENTS = 3
+MAX_IMAGE_DATA_URL_CHARS = 6_000_000
+MAX_DOCUMENT_BASE64_CHARS = 14_000_000
+MAX_ANSWER_CHARS = 2_000
 
 
 class UserProfile(BaseModel):
@@ -22,24 +35,24 @@ class UserProfile(BaseModel):
 
 
 class Memory(BaseModel):
-    category: str
-    key: str
-    value: str
+    category: str = Field(..., max_length=40)
+    key: str = Field(..., max_length=120)
+    value: str = Field(..., max_length=600)
 
 
 class HistoryMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(..., max_length=MAX_HISTORY_ENTRY_CHARS)
 
 
 class Attachment(BaseModel):
-    name: str
-    type: str = ""
+    name: str = Field(..., max_length=300)
+    type: str = Field("", max_length=200)
     # Images arrive as a data URL, and are read by the vision model.
-    data_url: Optional[str] = None
+    data_url: Optional[str] = Field(None, max_length=MAX_IMAGE_DATA_URL_CHARS)
     # PDF and Word documents arrive as base64 file bytes, and are read by
     # text extraction. /api fetches them, /data never touches storage.
-    content_base64: Optional[str] = None
+    content_base64: Optional[str] = Field(None, max_length=MAX_DOCUMENT_BASE64_CHARS)
 
 
 class ClarifyQuestion(BaseModel):
@@ -52,7 +65,7 @@ class ClarifyQuestion(BaseModel):
 
 class ClarifyAnswer(BaseModel):
     question_id: str
-    answer: str
+    answer: str = Field(..., max_length=MAX_ANSWER_CHARS)
 
 
 class SourceLink(BaseModel):
@@ -96,14 +109,14 @@ class ClarifyState(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    message: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS)
     # The target model the user selected in the interface.
     model: str = "gpt-4o"
     profile: UserProfile = Field(default_factory=UserProfile)
-    memories: list[Memory] = Field(default_factory=list)
+    memories: list[Memory] = Field(default_factory=list, max_length=MAX_MEMORIES)
     # Prior turns only, oldest first, not including `message`.
-    history: list[HistoryMessage] = Field(default_factory=list)
-    attachments: list[Attachment] = Field(default_factory=list)
+    history: list[HistoryMessage] = Field(default_factory=list, max_length=MAX_HISTORY_ENTRIES)
+    attachments: list[Attachment] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     clarify_state: Optional[ClarifyState] = None
     # True when `message` was submitted through the question interface, so
     # it is known to be the answer to the pending question.
@@ -112,4 +125,4 @@ class GenerateRequest(BaseModel):
 
 class TitleRequest(BaseModel):
     # The first message or two of a conversation, oldest first.
-    messages: list[str] = Field(..., min_length=1, max_length=4)
+    messages: list[Annotated[str, Field(max_length=4_000)]] = Field(..., min_length=1, max_length=4)

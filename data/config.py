@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
+from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,13 @@ class Settings(BaseSettings):
     openai_model: str = Field("gpt-4o", alias="OPENAI_MODEL")
     openai_fast_model: str = Field("gpt-4o-mini", alias="OPENAI_FAST_MODEL")
     openai_transcribe_model: str = Field("whisper-1", alias="OPENAI_TRANSCRIBE_MODEL")
+    # Optional per step overrides. Each falls back to OPENAI_MODEL when unset,
+    # so a step can be moved to a cheaper model by configuration alone.
+    openai_intent_model: Optional[str] = Field(None, alias="OPENAI_INTENT_MODEL")
+    openai_construct_model: Optional[str] = Field(None, alias="OPENAI_CONSTRUCT_MODEL")
+    openai_answer_model: Optional[str] = Field(None, alias="OPENAI_ANSWER_MODEL")
+    openai_vision_model: Optional[str] = Field(None, alias="OPENAI_VISION_MODEL")
+    openai_search_model: Optional[str] = Field(None, alias="OPENAI_SEARCH_MODEL")
     openai_embed_model: str = Field("text-embedding-3-small", alias="OPENAI_EMBED_MODEL")
     openai_timeout_seconds: float = Field(90.0, alias="OPENAI_TIMEOUT_SECONDS")
 

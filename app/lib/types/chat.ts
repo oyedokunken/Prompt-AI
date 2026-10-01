@@ -188,4 +188,6 @@ export function attachmentKind(mimeType: string): keyof typeof ATTACHMENT_BUCKET
 // Keeps a single user or a single conversation from exhausting API token
 // budget through attachments.
 export const MAX_FILES_PER_MESSAGE = 3;
+// Longer messages are rejected by the server, so say so before sending.
+export const MAX_MESSAGE_CHARS = 12_000;
 export const MAX_ATTACHMENT_BYTES_PER_CONVERSATION = 50 * 1024 * 1024;

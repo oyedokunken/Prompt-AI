@@ -554,11 +554,12 @@ Start `/data` first, then `/api`, then `/app`.
 
 ```bash
 cd data && pytest tests                       # unit tests, no network needed
-cd data && python evaluation/run_eval.py      # real model calls against the eval set
+cd data && python evaluation/run_eval.py      # free mock mode, no API key or cost
+cd data && python evaluation/run_eval.py --live --full --yes --judge   # a deliberate real run, about $0.50
 cd api && npm test
 ```
 
-The eval set is a collection of requests with notes on what a good result looks like. It checks decisions, required and forbidden content, formatting, filler phrases and memory behavior, and `--judge` also scores generated prompts with a reviewer model. Run it before and after any change to the prompt templates.
+The eval set is a collection of requests with notes on what a good result looks like. By default it runs offline against a scripted provider, so routine iteration costs nothing, and a real run has to be asked for explicitly. See `data/COST_AUDIT.md` for what a turn costs. It checks decisions, required and forbidden content, formatting, filler phrases and memory behavior, and `--judge` also scores generated prompts with a reviewer model. Run it before and after any change to the prompt templates.
 
 ## Project Roadmap
 

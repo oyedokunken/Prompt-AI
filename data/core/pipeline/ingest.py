@@ -26,7 +26,7 @@ logger = logging.getLogger("data.ingest")
 
 # Per file and overall ceilings on how much extracted text is handed to the
 # model, so one large document cannot crowd out the request itself.
-MAX_CHARS_PER_SOURCE = 12_000
+MAX_CHARS_PER_SOURCE = 8_000
 MAX_PAGES = 60
 MAX_FILES = 3
 
@@ -121,8 +121,9 @@ async def read_image(name: str, data_url: str, provider: ModelProvider, model: s
         model=model,
         system=IMAGE_SYSTEM_PROMPT,
         messages=[ProviderMessage(role="user", text=f"Image file name: {name}", images=[data_url])],
-        max_tokens=1500,
+        max_tokens=1200,
         temperature=0.1,
+        step="vision",
     )
     content = str(raw.get("content") or "").strip()
     if not content:

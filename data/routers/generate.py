@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from core import events
+from core import events, usage
 from core.context import (
     PipelineContext,
     assemble_context,
@@ -75,6 +75,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
     """Run one request through the pipeline, yielding events as it goes."""
     state = ctx.clarify_state
     pending = clarify.pending_question(state) if state else None
+    meter = usage.start_meter()
 
     try:
         # Memory is consulted before anything else, for every kind of message.
@@ -98,8 +99,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             and state is None
             and research.looks_time_sensitive(ctx.message)
         ):
-            planned = await research.plan_queries(ctx.message, provider)
-            decision = dataclasses.replace(decision, search_queries=planned)
+            decision = dataclasses.replace(decision, search_queries=research.query_from_message(ctx.message))
 
         # The model planned a search and also wants to ask. A search can close
         # the gap it would have asked about, so look first, then judge again
@@ -198,6 +198,8 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
     except Exception:
         logger.exception("unexpected pipeline failure")
         yield ErrorEvent(code="internal_error", message=GENERATION_FAILED_MESSAGE)
+    finally:
+        meter.log_summary()
 
 
 @router.post("/generate")

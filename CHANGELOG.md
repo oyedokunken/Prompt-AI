@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-10-01
+
+### Added
+
+- Token and estimated cost logging for every model call, and a total per request
+- Provider side prompt caching, by keeping everything static at the front of each prompt
+- Hard limits on message length, history, attachments and reference text on the path to the model, enforced in `app`, `api` and `data`
+- Per step model settings, so any step can move to a different model by configuration
+- A free offline mock mode for the eval suite, now the default. A live run needs `--live`, a scope and `--yes`, and reports its real spend
+- `data/COST_AUDIT.md` with the audit, the measurements and the decisions
+
+### Changed
+
+- Long conversations are bounded: a short recent window plus a condensed digest of older turns
+- One web search per turn instead of up to two, with the tool's low context setting
+- Output token caps tightened, with construction down from 6,000 to 2,500
+
+### Removed
+
+- The separate model call that only rephrased a message into a search query
+
 ## [0.4.0] - 2026-10-01
 
 ### Added

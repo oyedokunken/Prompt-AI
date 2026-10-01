@@ -8,11 +8,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Any, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-from typing import Any
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 
+from core import usage
 from core.providers.base import (
     ModelProvider,
     ProviderError,
@@ -47,16 +48,20 @@ class OpenAIProvider(ModelProvider):
         transcribe_model: str,
         embed_model: str,
         timeout_seconds: float,
+        step_models: Optional[dict[str, str]] = None,
     ) -> None:
         self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=1)
         self._default_model = default_model
         self._fast_model = fast_model
         self._transcribe_model = transcribe_model
         self._embed_model = embed_model
+        self._step_models = {k: v for k, v in (step_models or {}).items() if v}
 
-    def resolve_model(self, requested: str, *, fast: bool = False) -> str:
+    def resolve_model(self, requested: str, *, fast: bool = False, step: Optional[str] = None) -> str:
         if fast:
             return self._fast_model
+        if step and step in self._step_models:
+            return self._step_models[step]
         # Older sessions can still carry a target model with no provider
         # behind it, those run on the default model.
         return requested if requested in _SUPPORTED_MODELS else self._default_model
@@ -73,6 +78,20 @@ class OpenAIProvider(ModelProvider):
                 out.append({"role": message.role, "content": message.text})
         return out
 
+    @staticmethod
+    def _record_chat_usage(step: str, model: str, completion: Any) -> None:
+        u = getattr(completion, "usage", None)
+        if u is None:
+            return
+        details = getattr(u, "prompt_tokens_details", None)
+        usage.record(
+            step,
+            model,
+            prompt_tokens=getattr(u, "prompt_tokens", 0) or 0,
+            cached_tokens=(getattr(details, "cached_tokens", 0) or 0) if details else 0,
+            completion_tokens=getattr(u, "completion_tokens", 0) or 0,
+        )
+
     async def _complete(
         self,
         *,
@@ -82,6 +101,7 @@ class OpenAIProvider(ModelProvider):
         max_tokens: int,
         temperature: float,
         json_mode: bool,
+        step: str,
     ) -> str:
         kwargs: dict[str, Any] = {
             "model": model,
@@ -104,6 +124,7 @@ class OpenAIProvider(ModelProvider):
             logger.error("OpenAI connection error: %s", exc)
             raise ProviderError("Could not reach the model provider", code="connection_error") from exc
 
+        self._record_chat_usage(step, model, completion)
         choice = completion.choices[0] if completion.choices else None
         text = (choice.message.content or "") if choice else ""
         if choice is not None and choice.finish_reason == "length":
@@ -121,6 +142,7 @@ class OpenAIProvider(ModelProvider):
         messages: list[ProviderMessage],
         max_tokens: int,
         temperature: float,
+        step: str = "",
     ) -> dict[str, Any]:
         raw = await self._complete(
             model=model,
@@ -129,6 +151,7 @@ class OpenAIProvider(ModelProvider):
             max_tokens=max_tokens,
             temperature=temperature,
             json_mode=True,
+            step=step,
         )
         try:
             parsed = json.loads(raw)
@@ -147,6 +170,7 @@ class OpenAIProvider(ModelProvider):
         messages: list[ProviderMessage],
         max_tokens: int,
         temperature: float,
+        step: str = "",
     ) -> str:
         raw = await self._complete(
             model=model,
@@ -155,10 +179,11 @@ class OpenAIProvider(ModelProvider):
             max_tokens=max_tokens,
             temperature=temperature,
             json_mode=False,
+            step=step,
         )
         return raw.strip()
 
-    async def search(self, *, model: str, query: str) -> SearchOutcome:
+    async def search(self, *, model: str, query: str, step: str = "search") -> SearchOutcome:
         """Web search through the provider's own search tool.
 
         The model decides what to read and answers from it, and the
@@ -167,7 +192,8 @@ class OpenAIProvider(ModelProvider):
         try:
             response = await self._client.responses.create(
                 model=model,
-                tools=[{"type": "web_search_preview"}],
+                tools=[{"type": "web_search_preview", "search_context_size": "low"}],
+                max_output_tokens=500,
                 input=(
                     "Search the web and report concise, factual findings for the query below. "
                     "Plain text, no markdown, at most 150 words. State dates where they matter.\n\n"
@@ -180,6 +206,18 @@ class OpenAIProvider(ModelProvider):
         except (APITimeoutError, APIConnectionError) as exc:
             logger.error("OpenAI search connection error: %s", exc)
             raise ProviderError("Could not reach the model provider", code="connection_error") from exc
+
+        u = getattr(response, "usage", None)
+        if u is not None:
+            details = getattr(u, "input_tokens_details", None)
+            usage.record(
+                step,
+                model,
+                prompt_tokens=getattr(u, "input_tokens", 0) or 0,
+                cached_tokens=(getattr(details, "cached_tokens", 0) or 0) if details else 0,
+                completion_tokens=getattr(u, "output_tokens", 0) or 0,
+                extra_cost_usd=usage.SEARCH_CALL_USD,
+            )
 
         sources: list[SearchSource] = []
         seen: set[str] = set()
@@ -204,7 +242,7 @@ class OpenAIProvider(ModelProvider):
             raise ProviderResponseError("The search returned nothing")
         return SearchOutcome(summary=text, sources=sources[:5])
 
-    async def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str], *, step: str = "memory_embed") -> list[list[float]]:
         if not texts:
             return []
         try:
@@ -215,6 +253,9 @@ class OpenAIProvider(ModelProvider):
         except (APITimeoutError, APIConnectionError) as exc:
             logger.error("OpenAI embeddings connection error: %s", exc)
             raise ProviderError("Could not reach the model provider", code="connection_error") from exc
+        u = getattr(result, "usage", None)
+        if u is not None:
+            usage.record(step, self._embed_model, prompt_tokens=getattr(u, "prompt_tokens", 0) or 0)
         return [item.embedding for item in result.data]
 
     async def transcribe(self, *, filename: str, content: bytes, content_type: str) -> str:
@@ -229,4 +270,6 @@ class OpenAIProvider(ModelProvider):
         except (APITimeoutError, APIConnectionError) as exc:
             logger.error("OpenAI transcription connection error: %s", exc)
             raise ProviderError("Could not reach the model provider", code="connection_error") from exc
+        minutes = len(content) / usage.APPROX_AUDIO_BYTES_PER_MINUTE
+        usage.record("transcribe", self._transcribe_model, extra_cost_usd=minutes * usage.TRANSCRIBE_USD_PER_MINUTE)
         return (result.text or "").strip()

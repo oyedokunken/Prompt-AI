@@ -19,4 +19,11 @@ def get_provider() -> ModelProvider:
         transcribe_model=settings.openai_transcribe_model,
         embed_model=settings.openai_embed_model,
         timeout_seconds=settings.openai_timeout_seconds,
+        step_models={
+            "intent": settings.openai_intent_model,
+            "construct": settings.openai_construct_model,
+            "answer": settings.openai_answer_model,
+            "vision": settings.openai_vision_model,
+            "search": settings.openai_search_model,
+        },
     )

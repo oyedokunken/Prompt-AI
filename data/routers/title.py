@@ -43,6 +43,7 @@ async def title(
             messages=[ProviderMessage(role="user", text=source)],
             max_tokens=40,
             temperature=0.3,
+            step="title",
         )
     except (ProviderError, ProviderResponseError) as exc:
         logger.error("title inference failed: %s", exc)

@@ -21,7 +21,9 @@ from schemas.responses import MemoryCandidate, Readiness, StructuredPrompt
 
 # A comprehensive, production ready prompt can legitimately run long. A
 # tighter budget cut detailed requests off mid JSON.
-CONSTRUCT_MAX_TOKENS = 6000
+# A finished prompt is a few hundred words. 2,500 leaves room for a long one
+# and stops a runaway answer from costing six times what it should.
+CONSTRUCT_MAX_TOKENS = 2500
 
 
 @dataclass(frozen=True)
@@ -198,11 +200,12 @@ async def construct(
     # One corrective retry at most, never a loop.
     for attempt in range(2):
         raw = await provider.complete_json(
-            model=provider.resolve_model(ctx.target_model),
+            model=provider.resolve_model(ctx.target_model, step="construct"),
             system=construct_system_prompt(ctx, style),
             messages=messages,
             max_tokens=CONSTRUCT_MAX_TOKENS,
             temperature=0.4,
+            step="construct",
         )
         built = parse_construction(raw)
         if not leaks_user_name(built, ctx.profile.preferred_name):
@@ -241,11 +244,12 @@ async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> Answ
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
     messages.append(ProviderMessage(role="user", text=ctx.message))
     raw = await provider.complete_json(
-        model=provider.resolve_model(ctx.target_model),
+        model=provider.resolve_model(ctx.target_model, step="answer"),
         system=answer_system_prompt(ctx),
         messages=messages,
-        max_tokens=900,
+        max_tokens=600,
         temperature=0.7,
+        step="answer",
     )
     reply = _optional_text(raw.get("reply"))
     if not reply:

@@ -11,12 +11,15 @@ import asyncio
 import logging
 import re
 
-from core.providers.base import ModelProvider, ProviderError, ProviderMessage, ProviderResponseError
+from core.providers.base import ModelProvider, ProviderError, ProviderResponseError
 from schemas.requests import SourceLink, SourceNote
 
 logger = logging.getLogger("data.research")
 
-MAX_QUERIES = 2
+# One search per turn. Each search call carries a flat fee on top of its tokens,
+# so a second query has to earn it, and one well phrased query covers a request.
+MAX_QUERIES = 1
+MAX_QUERY_CHARS = 200
 MAX_SUMMARY_CHARS = 1500
 
 
@@ -79,22 +82,11 @@ def looks_time_sensitive(text: str) -> bool:
     return bool(_FRESHNESS.search(text) and _CHANGING_SUBJECT.search(text))
 
 
-PLANNER_SYSTEM_PROMPT = """You plan web searches. The user is asking for a prompt that depends on current, external information. List the 1 or 2 most useful, specific web search queries that would fetch the facts the prompt needs, such as the current version of a named tool and what changed in it.
+def query_from_message(message: str) -> list[str]:
+    """A search query taken straight from the user's own words.
 
-Respond with a single JSON object and nothing outside it: { "search_queries": ["query one", "query two"] }
-Use an empty array if no search would help."""
-
-
-async def plan_queries(message: str, provider: ModelProvider) -> list[str]:
-    try:
-        raw = await provider.complete_json(
-            model=provider.resolve_model("", fast=True),
-            system=PLANNER_SYSTEM_PROMPT,
-            messages=[ProviderMessage(role="user", text=message)],
-            max_tokens=120,
-            temperature=0.1,
-        )
-    except (ProviderError, ProviderResponseError) as exc:
-        logger.error("search planning failed: %s", exc)
-        return []
-    return clean_queries(raw.get("search_queries"))
+    The search tool rewrites a natural language query itself, so a separate
+    model call just to rephrase the request would only add cost and delay.
+    """
+    query = " ".join(message.split())[:MAX_QUERY_CHARS].strip()
+    return [query] if query else []
