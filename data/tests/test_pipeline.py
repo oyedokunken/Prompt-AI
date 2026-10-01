@@ -877,3 +877,21 @@ def test_a_follow_up_borrows_the_last_topic_so_a_short_reply_still_finds_memory(
     provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
     out = collect(assemble_context(make_request(message="yes do it", memories=STORE, history=history)), provider)
     assert [m.key for m in out[-1].memory_used] == ["Stack"]
+
+
+def test_em_and_en_dashes_are_replaced_in_every_user_facing_field():
+    dash, en = chr(0x2014), chr(0x2013)
+    built = construct.parse_construction(
+        {
+            "message": f"Nice{dash}here you go",
+            "content": f"Role{dash}reviewer. Range 1{en}5.",
+            "explanation": f"Short{dash}sharp",
+        }
+    )
+    for text in (built.message, built.content, built.explanation):
+        assert dash not in text and en not in text
+    assert built.content == "Role, reviewer. Range 1, 5."
+
+    provider = FakeProvider([{"kind": "conversation"}, {"reply": f"Rust{dash}huh.", "memory_candidates": []}])
+    out = collect(assemble_context(make_request(message="hi")), provider)
+    assert out[-1].content == "Rust, huh."

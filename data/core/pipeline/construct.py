@@ -70,6 +70,15 @@ def build_messages(ctx: PipelineContext, state: Optional[ClarifyState]) -> list[
     return messages
 
 
+_DASHES = re.compile(r"\s*[\u2014\u2013]\s*")
+
+
+def plain_dashes(text: str) -> str:
+    """Replace em and en dashes with a comma, house style, enforced in code
+    because a model does not reliably obey a rule against them."""
+    return _DASHES.sub(", ", text)
+
+
 def _string_list(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
@@ -109,6 +118,7 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     content = raw.get("content")
     if not isinstance(content, str) or not content.strip():
         raise ProviderResponseError("The model returned no prompt content")
+    content = plain_dashes(content)
 
     structured_raw = raw.get("structured") if isinstance(raw.get("structured"), dict) else {}
     readiness_raw = raw.get("readiness") if isinstance(raw.get("readiness"), dict) else {}
@@ -124,7 +134,7 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     candidates = parse_memory_candidates(raw.get("memory_candidates"))
 
     return ConstructedPrompt(
-        message=_optional_text(raw.get("message")),
+        message=plain_dashes(_optional_text(raw.get("message")) or "") or None,
         content=content.strip(),
         stated=stated,
         researched=researched,
@@ -140,7 +150,7 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
             missing=_string_list(readiness_raw.get("missing")),
             notes=_optional_text(readiness_raw.get("notes")),
         ),
-        explanation=_optional_text(raw.get("explanation")),
+        explanation=plain_dashes(_optional_text(raw.get("explanation")) or "") or None,
         memory_candidates=candidates,
     )
 
@@ -240,4 +250,4 @@ async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> Answ
     reply = _optional_text(raw.get("reply"))
     if not reply:
         raise ProviderResponseError("The model returned no reply")
-    return AnswerResult(text=reply, memory_candidates=parse_memory_candidates(raw.get("memory_candidates")))
+    return AnswerResult(text=plain_dashes(reply), memory_candidates=parse_memory_candidates(raw.get("memory_candidates")))
