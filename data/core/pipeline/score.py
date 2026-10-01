@@ -37,7 +37,11 @@ def completeness_score(prompt: ConstructedPrompt) -> int:
 
 
 def build_diff(prompt: ConstructedPrompt) -> PromptDiff:
-    return PromptDiff(stated=list(prompt.stated), inferred=list(prompt.assumptions))
+    return PromptDiff(
+        stated=list(prompt.stated),
+        inferred=list(prompt.assumptions),
+        researched=list(prompt.researched),
+    )
 
 
 def score(prompt: ConstructedPrompt) -> ScoredPrompt:

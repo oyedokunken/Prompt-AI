@@ -23,14 +23,16 @@ from pydantic import ValidationError  # noqa: E402
 
 from config import Settings  # noqa: E402
 from core.context import assemble_context, select_relevant_memories  # noqa: E402
-from core.pipeline import clarify, construct, intent, score  # noqa: E402
+from core import events  # noqa: E402
+from core.pipeline import clarify, construct, ingest, intent, research, score  # noqa: E402
 from core.prompts import system_prompts  # noqa: E402
 from core.providers import get_provider  # noqa: E402
-from core.providers.base import ModelProvider, ProviderError, ProviderMessage  # noqa: E402
+from core.providers.base import ModelProvider, ProviderError, ProviderMessage, SearchOutcome, SearchSource  # noqa: E402
+from core.prompts.targets import choose_format  # noqa: E402
 from main import app  # noqa: E402
 from routers.generate import run_pipeline  # noqa: E402
 from routers.title import clean_title  # noqa: E402
-from schemas.requests import ClarifyQuestion, GenerateRequest, Memory  # noqa: E402
+from schemas.requests import ClarifyQuestion, GenerateRequest, Memory, SourceNote  # noqa: E402
 
 AUTH = {"Authorization": "Bearer unit-test-shared-secret"}
 
@@ -59,6 +61,9 @@ class FakeProvider(ModelProvider):
 
     async def complete_text(self, *, model, system, messages, max_tokens, temperature):
         return self._next(kind="text", model=model, system=system, messages=messages)
+
+    async def search(self, *, model, query):
+        return self._next(kind="search", model=model, query=query)
 
     async def transcribe(self, *, filename, content, content_type):
         return self._next(kind="transcribe", filename=filename, size=len(content))
@@ -141,17 +146,18 @@ def test_relevant_memories_keep_about_and_rank_by_overlap():
     assert [m.key for m in selected] == ["Job", "Stack"]
 
 
-def test_attachments_split_into_images_and_unreadable_names():
+def test_attachments_are_held_unread_until_ingestion_and_earlier_sources_are_restored():
     ctx = assemble_context(
-        make_request(
-            attachments=[
-                {"name": "a.png", "type": "image/png", "data_url": "data:image/png;base64,AAA"},
-                {"name": "b.pdf", "type": "application/pdf"},
-            ]
-        )
+        make_request(attachments=[{"name": "a.png", "type": "image/png", "data_url": "data:image/png;base64,AAA"}])
     )
-    assert ctx.image_urls == ["data:image/png;base64,AAA"]
-    assert ctx.unreadable_attachments == ["b.pdf"]
+    assert [a.name for a in ctx.attachments] == ["a.png"]
+    assert ctx.sources == []
+
+    state = clarify.start(
+        "req", "", [ClarifyQuestion(id="q1", text="Q?")], [SourceNote(kind="attachment", label="brief.pdf", content="x")]
+    )
+    restored = assemble_context(make_request(clarify_state=state))
+    assert [s.label for s in restored.sources] == ["brief.pdf"]
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +379,7 @@ def test_pipeline_sufficient_request_emits_distinct_stages_then_result():
     out = collect(assemble_context(make_request()), provider)
     assert [e.stage for e in out[:-1]] == ["intent", "constructing", "scoring", "finalizing"]
     assert len({e.message for e in out[:-1]}) == 4
+    assert out[1].message in events.constructing_pool(0)
     result = out[-1]
     assert result.type == "result"
     assert result.score == 84
@@ -408,7 +415,7 @@ def test_pipeline_full_clarify_sequence_then_result_reflecting_every_answer():
         provider,
     )
     assert third[-1].type == "result"
-    assert "your 2 answers" in third[1].message
+    assert third[1].message in events.constructing_pool(2)
     final_turn: ProviderMessage = provider.calls[0]["messages"][-1]
     assert "write me a prompt for a support bot" in final_turn.text
     assert "Answer: Invoicing" in final_turn.text
@@ -490,3 +497,277 @@ def test_transcribe_endpoint_returns_text(client):
     app.dependency_overrides[get_provider] = lambda: FakeProvider(["hello there"])
     response = client.post("/transcribe", files={"audio": ("a.webm", b"abc", "audio/webm")}, headers=AUTH)
     assert response.json() == {"text": "hello there"}
+
+
+# ---------------------------------------------------------------------------
+# Attachment ingestion
+# ---------------------------------------------------------------------------
+
+def make_pdf(text: str) -> bytes:
+    """A minimal one page PDF with real extractable text."""
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for i, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for off in offsets:
+        out += f"{off:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return out
+
+
+def make_docx(paragraphs: list[str], table: list[list[str]] | None = None) -> bytes:
+    import io
+
+    from docx import Document
+
+    doc = Document()
+    for text in paragraphs:
+        doc.add_paragraph(text)
+    if table:
+        t = doc.add_table(rows=len(table), cols=len(table[0]))
+        for r, row in enumerate(table):
+            for c, cell in enumerate(row):
+                t.cell(r, c).text = cell
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+
+def b64(data: bytes) -> str:
+    import base64
+
+    return base64.b64encode(data).decode()
+
+
+def test_pdf_text_is_actually_extracted():
+    note = ingest.extract_pdf("brief.pdf", make_pdf("Launch date is 12 March for Ledgerly"))
+    assert "Launch date is 12 March" in note.content
+    assert note.summary.startswith("Read 1 page")
+    assert note.kind == "attachment" and note.label == "brief.pdf"
+
+
+def test_docx_paragraphs_and_tables_are_extracted():
+    data = make_docx(["Quarterly goals", "Reduce churn"], [["Metric", "Target"], ["Churn", "3 percent"]])
+    note = ingest.extract_docx("goals.docx", data)
+    assert "Reduce churn" in note.content
+    assert "Churn | 3 percent" in note.content
+
+
+def test_unreadable_files_become_an_honest_note_not_a_silent_skip():
+    attachment = {"name": "broken.pdf", "type": "application/pdf", "content_base64": b64(b"not a pdf")}
+    ctx = assemble_context(make_request(attachments=[attachment, {"name": "clip.mp4", "type": "video/mp4"}]))
+    notes = asyncio.run(ingest.ingest(ctx.attachments, FakeProvider([]), "m"))
+    assert [n.label for n in notes] == ["broken.pdf", "clip.mp4"]
+    assert notes[0].summary.startswith("Could not use this file")
+    assert "cannot be read yet" in notes[1].summary
+    assert all(n.content == "" for n in notes)
+
+
+def test_long_documents_are_truncated_and_say_so():
+    note = ingest.extract_docx("long.docx", make_docx(["word " * 400] * 20))
+    assert len(note.content) <= ingest.MAX_CHARS_PER_SOURCE + 20
+    assert "only the start was used" in note.summary
+
+
+def test_images_are_read_with_the_vision_model():
+    reply = {"kind": "diagram", "summary": "A three tier architecture diagram.", "content": "Browser to API to Database"}
+    provider = FakeProvider([reply])
+    note = asyncio.run(ingest.read_image("arch.png", "data:image/png;base64,AAA", provider, "m"))
+    assert note.content == "Browser to API to Database"
+    assert note.summary == "Read as a diagram. A three tier architecture diagram."
+    assert provider.calls[0]["messages"][0].images == ["data:image/png;base64,AAA"]
+
+
+# ---------------------------------------------------------------------------
+# Web research
+# ---------------------------------------------------------------------------
+
+def test_search_queries_are_cleaned_deduplicated_and_capped():
+    assert research.clean_queries(["a  b", "A B", "", "c", "d"]) == ["a b", "c"]
+    assert research.clean_queries("not a list") == []
+
+
+def test_search_findings_keep_their_sources_and_a_failed_search_is_reported():
+    outcome = SearchOutcome(
+        summary="FastAPI 0.142 is current. More detail.", sources=[SearchSource("PyPI", "https://pypi.org/p/fastapi")]
+    )
+    ok, failed = asyncio.run(research.search(["fastapi latest", "other"], FakeProvider([outcome, ProviderError("x")]), "m"))
+    assert ok.summary == "FastAPI 0.142 is current."
+    assert ok.links[0].url == "https://pypi.org/p/fastapi"
+    assert failed.summary.startswith("The search failed") and failed.content == ""
+
+
+# ---------------------------------------------------------------------------
+# Pipeline with attachments and search
+# ---------------------------------------------------------------------------
+
+def test_attachment_is_read_before_intent_and_reflected_in_construction():
+    pdf = {"name": "brief.pdf", "type": "application/pdf", "content_base64": b64(make_pdf("Launch date is 12 March for Ledgerly"))}
+    built = {**READY_CONSTRUCTION, "researched": ["From brief.pdf: launch date is 12 March"]}
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, built])
+    out = collect(assemble_context(make_request(attachments=[pdf])), provider)
+
+    assert [e.stage for e in out[:-1]] == ["reading", "intent", "constructing", "scoring", "finalizing"]
+    assert "Launch date is 12 March" in provider.calls[0]["system"]
+    assert "Launch date is 12 March" in provider.calls[1]["system"]
+    result = out[-1]
+    assert result.diff.researched == ["From brief.pdf: launch date is 12 March"]
+    assert [(s.kind, s.label) for s in result.sources] == [("attachment", "brief.pdf")]
+    assert "content" not in result.model_dump()["sources"][0]
+
+
+def test_search_runs_only_when_the_intent_stage_planned_it():
+    outcome = SearchOutcome(summary="FastAPI 0.142 is current.", sources=[SearchSource("PyPI", "https://pypi.org/p/fastapi")])
+    planned = FakeProvider(
+        [{"kind": "prompt_request", "sufficient": True, "search_queries": ["fastapi latest version"]}, outcome, READY_CONSTRUCTION]
+    )
+    out = collect(assemble_context(make_request()), planned)
+    assert [e.stage for e in out[:-1]] == ["intent", "searching", "constructing", "scoring", "finalizing"]
+    assert "FastAPI 0.142 is current." in planned.calls[2]["system"]
+    assert out[-1].sources[0].kind == "search" and out[-1].sources[0].links[0].title == "PyPI"
+
+    unplanned = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request()), unplanned)
+    assert "searching" not in [getattr(e, "stage", None) for e in out]
+    assert all(c["kind"] != "search" for c in unplanned.calls)
+
+
+def test_attachment_text_and_early_search_findings_survive_a_clarifying_sequence():
+    pdf = {"name": "brief.pdf", "type": "application/pdf", "content_base64": b64(make_pdf("Launch date is 12 March"))}
+    plan = {**TWO_QUESTIONS, "search_queries": ["ledgerly competitors"]}
+    # Search runs before asking, then the gap survives and the first question is asked.
+    first_provider = FakeProvider([plan, SearchOutcome(summary="Competitors include X."), TWO_QUESTIONS])
+    first = collect(assemble_context(make_request(attachments=[pdf])), first_provider)[-1]
+    assert first.type == "clarifying_question"
+    assert {s.kind for s in first.clarify_state.sources} == {"attachment", "search"}
+    assert first.clarify_state.search_queries == []
+
+    second = collect(
+        assemble_context(make_request(message="Invoicing", clarify_state=first.clarify_state, is_clarify_answer=True)),
+        FakeProvider([]),
+    )[-1]
+    provider = FakeProvider([READY_CONSTRUCTION])
+    third = collect(
+        assemble_context(make_request(message="Friendly", clarify_state=second.clarify_state, is_clarify_answer=True)),
+        provider,
+    )
+    assert "searching" not in [getattr(e, "stage", None) for e in third]
+    assert "Launch date is 12 March" in provider.calls[0]["system"]
+    assert "Competitors include X." in provider.calls[0]["system"]
+    assert {s.kind for s in third[-1].sources} == {"attachment", "search"}
+
+
+# ---------------------------------------------------------------------------
+# Output format and status variety
+# ---------------------------------------------------------------------------
+
+def test_default_output_format_is_plain_and_markdown_only_when_called_for():
+    assert choose_format("gpt-4o", "a prompt for a support bot") == "plain"
+    assert choose_format("gpt-4o", "write a prompt that outputs a README in Markdown") == "markdown"
+    assert choose_format("gpt-4o", "for my Notion workspace") == "markdown"
+    assert choose_format("claude-3-5-sonnet", "a prompt for a support bot") == "xml"
+    assert choose_format("claude-3-5-sonnet", "output as markdown") == "markdown"
+
+
+def test_construction_instructions_forbid_markdown_by_default():
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request()), provider)
+    assert "No pound signs, no asterisks" in provider.calls[1]["system"]
+    assert out[-1].format_style == "plain"
+
+    provider = FakeProvider([{"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request(message="a prompt that writes a README in markdown")), provider)
+    assert "The destination renders markdown" in provider.calls[1]["system"]
+    assert out[-1].format_style == "markdown"
+
+
+def test_every_stage_pool_mixes_single_words_and_fuller_phrases():
+    pools = [
+        events.INTENT_POOL, events.INTENT_PENDING_POOL, events.READING_POOL, events.SEARCHING_POOL,
+        events.CLARIFYING_FIRST_POOL, events.ANSWERING_POOL, events.SCORING_POOL, events.FINALIZING_POOL,
+        events.CONSTRUCTING_BARE_POOL, events.clarifying_pool(2, 3), events.constructing_pool(2),
+    ]
+    for pool in pools:
+        assert any(len(m.split()) == 1 for m in pool), pool
+        assert any(len(m.split()) >= 4 for m in pool), pool
+        assert len(set(pool)) == len(pool)
+
+
+def test_stage_messages_always_come_from_their_pool_and_vary_over_calls():
+    seen = {events.intent_parsing(False).message for _ in range(80)}
+    assert seen <= set(events.INTENT_POOL)
+    assert len(seen) > 2
+    assert events.finalizing().message in events.FINALIZING_POOL
+
+
+def test_researched_items_never_duplicate_stated_ones():
+    built = construct.parse_construction(
+        {
+            **READY_CONSTRUCTION,
+            "stated": ["Friendly tone"],
+            "researched": ["friendly tone", "From a.pdf: 12 March"],
+            "assumptions": ["From a.pdf: 12 March", "English only"],
+        }
+    )
+    assert built.researched == ["From a.pdf: 12 March"]
+    assert built.assumptions == ["English only"]
+
+
+def test_a_planned_search_runs_before_asking_and_can_close_the_gap():
+    both = {**TWO_QUESTIONS, "search_queries": ["latest python version"]}
+    outcome = SearchOutcome(summary="Python 3.14 is current.")
+    provider = FakeProvider([both, outcome, {"kind": "prompt_request", "sufficient": True}, READY_CONSTRUCTION])
+    out = collect(assemble_context(make_request()), provider)
+    assert [e.stage for e in out[:-1]] == ["intent", "searching", "intent", "constructing", "scoring", "finalizing"]
+    assert out[-1].type == "result"
+    assert "Python 3.14 is current." in provider.calls[2]["system"]
+    assert sum(1 for c in provider.calls if c["kind"] == "search") == 1
+
+
+def test_a_gap_that_survives_the_search_is_still_asked_and_the_search_is_not_repeated():
+    both = {**TWO_QUESTIONS, "search_queries": ["latest python version"]}
+    provider = FakeProvider([both, SearchOutcome(summary="Python 3.14 is current."), TWO_QUESTIONS])
+    out = collect(assemble_context(make_request()), provider)
+    assert out[-1].type == "clarifying_question"
+    assert out[-1].clarify_state.search_queries == []
+    assert out[-1].clarify_state.sources[0].kind == "search"
+
+
+def test_time_sensitive_requests_are_detected_and_others_are_not():
+    assert research.looks_time_sensitive("a briefing on the latest stable version of Node.js")
+    assert research.looks_time_sensitive("what are the current prices and features of the top plans")
+    assert not research.looks_time_sensitive("a prompt for a friendly customer support bot")
+    assert not research.looks_time_sensitive("summarize the latest email I pasted")
+
+
+def test_a_time_sensitive_request_gets_a_search_even_if_intent_forgot_to_plan_one():
+    provider = FakeProvider(
+        [
+            {"kind": "prompt_request", "sufficient": True},
+            {"search_queries": ["latest stable node.js version"]},
+            SearchOutcome(summary="Node 26 is current."),
+            READY_CONSTRUCTION,
+        ]
+    )
+    out = collect(assemble_context(make_request(message="a briefing on the latest stable version of Node.js")), provider)
+    assert [e.stage for e in out[:-1]] == ["intent", "searching", "constructing", "scoring", "finalizing"]
+    assert "Node 26 is current." in provider.calls[3]["system"]
+
+
+def test_provider_tracking_parameter_is_stripped_but_other_query_parameters_stay():
+    from core.providers.openai_provider import _strip_tracking
+
+    assert _strip_tracking("https://x.dev/a?utm_source=openai") == "https://x.dev/a"
+    assert _strip_tracking("https://x.dev/a?lang=en&utm_source=openai") == "https://x.dev/a?lang=en"
+    assert _strip_tracking("https://x.dev/a") == "https://x.dev/a"

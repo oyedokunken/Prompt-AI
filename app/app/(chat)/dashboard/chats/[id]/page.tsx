@@ -160,7 +160,7 @@ export default function ChatPage() {
         role: "user",
         content,
         metadata: attachments.length
-          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
+          ? { attachments: attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl || a.type === "application/pdf" })) }
           : {},
         created_at: new Date().toISOString(),
       },
@@ -419,10 +419,10 @@ export default function ChatPage() {
         {pendingAttachments.length > 0 && (
           <div className="mx-4 sm:mx-6 mb-2 flex flex-wrap gap-2">
             {pendingAttachments.map((a) => (
-              <div key={a.path} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted">
+              <div key={a.path || a.name} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-raised w-fit text-[11px] text-text-muted">
                 <span className="truncate max-w-[160px]">{a.name}</span>
                 <button
-                  onClick={() => setPendingAttachments((prev) => prev.filter((p) => p.path !== a.path))}
+                  onClick={() => setPendingAttachments((prev) => prev.filter((p) => p !== a))}
                   className="text-text-faint hover:text-red-400 transition-colors"
                   aria-label="Remove attachment"
                 >

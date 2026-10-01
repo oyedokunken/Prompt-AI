@@ -35,8 +35,11 @@ class HistoryMessage(BaseModel):
 class Attachment(BaseModel):
     name: str
     type: str = ""
-    # Present only for images, which are sent to the model as real context.
+    # Images arrive as a data URL, and are read by the vision model.
     data_url: Optional[str] = None
+    # PDF and Word documents arrive as base64 file bytes, and are read by
+    # text extraction. /api fetches them, /data never touches storage.
+    content_base64: Optional[str] = None
 
 
 class ClarifyQuestion(BaseModel):
@@ -52,6 +55,29 @@ class ClarifyAnswer(BaseModel):
     answer: str
 
 
+class SourceLink(BaseModel):
+    title: str = ""
+    url: str
+
+
+class SourceNote(BaseModel):
+    """Something /data read or looked up to build the prompt.
+
+    Attachments and web searches share this shape so they flow through the
+    same context assembly, and are shown to the user the same way.
+    """
+
+    kind: Literal["attachment", "search"]
+    # The file name, or the search query.
+    label: str
+    # What was found, in a sentence or two, shown to the user.
+    summary: str = ""
+    # The extracted text or findings handed to the model. Never sent back
+    # to the browser, only carried in the clarify state between turns.
+    content: str = ""
+    links: list[SourceLink] = Field(default_factory=list)
+
+
 class ClarifyState(BaseModel):
     """The whole clarifying sequence for one request.
 
@@ -63,6 +89,10 @@ class ClarifyState(BaseModel):
     intro: str = ""
     questions: list[ClarifyQuestion] = Field(default_factory=list)
     answers: list[ClarifyAnswer] = Field(default_factory=list)
+    # Attachment text read on the first turn and the searches planned then,
+    # kept here so the rest of the sequence builds on the same material.
+    sources: list[SourceNote] = Field(default_factory=list)
+    search_queries: list[str] = Field(default_factory=list)
 
 
 class GenerateRequest(BaseModel):

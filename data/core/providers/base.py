@@ -22,6 +22,20 @@ class ProviderMessage:
     images: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class SearchSource:
+    title: str
+    url: str
+
+
+@dataclass(frozen=True)
+class SearchOutcome:
+    """What a web search found: the findings as text, and where they came from."""
+
+    summary: str
+    sources: list[SearchSource] = field(default_factory=list)
+
+
 class ProviderError(Exception):
     """The provider call itself failed: auth, rate limit, network, timeout."""
 
@@ -65,6 +79,10 @@ class ModelProvider(ABC):
         temperature: float,
     ) -> str:
         """Run a completion that returns plain text."""
+
+    @abstractmethod
+    async def search(self, *, model: str, query: str) -> SearchOutcome:
+        """Search the web for current information and report what was found."""
 
     @abstractmethod
     async def transcribe(self, *, filename: str, content: bytes, content_type: str) -> str:

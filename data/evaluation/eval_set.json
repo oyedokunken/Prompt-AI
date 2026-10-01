@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear.",
+  "version": 2,
+  "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear. For ready results the prompt must be lightweight plain text unless expect.format is markdown. expect.search true means a web search must have run, false means it must not have.",
   "cases": [
     {
       "id": "vague-support-bot",
@@ -150,7 +150,8 @@
             "table"
           ]
         ],
-        "must_not_include": []
+        "must_not_include": [],
+        "format": "markdown"
       },
       "good_prompt_notes": "Role is a database reviewer. All three checks, the three severity levels and the four column markdown table must appear exactly as stated."
     },
@@ -380,7 +381,8 @@
         ],
         "must_not_include": [
           "Tunde"
-        ]
+        ],
+        "format": "markdown"
       },
       "good_prompt_notes": "Release notes prompt with the three groups, markdown output and a customer facing tone. The user's name must never appear inside the generated prompt, it is addressed to another AI."
     },
@@ -625,6 +627,73 @@
         "must_not_include": []
       },
       "good_prompt_notes": "The request is messy but complete. A good prompt extracts the real spec: CSV input with the four named columns, top five themes with counts, example quotes and a CSAT comparison per theme, as a one page summary."
+    },
+    {
+      "id": "explicit-markdown",
+      "input": "Write a prompt that makes an AI produce a README.md in markdown for a small Python CLI called tidy that renames photo files by date. It needs install, usage and license sections.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "format": "markdown",
+        "must_include": [
+          [
+            "readme"
+          ],
+          [
+            "install"
+          ],
+          [
+            "usage"
+          ],
+          [
+            "license"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The destination is markdown, so headers and lists in the generated prompt are acceptable. It should specify the three sections and the tool's purpose."
+    },
+    {
+      "id": "search-current-info",
+      "input": "Write a prompt that makes an AI produce a short briefing for new engineers on the current latest stable version of Python and the three most notable changes in that release. Plain text, under 200 words, one paragraph per change.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "search": true,
+        "must_include": [
+          [
+            "python"
+          ],
+          [
+            "three",
+            "3"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "The current version and its changes cannot come from the model's memory, so a web search is warranted. The prompt should carry the researched version and changes, attributed as findings, and keep the stated format limits."
+    },
+    {
+      "id": "no-search-needed",
+      "input": "Write a prompt for a friendly assistant that proofreads short emails for tone and typos, returns the corrected email, and lists what it changed.",
+      "profile": {},
+      "memories": [],
+      "expect": {
+        "decision": "ready",
+        "search": false,
+        "must_include": [
+          [
+            "email"
+          ],
+          [
+            "tone"
+          ]
+        ],
+        "must_not_include": []
+      },
+      "good_prompt_notes": "Fully self contained. Searching here would be wasted effort, no sources should be shown."
     }
   ]
 }

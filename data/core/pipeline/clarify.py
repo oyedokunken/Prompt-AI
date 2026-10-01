@@ -9,16 +9,25 @@ from __future__ import annotations
 
 from typing import Optional
 
-from schemas.requests import ClarifyAnswer, ClarifyQuestion, ClarifyState
+from schemas.requests import ClarifyAnswer, ClarifyQuestion, ClarifyState, SourceNote
 
 MAX_QUESTIONS = 3
+# Attachment text kept in the state is shortened, the full text is only needed on
+# the turn it was read. This bounds what is stored and re-sent between answers.
+MAX_STATE_CHARS_PER_SOURCE = 6_000
 
 
 class ClarifyError(Exception):
     pass
 
 
-def start(original_message: str, intro: str, questions: list[ClarifyQuestion]) -> ClarifyState:
+def start(
+    original_message: str,
+    intro: str,
+    questions: list[ClarifyQuestion],
+    sources: list[SourceNote] | None = None,
+    search_queries: list[str] | None = None,
+) -> ClarifyState:
     if not questions:
         raise ClarifyError("A clarifying sequence needs at least one question")
     return ClarifyState(
@@ -26,6 +35,10 @@ def start(original_message: str, intro: str, questions: list[ClarifyQuestion]) -
         intro=intro,
         questions=questions[:MAX_QUESTIONS],
         answers=[],
+        sources=[
+            s.model_copy(update={"content": s.content[:MAX_STATE_CHARS_PER_SOURCE]}) for s in (sources or [])
+        ],
+        search_queries=list(search_queries or []),
     )
 
 

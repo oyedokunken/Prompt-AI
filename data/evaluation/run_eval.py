@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +64,11 @@ def check_case(case: dict[str, Any], events: list[Any]) -> tuple[bool, list[str]
             failures.append("structured role or format is missing")
         if not 30 <= final.score <= 97:
             failures.append(f"score {final.score} is out of range")
+        if expect.get("format", "plain") == "plain" and re.search(r"^\s*#{1,6}\s|\*\*|^\s*```|^\s*\|.*\|\s*$", final.content, re.M):
+            failures.append("prompt uses heavy markdown where plain text was expected")
+        searched = "searching" in detail["stages"]
+        if "search" in expect and searched != expect["search"]:
+            failures.append(f"search ran: {searched}, expected {expect['search']}")
     elif final.type == "answer":
         text = final.content
         if text.lstrip().startswith("{"):

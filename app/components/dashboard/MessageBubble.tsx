@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw, Pencil } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain, X, CircleHelp, CircleCheck, AlertTriangle, RefreshCw, Pencil, FileText, Globe } from "lucide-react";
 import type { ChatMessage, MemoryCandidate } from "@/lib/types/chat";
 import { formatMessageTimestamp } from "@/lib/utils";
+import { Markdown } from "@/components/dashboard/Markdown";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -53,35 +54,10 @@ function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   );
 }
 
-function formatContent(raw: string) {
-  // Very lightweight markdown-ish rendering for the structured prompt output
-  return raw.split("\n").map((line, i) => {
-    const isSeparator = line.trim() === "---";
-    if (isSeparator) return <hr key={i} className="border-border my-2" />;
-
-    // Bold: **text**
-    const parts = line.split(/(\*\*[^*]+\*\*)/g);
-    const rendered = parts.map((p, j) =>
-      p.startsWith("**") && p.endsWith("**") ? (
-        <strong key={j} className="text-text-primary font-semibold">
-          {p.slice(2, -2)}
-        </strong>
-      ) : (
-        p
-      )
-    );
-
-    return (
-      <p key={i} className={`${line.startsWith("-") || /^\d+\./.test(line.trim()) ? "ml-1" : ""} leading-relaxed`}>
-        {rendered}
-      </p>
-    );
-  });
-}
-
 export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const [saved, setSaved] = useState(false);
   const [memoryHandled, setMemoryHandled] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -92,7 +68,9 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
   const isError = meta.mode === "error";
   const statedItems = meta.diff?.stated ?? [];
   const inferredItems = meta.diff?.inferred ?? meta.assumptions ?? [];
-  const hasBreakdown = statedItems.length > 0 || inferredItems.length > 0;
+  const researchedItems = meta.diff?.researched ?? [];
+  const sources = meta.sources ?? [];
+  const hasBreakdown = statedItems.length > 0 || inferredItems.length > 0 || researchedItems.length > 0;
   const now = useNow();
 
   const handleCopy = async (text: string = message.content) => {
@@ -225,8 +203,8 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
       <div className="max-w-[85%] sm:max-w-[72%] min-w-0">
         {/* Bubble */}
         <div className="rounded-2xl rounded-tl-md bg-base border border-border px-4 py-3">
-          <div className="text-sm text-text-primary space-y-1">
-            {formatContent(message.content)}
+          <div className="text-sm text-text-primary">
+            <Markdown>{message.content}</Markdown>
           </div>
         </div>
 
@@ -273,7 +251,18 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
               className="flex items-center gap-1 text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMeta ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-              {statedItems.length} stated, {inferredItems.length} inferred
+              {statedItems.length} stated, {researchedItems.length > 0 ? `${researchedItems.length} found, ` : ""}{inferredItems.length} inferred
+            </button>
+          )}
+
+          {/* What was read from attached files or searched for */}
+          {sources.length > 0 && (
+            <button
+              onClick={() => setShowSources((v) => !v)}
+              className="flex items-center gap-1 text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+            >
+              {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              {sources.length} source{sources.length > 1 ? "s" : ""}
             </button>
           )}
         </div>
@@ -291,6 +280,16 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
                 ))}
               </div>
             )}
+            {researchedItems.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
+                {researchedItems.map((a, i) => (
+                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
+                    <span className="text-signal shrink-0">&middot;</span> {a}
+                  </p>
+                ))}
+              </div>
+            )}
             {inferredItems.length > 0 && (
               <div className="space-y-1">
                 <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
@@ -301,6 +300,30 @@ export function MessageBubble({ message, onSave, onSaveMemories, onRetry, onEdit
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Where the researched parts of this prompt came from */}
+        {showSources && sources.length > 0 && (
+          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2.5">
+            {sources.map((src, i) => (
+              <div key={i} className="space-y-0.5">
+                <p className="text-[10px] text-text-primary font-medium flex items-center gap-1.5">
+                  {src.kind === "attachment" ? <FileText size={10} className="text-text-faint shrink-0" /> : <Globe size={10} className="text-text-faint shrink-0" />}
+                  <span className="truncate">{src.kind === "attachment" ? `Read ${src.label}` : `Searched: ${src.label}`}</span>
+                </p>
+                {src.summary && <p className="text-[10px] text-text-muted leading-relaxed pl-4">{src.summary}</p>}
+                {src.links && src.links.length > 0 && (
+                  <div className="pl-4 flex flex-wrap gap-x-3 gap-y-0.5">
+                    {src.links.map((l) => (
+                      <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent underline underline-offset-2 truncate max-w-[220px]">
+                        {l.title || l.url}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

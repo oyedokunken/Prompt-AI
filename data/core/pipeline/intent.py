@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
 from core.context import PipelineContext
-from core.pipeline import clarify
+from core.pipeline import clarify, research
 from core.prompts.system_prompts import intent_system_prompt
 from core.providers.base import ModelProvider, ProviderMessage
 from schemas.requests import ClarifyQuestion
@@ -27,6 +27,8 @@ class IntentDecision:
     sufficient: bool = True
     intro: str = ""
     questions: list[ClarifyQuestion] = field(default_factory=list)
+    # Web searches the model decided are worth running, usually none.
+    search_queries: list[str] = field(default_factory=list)
     reason: str = ""
 
     @property
@@ -83,23 +85,22 @@ def parse_intent(raw: dict[str, Any], *, has_pending_question: bool) -> IntentDe
     # treated as a prompt request.
     questions = _parse_questions(raw.get("questions"))
     sufficient = raw.get("sufficient") is not False or not questions
+    queries = research.clean_queries(raw.get("search_queries"))
     if sufficient:
-        return IntentDecision(kind="prompt_request", sufficient=True, reason=reason)
+        return IntentDecision(kind="prompt_request", sufficient=True, search_queries=queries, reason=reason)
     return IntentDecision(
         kind="prompt_request",
         sufficient=False,
         intro=str(raw.get("intro") or "").strip(),
         questions=questions,
+        search_queries=queries,
         reason=reason,
     )
 
 
 def build_messages(ctx: PipelineContext) -> list[ProviderMessage]:
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
-    text = ctx.message
-    if ctx.unreadable_attachments:
-        text += f"\n\n[Attached files that cannot be read: {', '.join(ctx.unreadable_attachments)}]"
-    messages.append(ProviderMessage(role="user", text=text, images=list(ctx.image_urls)))
+    messages.append(ProviderMessage(role="user", text=ctx.message))
     return messages
 
 

@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-ACTIVE_VERSION = "v1"
+ACTIVE_VERSION = "v2"
 TEMPLATE_NAMES = ("intent", "construct", "answer", "title")
 
 

@@ -202,7 +202,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             type="file"
             multiple
             className="hidden"
-            accept="image/*,video/*,.pdf"
+            accept="image/*,video/*,.pdf,.docx"
             onChange={handleFiles}
             disabled={busy}
           />

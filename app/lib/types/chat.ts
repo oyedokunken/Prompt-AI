@@ -66,6 +66,17 @@ export interface ClarifyQuestion {
 export interface PromptDiff {
   stated: string[];
   inferred: string[];
+  // Facts taken from attached files or web searches.
+  researched?: string[];
+}
+
+// Something read from an attached file or found by a web search while the
+// prompt was built, shown so the user can see where that part came from.
+export interface PromptSource {
+  kind: "attachment" | "search";
+  label: string;
+  summary?: string;
+  links?: { title: string; url: string }[];
 }
 
 // "answer": a direct conversational reply, for example to a question about
@@ -83,6 +94,8 @@ export interface PromptMetadata {
   clarifyState?: unknown;
   // ready mode: what the user stated against what was inferred for them.
   diff?: PromptDiff;
+  sources?: PromptSource[];
+  formatStyle?: "plain" | "markdown" | "xml";
   score?: number;
   assumptions?: string[];
   structured?: {
@@ -154,7 +167,13 @@ export const ATTACHMENT_BUCKETS: Record<string, { bucket: string; maxBytes: numb
   pdf: { bucket: "PDF-attachments", maxBytes: 10 * 1024 * 1024 },
 };
 
-export function attachmentKind(mimeType: string): keyof typeof ATTACHMENT_BUCKETS | null {
+// Word documents are small, so they are not stored. They are read in the
+// browser and sent straight to the server with the message.
+export const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+export const MAX_DOCX_BYTES = 3 * 1024 * 1024;
+
+export function attachmentKind(mimeType: string): keyof typeof ATTACHMENT_BUCKETS | "docx" | null {
+  if (mimeType === DOCX_TYPE) return "docx";
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
   if (mimeType === "application/pdf") return "pdf";

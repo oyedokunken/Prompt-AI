@@ -46,7 +46,8 @@ export default function MediaPage() {
       const attachments = (data ?? []).flatMap(
         (row) => (row.metadata?.attachments ?? []) as { name: string; type: string; path: string }[]
       );
-      const resolved = attachments.map((att) => {
+      // Word documents are read but never stored, they have no file to show here.
+      const resolved = attachments.filter((att) => att.path).map((att) => {
         const bucket = att.path.split("/")[0];
         const objectPath = att.path.slice(bucket.length + 1);
         const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(objectPath);

@@ -11,6 +11,7 @@ import {
   transcribeAudio,
   type GenerateRequestBody,
 } from "../lib/dataClient";
+import { isReadable, toDataAttachments } from "../services/attachments";
 import {
   TERMINAL_EVENTS,
   errorRecord,
@@ -107,7 +108,7 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
       role: "user",
       content,
       metadata: body.attachments?.length
-        ? { attachments: body.attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: !!a.dataUrl })) }
+        ? { attachments: body.attachments.map((a) => ({ name: a.name, type: a.type, path: a.path, usedAsContext: isReadable(a) })) }
         : {},
     })
     .select()
@@ -131,7 +132,7 @@ chatRouter.post("/stream", chatLimiter, requireUser, async (req: Request, res: R
     },
     memories: memoryResult.data ?? [],
     history,
-    attachments: (body.attachments ?? []).map((a) => ({ name: a.name, type: a.type, data_url: a.dataUrl })),
+    attachments: await toDataAttachments(body.attachments ?? [], user.id),
     clarify_state: clarifyState,
     is_clarify_answer: body.is_clarify_answer && clarifyState !== null,
   };

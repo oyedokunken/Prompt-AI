@@ -7,18 +7,24 @@ downstream reads a raw request.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from schemas.requests import (
+    Attachment,
     ClarifyState,
     GenerateRequest,
     HistoryMessage,
     Memory,
+    SourceNote,
     TitleRequest,
     UserProfile,
 )
+
+if TYPE_CHECKING:
+    from core.providers.base import ModelProvider
 
 # Bounds how much prior conversation is replayed into each call, the
 # smallest amount that still gives the model real continuity.
@@ -50,8 +56,11 @@ class PipelineContext:
     # The subset relevant to this request, used when constructing a prompt.
     relevant_memories: list[Memory]
     history: list[HistoryMessage]
-    image_urls: list[str] = field(default_factory=list)
-    unreadable_attachments: list[str] = field(default_factory=list)
+    # Files attached to this message, not yet read.
+    attachments: list[Attachment] = field(default_factory=list)
+    # Everything read or looked up for this request: attachment text and
+    # web findings. This is what construction builds on.
+    sources: list[SourceNote] = field(default_factory=list)
     clarify_state: Optional[ClarifyState] = None
     is_clarify_answer: bool = False
 
@@ -124,8 +133,9 @@ def assemble_context(request: GenerateRequest) -> PipelineContext:
         all_memories=memories,
         relevant_memories=select_relevant_memories(memories, message),
         history=history,
-        image_urls=[a.data_url for a in request.attachments if a.data_url],
-        unreadable_attachments=[a.name for a in request.attachments if not a.data_url],
+        attachments=list(request.attachments),
+        # Material gathered earlier in an open clarifying sequence.
+        sources=list(state.sources) if state else [],
         clarify_state=state,
         is_clarify_answer=request.is_clarify_answer and state is not None,
     )
@@ -135,3 +145,35 @@ def assemble_title_source(request: TitleRequest) -> str:
     """The opening of a conversation, trimmed to what a title needs."""
     parts = [m.strip() for m in request.messages if m.strip()]
     return "\n\n".join(parts)[:MAX_TITLE_SOURCE_CHARS]
+
+
+# ---------------------------------------------------------------------------
+# External context
+#
+# Attachments and web findings join the context here, before anything is
+# constructed, so every later stage reads them from the same place.
+# ---------------------------------------------------------------------------
+
+def _merge_sources(existing: list[SourceNote], new: list[SourceNote]) -> list[SourceNote]:
+    keys = {(n.kind, n.label) for n in new}
+    return [s for s in existing if (s.kind, s.label) not in keys] + new
+
+
+async def read_attachments(ctx: PipelineContext, provider: "ModelProvider") -> PipelineContext:
+    """Read this message's attachments and add what was found to the context."""
+    if not ctx.attachments:
+        return ctx
+    from core.pipeline import ingest
+
+    notes = await ingest.ingest(ctx.attachments, provider, provider.resolve_model(ctx.target_model))
+    return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes), attachments=[])
+
+
+async def run_research(ctx: PipelineContext, queries: list[str], provider: "ModelProvider") -> PipelineContext:
+    """Run the planned web searches and add the findings to the context."""
+    if not queries:
+        return ctx
+    from core.pipeline import research
+
+    notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model))
+    return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes))

@@ -12,7 +12,7 @@ export const chatStreamSchema = z
         z.object({
           name: z.string().max(300),
           type: z.string().max(200).default(""),
-          path: z.string().max(1000),
+          path: z.string().max(1000).default(""),
           dataUrl: z.string().nullable().default(null),
         })
       )

@@ -1,6 +1,6 @@
 {
-  "saved_at": "2026-10-01T19:34:11+00:00",
-  "template_version": "v1",
+  "saved_at": "2026-10-01T20:50:06+00:00",
+  "template_version": "v2",
   "cases": {
     "vague-support-bot": true,
     "vague-blog": true,
@@ -28,6 +28,9 @@
     "greeting": true,
     "thanks": true,
     "short-but-complete": true,
-    "long-rambling": true
+    "long-rambling": true,
+    "explicit-markdown": true,
+    "search-current-info": true,
+    "no-search-needed": true
   }
 }

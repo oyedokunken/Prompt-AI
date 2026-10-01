@@ -38,7 +38,7 @@ export interface GenerateRequestBody {
   };
   memories: { category: string; key: string; value: string }[];
   history: { role: "user" | "assistant"; content: string }[];
-  attachments: { name: string; type: string; data_url: string | null }[];
+  attachments: { name: string; type: string; data_url: string | null; content_base64: string | null }[];
   clarify_state: unknown | null;
   is_clarify_answer: boolean;
 }

@@ -6,9 +6,11 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from schemas.requests import ClarifyQuestion, ClarifyState
+from schemas.requests import ClarifyQuestion, ClarifyState, SourceLink
 
-Stage = Literal["intent", "clarifying", "answering", "constructing", "scoring", "finalizing"]
+Stage = Literal[
+    "intent", "reading", "searching", "clarifying", "answering", "constructing", "scoring", "finalizing"
+]
 
 
 class StageEvent(BaseModel):
@@ -61,6 +63,18 @@ class PromptDiff(BaseModel):
 
     stated: list[str] = Field(default_factory=list)
     inferred: list[str] = Field(default_factory=list)
+    # Facts taken from attached files or web searches, not said by the
+    # user and not guessed by the model.
+    researched: list[str] = Field(default_factory=list)
+
+
+class SourceSummary(BaseModel):
+    """The user facing part of a SourceNote. The raw content stays server side."""
+
+    kind: Literal["attachment", "search"]
+    label: str
+    summary: str = ""
+    links: list[SourceLink] = Field(default_factory=list)
 
 
 class MemoryCandidate(BaseModel):
@@ -79,6 +93,8 @@ class ResultEvent(BaseModel):
     readiness: Readiness
     explanation: Optional[str] = None
     memory_candidates: list[MemoryCandidate] = Field(default_factory=list)
+    sources: list[SourceSummary] = Field(default_factory=list)
+    format_style: str = "plain"
     template_version: str
 
 

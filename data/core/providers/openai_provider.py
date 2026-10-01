@@ -7,13 +7,29 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from typing import Any
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 
-from core.providers.base import ModelProvider, ProviderError, ProviderMessage, ProviderResponseError
+from core.providers.base import (
+    ModelProvider,
+    ProviderError,
+    ProviderMessage,
+    ProviderResponseError,
+    SearchOutcome,
+    SearchSource,
+)
 
 logger = logging.getLogger("data.provider.openai")
+
+def _strip_tracking(url: str) -> str:
+    """Drop the provider's utm_source tag, keeping any other query parameters."""
+    parts = urlsplit(url)
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != "utm_source"])
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+
 
 # Target models the interface offers that this provider can actually run.
 _SUPPORTED_MODELS = {"gpt-4o", "gpt-4o-mini"}
@@ -139,6 +155,52 @@ class OpenAIProvider(ModelProvider):
             json_mode=False,
         )
         return raw.strip()
+
+    async def search(self, *, model: str, query: str) -> SearchOutcome:
+        """Web search through the provider's own search tool.
+
+        The model decides what to read and answers from it, and the
+        citations it attaches are returned as the sources.
+        """
+        try:
+            response = await self._client.responses.create(
+                model=model,
+                tools=[{"type": "web_search_preview"}],
+                input=(
+                    "Search the web and report concise, factual findings for the query below. "
+                    "Plain text, no markdown, at most 150 words. State dates where they matter.\n\n"
+                    f"Query: {query}"
+                ),
+            )
+        except APIStatusError as exc:
+            logger.error("OpenAI search error status=%s code=%s message=%s", exc.status_code, exc.code, exc.message)
+            raise ProviderError(exc.message, status=exc.status_code, code=exc.code) from exc
+        except (APITimeoutError, APIConnectionError) as exc:
+            logger.error("OpenAI search connection error: %s", exc)
+            raise ProviderError("Could not reach the model provider", code="connection_error") from exc
+
+        sources: list[SearchSource] = []
+        seen: set[str] = set()
+        for item in response.output:
+            if getattr(item, "type", None) != "message":
+                continue
+            for part in getattr(item, "content", []) or []:
+                for annotation in getattr(part, "annotations", []) or []:
+                    url = getattr(annotation, "url", None)
+                    if getattr(annotation, "type", "") != "url_citation" or not url:
+                        continue
+                    clean = _strip_tracking(url)
+                    if clean in seen:
+                        continue
+                    seen.add(clean)
+                    sources.append(SearchSource(title=(getattr(annotation, "title", "") or "").strip(), url=clean))
+
+        # Citations are returned separately, drop the inline markdown links.
+        text = re.sub(r"\s*\(\[[^\]]*\]\([^)]*\)\)", "", response.output_text or "")
+        text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text).strip()
+        if not text:
+            raise ProviderResponseError("The search returned nothing")
+        return SearchOutcome(summary=text, sources=sources[:5])
 
     async def transcribe(self, *, filename: str, content: bytes, content_type: str) -> str:
         try:

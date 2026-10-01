@@ -14,6 +14,7 @@ from typing import Any, Optional
 from core.context import PipelineContext
 from core.pipeline import clarify
 from core.prompts.system_prompts import answer_system_prompt, construct_system_prompt
+from core.prompts.targets import FormatStyle, choose_format
 from core.providers.base import ModelProvider, ProviderMessage, ProviderResponseError
 from schemas.requests import ClarifyState
 from schemas.responses import MemoryCandidate, Readiness, StructuredPrompt
@@ -27,6 +28,7 @@ CONSTRUCT_MAX_TOKENS = 6000
 class ConstructedPrompt:
     content: str
     stated: list[str] = field(default_factory=list)
+    researched: list[str] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
     structured: StructuredPrompt = field(default_factory=StructuredPrompt)
     readiness: Readiness = field(default_factory=Readiness)
@@ -51,19 +53,12 @@ def build_user_turn(ctx: PipelineContext, state: Optional[ClarifyState]) -> str:
         lines.append("Build the final prompt now, using the original request and every answer above.")
         text = "\n".join(lines)
 
-    if ctx.unreadable_attachments:
-        text += (
-            f"\n\n[Attached: {', '.join(ctx.unreadable_attachments)}. These file types cannot be read "
-            "as context yet, only their names are known.]"
-        )
     return text
 
 
 def build_messages(ctx: PipelineContext, state: Optional[ClarifyState]) -> list[ProviderMessage]:
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
-    messages.append(
-        ProviderMessage(role="user", text=build_user_turn(ctx, state), images=list(ctx.image_urls))
-    )
+    messages.append(ProviderMessage(role="user", text=build_user_turn(ctx, state)))
     return messages
 
 
@@ -88,10 +83,12 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     readiness_raw = raw.get("readiness") if isinstance(raw.get("readiness"), dict) else {}
 
     stated = _string_list(raw.get("stated"))
-    # Nothing may be both stated and inferred. If the model lists an item
-    # in both, the user did say it, so it stays stated.
+    # Nothing may sit in two lists. Stated wins over researched, which wins
+    # over inferred: if the user said it, or a source held it, it was not a guess.
     stated_keys = {s.lower() for s in stated}
-    assumptions = [a for a in _string_list(raw.get("assumptions")) if a.lower() not in stated_keys]
+    researched = [r for r in _string_list(raw.get("researched")) if r.lower() not in stated_keys]
+    known = stated_keys | {r.lower() for r in researched}
+    assumptions = [a for a in _string_list(raw.get("assumptions")) if a.lower() not in known]
 
     candidates: list[MemoryCandidate] = []
     if isinstance(raw.get("memory_candidates"), list):
@@ -114,6 +111,7 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
     return ConstructedPrompt(
         content=content.strip(),
         stated=stated,
+        researched=researched,
         assumptions=assumptions,
         structured=StructuredPrompt(
             role=_optional_text(structured_raw.get("role")),
@@ -129,6 +127,16 @@ def parse_construction(raw: dict[str, Any]) -> ConstructedPrompt:
         explanation=_optional_text(raw.get("explanation")),
         memory_candidates=candidates,
     )
+
+
+def format_style_for(ctx: PipelineContext, state: Optional[ClarifyState]) -> FormatStyle:
+    """Plain by default, markdown or tagged sections only when the destination calls for it."""
+    parts = [state.original_message if state else ctx.message]
+    if state:
+        parts.extend(answer for _, answer in clarify.question_answer_pairs(state))
+    else:
+        parts.append(ctx.message)
+    return choose_format(ctx.target_model, "\n".join(parts))
 
 
 def leaks_user_name(prompt: ConstructedPrompt, name: Optional[str]) -> bool:
@@ -158,13 +166,14 @@ async def construct(
     ctx: PipelineContext, state: Optional[ClarifyState], provider: ModelProvider
 ) -> ConstructedPrompt:
     messages = build_messages(ctx, state)
+    style = format_style_for(ctx, state)
     built: Optional[ConstructedPrompt] = None
 
     # One corrective retry at most, never a loop.
     for attempt in range(2):
         raw = await provider.complete_json(
             model=provider.resolve_model(ctx.target_model),
-            system=construct_system_prompt(ctx),
+            system=construct_system_prompt(ctx, style),
             messages=messages,
             max_tokens=CONSTRUCT_MAX_TOKENS,
             temperature=0.4,
@@ -182,6 +191,7 @@ async def construct(
     return ConstructedPrompt(
         content=scrub.sub("the user", built.content),
         stated=built.stated,
+        researched=built.researched,
         assumptions=built.assumptions,
         structured=StructuredPrompt(
             role=built.structured.role,
@@ -198,7 +208,7 @@ async def construct(
 async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> str:
     """Answer a direct question, such as what is stored about the user."""
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
-    messages.append(ProviderMessage(role="user", text=ctx.message, images=list(ctx.image_urls)))
+    messages.append(ProviderMessage(role="user", text=ctx.message))
     return await provider.complete_text(
         model=provider.resolve_model(ctx.target_model),
         system=answer_system_prompt(ctx),

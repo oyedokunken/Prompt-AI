@@ -17,27 +17,36 @@ interface ClarifyInterviewProps {
 
 // One question at a time. The server sends exactly one, and the next only
 // after this one is answered, so this card never has a "next" to move to.
+// A single select question advances the moment an option is picked. Only
+// multi select and free text answers need an explicit confirm.
 // It gets its own visual language so a user can tell when Prompt AI is
 // asking rather than answering.
 export function ClarifyInterview({ intro, question, position, total, onAnswer }: ClarifyInterviewProps) {
   const [selected, setSelected] = useState<string[]>([]);
   const [textDraft, setTextDraft] = useState("");
+  // Set once an answer is sent, so a double click cannot send it twice.
+  const [sent, setSent] = useState(false);
 
   const hasOptions = !!question.options?.length;
   const currentAnswer = hasOptions ? selected.join(", ") : textDraft.trim();
   const canContinue = currentAnswer.length > 0;
   const isLast = position >= total;
+  const autoAdvances = hasOptions && !question.multiple;
+
+  const submit = (answer: string = currentAnswer) => {
+    if (sent || !answer) return;
+    setSent(true);
+    onAnswer(answer);
+  };
 
   const toggleOption = (opt: string) => {
+    if (sent) return;
     if (question.multiple) {
       setSelected((prev) => (prev.includes(opt) ? prev.filter((o) => o !== opt) : [...prev, opt]));
     } else {
       setSelected([opt]);
+      submit(opt);
     }
-  };
-
-  const submit = () => {
-    if (canContinue) onAnswer(currentAnswer);
   };
 
   return (
@@ -106,10 +115,11 @@ export function ClarifyInterview({ intro, question, position, total, onAnswer }:
             )}
           </motion.div>
 
+          {!autoAdvances && (
           <div className="flex items-center justify-end mt-4">
             <button
-              onClick={submit}
-              disabled={!canContinue}
+              onClick={() => submit()}
+              disabled={!canContinue || sent}
               className={cn(
                 "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors",
                 canContinue
@@ -120,6 +130,7 @@ export function ClarifyInterview({ intro, question, position, total, onAnswer }:
               {isLast ? "Finish" : "Next"} <ArrowRight size={12} />
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

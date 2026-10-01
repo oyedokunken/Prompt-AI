@@ -69,7 +69,9 @@ interface StoredQuestion {
 interface TerminalData {
   content?: string;
   score?: number;
-  diff?: { stated?: string[]; inferred?: string[] };
+  diff?: { stated?: string[]; inferred?: string[]; researched?: string[] };
+  sources?: unknown;
+  format_style?: string;
   structured?: unknown;
   readiness?: unknown;
   explanation?: string;
@@ -152,6 +154,8 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
         readiness: d.readiness,
         explanation: d.explanation,
         memoryCandidates: d.memory_candidates,
+        sources: d.sources ?? [],
+        formatStyle: d.format_style,
         templateVersion: d.template_version,
       },
     };
