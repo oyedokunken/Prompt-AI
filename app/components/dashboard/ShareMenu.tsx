@@ -29,7 +29,7 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-raised text-text-muted hover:text-text-primary hover:border-border/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-raised text-text-muted hover:text-text-primary hover:border-border/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Share conversation"
       >
         <Share2 size={11} />

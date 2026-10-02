@@ -33,11 +33,11 @@ function ExportMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-raised text-text-muted hover:text-text-primary hover:border-border/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-raised text-text-muted hover:text-text-primary hover:border-border/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         aria-label="Export conversation"
       >
         <Download size={11} />
-        <span className="font-mono text-[10px]">Export</span>
+        <span className="font-mono text-xs">Export</span>
       </button>
       {open && (
         <>

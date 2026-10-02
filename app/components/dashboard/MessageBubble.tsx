@@ -218,7 +218,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
               {onEdit && (
                 <button
                   onClick={() => { setDraft(message.content); setEditing(true); }}
-                  className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+                  className="p-3 -m-2.5 md:p-2.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
                   aria-label="Edit message"
                 >
                   <Pencil size={16} className="md:!w-[14px] md:!h-[14px]" />
@@ -226,7 +226,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
               )}
               <button
                 onClick={() => handleCopy()}
-                className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+                className="p-3 -m-2.5 md:p-2.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
                 aria-label="Copy message"
               >
                 {copied ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
@@ -294,7 +294,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
               </p>
               <button
                 onClick={handleCopyPrompt}
-                className="inline-flex items-center gap-1.5 px-3 py-2.5 md:px-2 md:py-1 rounded-md border border-border bg-raised text-xs md:text-xs font-medium text-text-muted hover:text-text-primary transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 md:px-3 md:py-2 rounded-md border border-border bg-raised text-xs md:text-xs font-medium text-text-muted hover:text-text-primary transition-colors"
                 aria-label="Copy prompt"
               >
                 {copiedPrompt ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
@@ -331,7 +331,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {/* Copy */}
           <button
             onClick={() => handleCopy()}
-            className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+            className="p-3 -m-2.5 md:p-2.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
             aria-label="Copy response"
           >
             {copied ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
@@ -342,7 +342,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
             <button
               onClick={handleSave}
               disabled={saved}
-              className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${saved ? "text-accent" : "text-text-faint hover:text-text-muted"}`}
+              className={`p-3 -m-2.5 md:p-2.5 md:m-0 transition-colors ${saved ? "text-accent" : "text-text-faint hover:text-text-muted"}`}
               aria-label={saved ? "Saved to library" : "Save to library"}
             >
               {saved ? <BookmarkCheck size={16} className="md:!w-[14px] md:!h-[14px]" /> : <BookmarkPlus size={16} className="md:!w-[14px] md:!h-[14px]" />}
@@ -357,7 +357,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
                 aria-pressed={meta.feedback?.rating === "up"}
                 aria-label="Helpful"
                 title="Helpful"
-                className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${meta.feedback?.rating === "up" ? "text-green-400" : "text-text-faint hover:text-green-400"}`}
+                className={`p-3 -m-2.5 md:p-2.5 md:m-0 transition-colors ${meta.feedback?.rating === "up" ? "text-green-400" : "text-text-faint hover:text-green-400"}`}
               >
                 <ThumbsUp size={16} className="md:!w-[14px] md:!h-[14px]" fill={meta.feedback?.rating === "up" ? "currentColor" : "none"} />
               </button>
@@ -366,7 +366,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
                 aria-pressed={meta.feedback?.rating === "down"}
                 aria-label="Not helpful"
                 title="Not helpful"
-                className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${meta.feedback?.rating === "down" ? "text-red-400" : "text-text-faint hover:text-red-400"}`}
+                className={`p-3 -m-2.5 md:p-2.5 md:m-0 transition-colors ${meta.feedback?.rating === "down" ? "text-red-400" : "text-text-faint hover:text-red-400"}`}
               >
                 <ThumbsDown size={16} className="md:!w-[14px] md:!h-[14px]" fill={meta.feedback?.rating === "down" ? "currentColor" : "none"} />
               </button>
@@ -377,7 +377,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {hasBreakdown && (
             <button
               onClick={() => setShowMeta((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-2 md:-my-1.5 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMeta ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {statedItems.length} stated, {researchedItems.length > 0 ? `${researchedItems.length} found, ` : ""}{inferredItems.length} inferred
@@ -388,7 +388,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {sources.length > 0 && (
             <button
               onClick={() => setShowSources((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-2 md:-my-1.5 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {sources.length} source{sources.length > 1 ? "s" : ""}
@@ -399,7 +399,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {patternsUsed.length > 0 && (
             <button
               onClick={() => setShowPatterns((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-2 md:-my-1.5 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showPatterns ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {patternsUsed.length} pattern{patternsUsed.length > 1 ? "s" : ""}
@@ -410,7 +410,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {memoryUsed.length > 0 && (
             <button
               onClick={() => setShowMemory((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-2 md:-my-1.5 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMemory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               <Brain size={9} /> used {memoryUsed.length} from memory

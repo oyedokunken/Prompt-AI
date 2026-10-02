@@ -267,7 +267,7 @@ function SessionGroup({
   if (!items.length) return null;
   return (
     <div className="mb-2">
-      <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint flex items-center gap-1.5 ${mobile ? "text-[11px]" : "text-[11px]"}`}>
+      <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint flex items-center gap-1.5 ${mobile ? "text-xs" : "text-xs"}`}>
         {icon}{label}
       </p>
       {items.map((s) => (
@@ -576,7 +576,7 @@ export function Sidebar({
           )}
 
           <div className="mt-3 pt-2 border-t border-border">
-            <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint ${mobile ? "text-[11px]" : "text-[11px]"}`}>
+            <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint ${mobile ? "text-xs" : "text-xs"}`}>
               Library
             </p>
             {LIBRARY_ITEMS.map(({ href, icon: Icon, label }) => (
@@ -618,7 +618,7 @@ export function Sidebar({
             <div className="min-w-0">
               <p className={`text-text-primary font-medium truncate leading-tight ${mobile ? "text-sm" : "text-[13px]"}`}>{displayName}</p>
               {roleDisplay && (
-                <p className={`text-text-faint truncate leading-tight ${mobile ? "text-xs" : "text-[11px]"}`}>{roleDisplay}</p>
+                <p className={`text-text-faint truncate leading-tight ${mobile ? "text-xs" : "text-xs"}`}>{roleDisplay}</p>
               )}
             </div>
           </button>

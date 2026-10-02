@@ -36,7 +36,7 @@ function ModelSelector({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-3 md:py-1.5 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
+        className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-3 md:py-2 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
         <span className="font-mono text-xs md:text-xs text-text-muted">{model.label}</span>
@@ -330,7 +330,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           readOnly={isRecording}
           disabled={busy}
           rows={1}
-          className="flex-1 bg-transparent outline-none text-[16px] md:text-[15px] text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
+          className="flex-1 bg-transparent outline-none text-[16px] md:text-[15px] text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-1"
           style={{ maxHeight: 140 }}
         />
 
