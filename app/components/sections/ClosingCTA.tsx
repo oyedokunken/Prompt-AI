@@ -4,8 +4,10 @@ import Link from "next/link";
 import { ArrowRight, Github } from "lucide-react";
 import { motion } from "framer-motion";
 import { Container } from "@/components/Container";
+import { useHasSession } from "@/lib/hooks/useHasSession";
 
 export function ClosingCTA() {
+  const hasSession = useHasSession();
   return (
     <section className="py-16 lg:py-24 border-t border-border-subtle">
       <Container>
@@ -29,10 +31,10 @@ export function ClosingCTA() {
           </p>
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <Link
-              href="/signup"
+              href={hasSession ? "/dashboard" : "/signup"}
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              Create a free account
+              {hasSession ? "Open your dashboard" : "Create a free account"}
               <ArrowRight size={15} />
             </Link>
             <a

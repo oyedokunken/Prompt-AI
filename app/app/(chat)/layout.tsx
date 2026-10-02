@@ -21,6 +21,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     requestDeleteSession,
     toggleSessionFavorite,
     renameSession,
+    pinnedIds,
+    togglePin,
     sidebarCollapsed,
     setSidebarCollapsed,
     mobileSidebarOpen,
@@ -67,6 +69,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         roleDisplay={roleLabel(profile?.role ?? null)}
         onToggleSessionFavorite={toggleSessionFavorite}
         onRenameSession={renameSession}
+        pinnedIds={pinnedIds}
+        onTogglePin={togglePin}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
+import { useHasSession } from "@/lib/hooks/useHasSession";
 
 const navLinks = [
   { href: "#how-it-works", label: "How it works" },
@@ -18,6 +19,7 @@ const navLinks = [
 ];
 
 export function Header() {
+  const hasSession = useHasSession();
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -106,24 +108,45 @@ export function Header() {
 
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Link
-                href="/login"
-                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary transition-colors focus-visible:outline-accent"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/signup"
-                className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Start free
-              </Link>
-              <Link
-                href="/signup"
-                className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Start free
-              </Link>
+              {hasSession ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Dashboard
+                  </Link>
+                </>
+              ) : (
+                // Held invisible until the session check answers, so a signed in
+                // visitor never sees a flash of Log in and Start free.
+                <div className={cn("flex items-center gap-2", hasSession === null && "invisible")}>
+                  <Link
+                    href="/login"
+                    className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-text-muted hover:text-text-primary transition-colors focus-visible:outline-accent"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="hidden md:inline-flex items-center px-4 py-2 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Start free
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="md:hidden inline-flex items-center px-3 py-1.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-xs font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    Start free
+                  </Link>
+                </div>
+              )}
               <button
                 ref={menuButtonRef}
                 onClick={() => setDrawerOpen(true)}
@@ -190,6 +213,16 @@ export function Header() {
               </nav>
 
               <div className="p-4 border-t border-border flex flex-col gap-2">
+                {hasSession ? (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center justify-center w-full px-4 py-3 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-accent"
+                  >
+                    Dashboard
+                  </Link>
+                ) : (
+                  <>
                 <Link
                   href="/login"
                   onClick={() => setDrawerOpen(false)}
@@ -204,6 +237,8 @@ export function Header() {
                 >
                   Start free
                 </Link>
+                  </>
+                )}
               </div>
             </motion.div>
           </>

@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { env } from "../config/env";
 
 /**
@@ -119,4 +120,21 @@ export async function transcribeAudio(audio: Buffer, contentType: string): Promi
   if (!res.ok) throw new DataServiceError("Transcription failed", res.status);
   const payload = (await res.json()) as { text?: string };
   return payload.text ?? "";
+}
+
+const TICKET_TTL_SECONDS = 60;
+
+/**
+ * A short lived ticket for the live transcription socket. A browser cannot send
+ * an Authorization header on a WebSocket and the serverless /api cannot hold
+ * one open, so the browser connects to /data directly and presents this. It is
+ * signed with the shared secret, names the user, and /data accepts it once.
+ * The signing format matches data/core/ticket.py.
+ */
+export function mintTranscribeTicket(userId: string, nowMs: number = Date.now()): { ticket: string; url: string } {
+  const expires = Math.floor(nowMs / 1000) + TICKET_TTL_SECONDS;
+  const payload = `${userId}.${expires}`;
+  const signature = createHmac("sha256", env.API_SHARED_SECRET).update(`transcribe-stream:${payload}`).digest("hex");
+  const base = env.DATA_SERVICE_URL.replace(/\/+$/, "").replace(/^http/, "ws");
+  return { ticket: `${payload}.${signature}`, url: `${base}/transcribe/stream` };
 }

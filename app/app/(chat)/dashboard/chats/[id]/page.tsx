@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Menu, X, Download, Copy, Check, FileType, FileDown, FileText, FileJson, Loader2 } from "lucide-react";
+import { Pin, PinOff, Download, Copy, Check, FileType, FileDown, FileText, FileJson, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
 import { useDashboard } from "@/lib/dashboard/DashboardContext";
 import { MessageBubble } from "@/components/dashboard/MessageBubble";
 import { ClarifyInterview } from "@/components/dashboard/ClarifyInterview";
@@ -13,7 +12,7 @@ import { GenerationStatus } from "@/components/dashboard/GenerationStatus";
 import { MemoryToast } from "@/components/dashboard/MemoryToast";
 import { AttachmentCard } from "@/components/dashboard/AttachmentCard";
 import { ShareMenu } from "@/components/dashboard/ShareMenu";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
 import { streamChat } from "@/lib/api/chatApi";
 import { exportSession } from "@/lib/export";
@@ -81,8 +80,8 @@ export default function ChatPage() {
     sharedLinks, createShareLink, revokeShareLink,
     refreshExportHistory,
     pendingFirstMessage, setPendingFirstMessage,
-    setMobileSidebarOpen,
     error, setError,
+    pinnedIds, togglePin,
   } = useDashboard();
 
   const [session, setSession] = useState<ChatSession | null>(null);
@@ -340,27 +339,19 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col bg-base overflow-hidden">
-      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface shrink-0">
-        <div className="flex items-center gap-3">
+      <DashboardHeader
+        actions={
+          <>
           <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="md:hidden p-1 text-text-faint hover:text-text-primary transition-colors"
-            aria-label="Open menu"
+            onClick={() => togglePin(session.id)}
+            className={`w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-raised ${
+              pinnedIds.includes(session.id) ? "text-accent" : "text-text-muted hover:text-text-primary"
+            }`}
+            aria-label={pinnedIds.includes(session.id) ? "Unpin this chat" : "Pin this chat"}
+            aria-pressed={pinnedIds.includes(session.id)}
           >
-            <Menu size={16} />
+            {pinnedIds.includes(session.id) ? <PinOff size={18} className="md:w-[13px] md:h-[13px]" /> : <Pin size={18} className="md:w-[13px] md:h-[13px]" />}
           </button>
-          <div className="hidden md:flex gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
-          </div>
-        </div>
-
-        <span className={cn("font-mono text-[11px] text-text-faint absolute left-1/2 -translate-x-1/2 max-w-[50%] truncate")}>
-          {session.title !== "New Chat" ? session.title : "Prompt AI"}
-        </span>
-
-        <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="hidden sm:flex items-center gap-2">
             <ShareMenu
               disabled={messages.length === 0}
@@ -376,22 +367,9 @@ export default function ChatPage() {
               copied={copiedMarkdown}
             />
           </div>
-          <ThemeToggle size={13} className="w-7 h-7" />
-          <button
-            onClick={() => router.push("/settings")}
-            className="w-7 h-7 rounded-full overflow-hidden border border-border hover:border-accent/40 transition-colors shrink-0"
-            aria-label="Open settings"
-          >
-            {profile?.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-accent/15 flex items-center justify-center text-[10px] text-accent font-mono">
-                {(profile?.username ?? "U")[0]?.toUpperCase()}
-              </div>
-            )}
-          </button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {error && (

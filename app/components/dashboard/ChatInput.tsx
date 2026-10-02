@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import { transcribeVoice } from "@/lib/api/chatApi";
+import { LiveTranscriber, liveTranscriptionSupported } from "@/lib/voice/liveTranscriber";
 import dynamic from "next/dynamic";
 import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square, ChevronDown } from "lucide-react";
 import type { EmojiClickData } from "emoji-picker-react";
@@ -108,6 +109,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const liveRef = useRef<LiveTranscriber | null>(null);
+  const baseTextRef = useRef("");
+  const [liveFailed, setLiveFailed] = useState(false);
 
   useEffect(() => {
     valueRef.current = value;
@@ -139,45 +143,83 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     textareaRef.current?.focus();
   };
 
+  // Voice input. Where the browser allows it the audio is streamed and the text
+  // appears in the box as the user speaks. A normal recording is made at the
+  // same time, so if live transcription cannot connect the whole message is
+  // still transcribed the older way when recording stops.
   const startRecording = async () => {
     setVoiceError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setIsTranscribing(true);
-        try {
-          const text = await transcribeVoice(blob);
-          if (text) {
-            const current = valueRef.current;
-            onChange(current ? `${current} ${text}`.trim() : text);
-          }
-        } catch (err) {
-          setVoiceError(err instanceof Error ? err.message : "Could not transcribe audio");
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      recorder.start();
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       setVoiceError("Microphone access was denied");
+      return;
     }
+
+    const recorder = new MediaRecorder(stream);
+    chunksRef.current = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    recorder.onstop = () => stream.getTracks().forEach((t) => t.stop());
+    recorder.start();
+    mediaRecorderRef.current = recorder;
+
+    baseTextRef.current = valueRef.current;
+    liveRef.current = null;
+    setLiveFailed(false);
+    if (liveTranscriptionSupported()) {
+      const live = new LiveTranscriber({
+        onText: (text) => {
+          const base = baseTextRef.current;
+          onChange(base && text ? `${base} ${text}` : base || text);
+        },
+        onError: () => setLiveFailed(true),
+      });
+      try {
+        await live.start(stream);
+        liveRef.current = live;
+      } catch {
+        live.dispose();
+      }
+    }
+    setIsRecording(true);
   };
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+  const stopRecording = async () => {
     setIsRecording(false);
+    const recorder = mediaRecorderRef.current;
+    const stopped = new Promise<void>((resolve) => {
+      if (!recorder || recorder.state === "inactive") return resolve();
+      recorder.addEventListener("stop", () => resolve(), { once: true });
+    });
+    recorder?.stop();
+
+    setIsTranscribing(true);
+    try {
+      const live = liveRef.current;
+      liveRef.current = null;
+      const result = live ? await live.stop() : { text: "", ok: false };
+      await stopped;
+      if (result.ok && result.text) {
+        const base = baseTextRef.current;
+        onChange(base ? `${base} ${result.text}` : result.text);
+        return;
+      }
+      // Live transcription did not produce anything, send the recording.
+      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      if (blob.size === 0) return;
+      const text = await transcribeVoice(blob);
+      if (text) {
+        const base = baseTextRef.current;
+        onChange(base ? `${base} ${text}`.trim() : text);
+      }
+    } catch (err) {
+      setVoiceError(err instanceof Error ? err.message : "Could not transcribe audio");
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const busy = disabled || isTranscribing;
@@ -189,6 +231,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       </div>
       {voiceError && (
         <p className="text-[10px] text-red-400 mb-1.5">{voiceError}</p>
+      )}
+      {isRecording && liveFailed && (
+        <p className="text-[10px] text-text-faint mb-1.5">Live text is unavailable, your message will be transcribed when you stop.</p>
       )}
       <div
         className={`flex items-end gap-2 rounded-xl border bg-raised px-3 py-2.5 transition-colors ${
@@ -235,7 +280,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKey}
-          placeholder={isTranscribing ? "Transcribing your voice message..." : placeholder}
+          placeholder={isTranscribing ? "Finishing your voice message..." : isRecording ? "Listening, start speaking..." : placeholder}
+          readOnly={isRecording}
           disabled={busy}
           rows={1}
           className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed"

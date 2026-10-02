@@ -139,3 +139,15 @@ export async function transcribeVoice(blob: Blob): Promise<string> {
   const payload = (await res.json()) as { text?: string };
   return payload.text ?? "";
 }
+
+// A short lived ticket and the address of the live transcription socket on
+// the /data service. The audio goes there directly, not through /api.
+export async function fetchTranscribeTicket(): Promise<{ ticket: string; url: string }> {
+  const token = await accessToken();
+  const res = await fetch(`${API_URL}/chat/transcribe/ticket`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await errorMessageFrom(res, "Live transcription is unavailable"));
+  return (await res.json()) as { ticket: string; url: string };
+}

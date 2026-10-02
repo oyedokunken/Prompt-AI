@@ -10,6 +10,7 @@ import {
   summarizeMemory,
   openGenerateStream,
   transcribeAudio,
+  mintTranscribeTicket,
   type GenerateRequestBody,
 } from "../lib/dataClient";
 import { isReadable, toDataAttachments } from "../services/attachments";
@@ -303,4 +304,16 @@ chatRouter.post("/transcribe", chatLimiter, requireUser, async (req: Request, re
     console.error("[chat/transcribe] failed:", err);
     res.status(502).json({ error: "TRANSCRIBE_FAILED", message: "Could not transcribe audio." });
   }
+});
+
+// POST /chat/transcribe/ticket
+// Hands the browser what it needs to open the live transcription socket on
+// /data. The audio itself never passes through this service.
+chatRouter.post("/transcribe/ticket", chatLimiter, requireUser, (req: Request, res: Response): void => {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: "UNAUTHORIZED", message: "Sign in again." });
+    return;
+  }
+  res.json(mintTranscribeTicket(user.id));
 });

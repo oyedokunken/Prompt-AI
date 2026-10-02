@@ -9,9 +9,10 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { UsageTab } from "@/components/settings/UsageTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
+import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
 import { Upload, Loader2, X, Pencil, Check } from "lucide-react";
 
-type SettingsTab = "profile" | "memory" | "usage";
+type SettingsTab = "profile" | "memory" | "usage" | "integrations";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -23,7 +24,7 @@ export default function SettingsPage() {
   // Lets other screens link straight to a tab, such as the memory toast.
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tab");
-    if (requested === "memory" || requested === "usage" || requested === "profile") setTab(requested);
+    if (requested === "memory" || requested === "usage" || requested === "profile" || requested === "integrations") setTab(requested);
   }, []);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,16 +113,17 @@ export default function SettingsPage() {
       <SimplePageHeader title="Settings" />
 
       {/* Tabs */}
-      <div className="flex border-b border-border px-6 gap-1 shrink-0">
+      <div className="flex border-b border-border px-3 sm:px-6 gap-1 shrink-0 overflow-x-auto scrollbar-hide">
         {([
           { id: "profile", label: "Profile" },
           { id: "memory", label: "Memory" },
           { id: "usage", label: "Usage" },
+          { id: "integrations", label: "Integrations" },
         ] as { id: SettingsTab; label: string }[]).map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0 ${
               tab === id
                 ? "text-text-primary border-accent"
                 : "text-text-muted border-transparent hover:text-text-primary"
@@ -299,6 +301,8 @@ export default function SettingsPage() {
         {tab === "memory" && <MemoryTab />}
 
         {tab === "usage" && <UsageTab />}
+
+        {tab === "integrations" && <IntegrationsTab />}
       </div>
     </div>
   );

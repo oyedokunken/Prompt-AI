@@ -18,7 +18,7 @@ from config import get_settings
 from core.patterns import validate_library
 from core.prompts.loader import validate_templates
 from core.security import require_shared_secret
-from routers import generate, health, memory, title, transcribe
+from routers import generate, health, memory, title, transcribe, transcribe_stream
 from routers.health import SERVICE_VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -52,6 +52,9 @@ app.include_router(health.router)
 protected = [Depends(require_shared_secret)]
 app.include_router(generate.router, dependencies=protected)
 app.include_router(transcribe.router, dependencies=protected)
+# The live transcription socket checks a short lived ticket itself, since a
+# browser cannot send an Authorization header on a WebSocket.
+app.include_router(transcribe_stream.router)
 app.include_router(title.router, dependencies=protected)
 app.include_router(memory.router, dependencies=protected)
 

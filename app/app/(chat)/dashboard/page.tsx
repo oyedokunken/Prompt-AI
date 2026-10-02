@@ -2,11 +2,10 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Menu } from "lucide-react";
+import { Zap } from "lucide-react";
 import { useDashboard } from "@/lib/dashboard/DashboardContext";
 import { ChatInput, type ChatInputHandle } from "@/components/dashboard/ChatInput";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Logo } from "@/components/Logo";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { uploadAttachment, type UploadedAttachment } from "@/lib/attachments";
 import { MODELS, MAX_FILES_PER_MESSAGE, MAX_ATTACHMENT_BYTES_PER_CONVERSATION } from "@/lib/types/chat";
 
@@ -51,7 +50,7 @@ function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; na
 // itself is what actually sends it and shows the response.
 export default function DashboardWelcomePage() {
   const router = useRouter();
-  const { profile, createSession, setPendingFirstMessage, setMobileSidebarOpen, error, setError } = useDashboard();
+  const { profile, createSession, setPendingFirstMessage, error, setError } = useDashboard();
   const chatInputRef = useRef<ChatInputHandle>(null);
 
   const [inputValue, setInputValue] = useState("");
@@ -106,20 +105,7 @@ export default function DashboardWelcomePage() {
 
   return (
     <div className="h-screen flex flex-col bg-base overflow-hidden">
-      <header className="flex items-center justify-between px-4 h-10 border-b border-border bg-surface shrink-0">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="md:hidden p-1 text-text-faint hover:text-text-primary transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu size={16} />
-          </button>
-          <Logo variant="color" size={16} className="md:hidden" />
-          <span className="font-mono text-[11px] text-text-faint hidden md:block">Prompt AI</span>
-        </div>
-        <ThemeToggle size={13} className="w-7 h-7" />
-      </header>
+      <DashboardHeader />
 
       <main className="flex-1 flex flex-col min-w-0 min-h-0">
         {error && (

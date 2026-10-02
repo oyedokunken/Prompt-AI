@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useHasSession } from "@/lib/hooks/useHasSession";
 import {
   Github, ArrowRight, Plus, Search, MessageSquare,
   BookOpen, Settings, Paperclip, ChevronDown, History,
@@ -76,6 +77,7 @@ type AnimationPhase =
   | "clearing";
 
 export function Hero() {
+  const hasSession = useHasSession();
   const prefersReducedMotion = useReducedMotion();
   const [pairIndex, setPairIndex] = useState(0);
   const [phase, setPhase] = useState<AnimationPhase>("typing");
@@ -204,8 +206,8 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center gap-3"
           >
-            <Link href="/signup" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-              Start free <ArrowRight size={15} />
+            <Link href={hasSession ? "/dashboard" : "/signup"} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold hover:bg-accent-fill/90 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+              {hasSession ? "Dashboard" : "Start free"} <ArrowRight size={15} />
             </Link>
             <a href="https://github.com/oyedokunken/Prompt-AI" target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-text-muted hover:text-text-primary hover:border-border/80 transition-colors focus-visible:outline-accent">

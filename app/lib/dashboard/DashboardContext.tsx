@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserProfile, type UserProfile } from "@/lib/hooks/useUserProfile";
 import { useSavedPrompts } from "@/lib/hooks/useSavedPrompts";
 import { useSharedLinks } from "@/lib/hooks/useSharedLinks";
 import { useExportHistory, type ExportRecord } from "@/lib/hooks/useExportHistory";
 import { useMemories } from "@/lib/hooks/useMemories";
+import { PIN_KEY, readPinned, togglePinned } from "@/lib/pins";
 import type { ChatSession, SavedPrompt, SharedLink, ExportFormat, UserMemory } from "@/lib/types/chat";
 import type { UploadedAttachment } from "@/lib/attachments";
 
@@ -33,6 +34,9 @@ interface DashboardContextValue {
   requestDeleteSession: (id: string) => void;
   toggleSessionFavorite: (id: string, next: boolean) => Promise<void>;
   renameSession: (id: string, title: string) => Promise<void>;
+  // Pinned chats, newest pin first, and the control that pins or unpins one.
+  pinnedIds: string[];
+  togglePin: (id: string) => Promise<void>;
 
   // Saved prompts
   savedPrompts: SavedPrompt[];
@@ -95,6 +99,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const { memories, refresh: refreshMemories } = useMemories();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [pendingFirstMessage, setPendingFirstMessage] = useState<PendingFirstMessage | null>(null);
@@ -102,6 +107,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const pinnedIdsRef = useRef<string[]>([]);
+  pinnedIdsRef.current = pinnedIds;
 
   const loadSessions = useCallback(async () => {
     const query = () =>
@@ -127,6 +135,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setPinnedIds(readPinned(data.user?.user_metadata)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Creates a session row and returns it, or null with setError already
   // called. Callers must check for null, a silent failure here is what
@@ -189,6 +202,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Applied at once and saved to the profile, put back if the save fails.
+  const togglePin = useCallback(async (id: string) => {
+    const previous = pinnedIdsRef.current;
+    const next = togglePinned(previous, id);
+    setPinnedIds(next);
+    const { error: pinError } = await supabase.auth.updateUser({ data: { [PIN_KEY]: next } });
+    if (pinError) {
+      console.error("[dashboard] togglePin failed:", pinError);
+      setPinnedIds(previous);
+      setError("Could not update pinned chats. Try again.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cancelPendingDelete = useCallback(() => setPendingDelete(null), []);
 
   const confirmPendingDelete = useCallback(async () => {
@@ -223,6 +250,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     requestDeleteSession,
     toggleSessionFavorite,
     renameSession,
+    pinnedIds,
+    togglePin,
     savedPrompts,
     savePrompt,
     requestDeleteSavedPrompt,
