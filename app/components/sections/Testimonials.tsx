@@ -40,7 +40,7 @@ const ROW_ONE: Testimonial[] = [
   {
     id: 3,
     quote:
-      "Multi-model targeting made this genuinely useful. I test across Claude and GPT-4o without reformatting the prompt manually for each.",
+      "The stated versus inferred breakdown made this genuinely useful. I can see exactly what was added to my request before I paste it anywhere.",
     name: "Sam Kirchner",
     role: "AI/ML Engineer",
     img: 60,

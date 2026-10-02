@@ -72,10 +72,10 @@ export function Integrations() {
           className="text-center mb-12"
         >
           <p className="font-mono text-xs uppercase tracking-widest text-text-faint mb-3">
-            Compatible
+            Paste anywhere
           </p>
           <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary tracking-tight">
-            Works with the models you already use
+            Plain text, ready for the tools you already use
           </h2>
         </motion.div>
       </Container>

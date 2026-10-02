@@ -109,7 +109,7 @@ export function UsageTab() {
             aria-selected={range === r.id}
             onClick={() => setRange(r.id)}
             className={cn(
-              "px-3 py-1.5 rounded-md text-[13px] md:text-[11px] font-medium transition-colors",
+              "px-3 py-1.5 rounded-md text-[13px] md:text-[13px] font-medium transition-colors",
               range === r.id ? "bg-accent-fill text-accent-fill-foreground" : "text-text-muted hover:text-text-primary"
             )}
           >
@@ -138,7 +138,7 @@ export function UsageTab() {
               metric === m.id ? "border-accent/50" : "border-border hover:border-border/70"
             )}
           >
-            <p className="text-xs md:text-[10px] text-text-faint uppercase tracking-wide mb-1 flex items-center gap-1.5">
+            <p className="text-xs md:text-xs text-text-faint uppercase tracking-wide mb-1 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS[m.id] }} />
               {m.label}
             </p>
@@ -151,7 +151,7 @@ export function UsageTab() {
       <div className="rounded-xl border border-border bg-surface p-4 mb-4">
         <div className="flex items-baseline justify-between mb-2">
           <p className="text-xs font-medium text-text-primary">{metricConfig.label} over the last {rangeConfig.label}</p>
-          <p className="text-xs md:text-[10px] text-text-faint">{metricConfig.hint}</p>
+          <p className="text-xs md:text-xs text-text-faint">{metricConfig.hint}</p>
         </div>
         <LineChart
           points={points}
@@ -159,12 +159,12 @@ export function UsageTab() {
           color={COLORS[metric]}
           ariaLabel={`${metricConfig.label} over the last ${rangeConfig.label}. Move along the line to read exact values.`}
         />
-        <p className="text-xs md:text-[10px] text-text-faint mt-2">
+        <p className="text-xs md:text-xs text-text-faint mt-2">
           Hover or use the arrow keys to read a point.{" "}
           {series.totals.tokenMessages > 0 && `Estimated model cost for this range: about $${series.totals.costUsd.toFixed(2)}.`}
         </p>
         {untracked > 0 && (
-          <p className="text-xs md:text-[10px] text-text-faint mt-1">
+          <p className="text-xs md:text-xs text-text-faint mt-1">
             Token counts are only recorded on newer replies, so {untracked} earlier {untracked === 1 ? "reply is" : "replies are"} not included in the token totals.
           </p>
         )}
@@ -173,11 +173,11 @@ export function UsageTab() {
       {/* Totals that are not time series */}
       <div className="grid grid-cols-2 gap-2.5 mb-4">
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <p className="text-xs md:text-[10px] text-text-faint uppercase tracking-wide mb-1">Reports exported</p>
+          <p className="text-xs md:text-xs text-text-faint uppercase tracking-wide mb-1">Reports exported</p>
           <p className="text-xl font-semibold text-text-primary">{data.exports}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-3.5">
-          <p className="text-xs md:text-[10px] text-text-faint uppercase tracking-wide mb-1">Files attached</p>
+          <p className="text-xs md:text-xs text-text-faint uppercase tracking-wide mb-1">Files attached</p>
           <p className="text-xl font-semibold text-text-primary">{data.files}</p>
         </div>
       </div>
@@ -185,7 +185,7 @@ export function UsageTab() {
       <div className="rounded-xl border border-border bg-surface p-4">
         <p className="text-xs font-medium text-text-primary mb-3">Target models used</p>
         {data.models.length === 0 ? (
-          <p className="text-xs md:text-[10px] text-text-faint">No chats yet.</p>
+          <p className="text-xs md:text-xs text-text-faint">No chats yet.</p>
         ) : (
           <div className="space-y-2">
             {data.models.map(({ model, count }) => (

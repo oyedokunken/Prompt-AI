@@ -29,8 +29,18 @@ registerProcessor("capture", Capture);
 
 const FLUSH_WAIT_MS = 9000;
 
+// A language hint makes short phrases far more reliable. Without one, a phrase
+// of a second or two is sometimes guessed as the wrong language entirely.
+function browserLanguage(): string | undefined {
+  const tag = typeof navigator !== "undefined" ? navigator.language : "";
+  const base = tag.split("-")[0]?.toLowerCase();
+  return base && /^[a-z]{2,3}$/.test(base) ? base : undefined;
+}
+
 export interface LiveOptions {
   onText: (text: string) => void;
+  // How many phrases have been heard but not finished yet.
+  onPending?: (pending: number) => void;
   onLevel?: (level: number) => void;
   onError?: (message: string) => void;
 }
@@ -62,9 +72,23 @@ export class LiveTranscriber {
   // Starts capturing immediately and connects in the background. Audio spoken
   // while the socket is still opening is held and sent as soon as it is ready,
   // so the first words are not lost.
-  async start(stream: MediaStream): Promise<void> {
+  //
+  // prime() must run straight from the tap that starts recording, before any
+  // await. Phones only let an audio context run when it is made inside a tap,
+  // and it also lets the socket start opening while the microphone permission
+  // is still being answered.
+  prime(): void {
+    if (this.ctx) return;
     const ctx = new AudioContext();
     this.ctx = ctx;
+    void ctx.resume().catch(() => undefined);
+    void this.connect();
+  }
+
+  async start(stream: MediaStream): Promise<void> {
+    this.prime();
+    const ctx = this.ctx as AudioContext;
+    await ctx.resume().catch(() => undefined);
     this.resampler = new Resampler(ctx.sampleRate, TARGET_RATE);
     this.workletUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "application/javascript" }));
     await ctx.audioWorklet.addModule(this.workletUrl);
@@ -76,7 +100,6 @@ export class LiveTranscriber {
     silent.gain.value = 0;
     this.source.connect(this.node);
     this.node.connect(silent).connect(ctx.destination);
-    void this.connect();
   }
 
   private async connect(): Promise<void> {
@@ -85,21 +108,22 @@ export class LiveTranscriber {
       const ws = new WebSocket(url);
       ws.binaryType = "arraybuffer";
       this.ws = ws;
-      ws.onopen = () => ws.send(JSON.stringify({ type: "auth", ticket }));
+      ws.onopen = () => ws.send(JSON.stringify({ type: "auth", ticket, language: browserLanguage() }));
       ws.onmessage = (e) => this.onMessage(e.data);
       ws.onerror = () => this.fail("Live transcription could not connect");
       ws.onclose = () => {
         if (!this.ready) this.fail("Live transcription could not connect");
         this.finished?.();
       };
-    } catch {
-      this.fail("Live transcription is unavailable");
+    } catch (err) {
+      this.fail(`Live transcription is unavailable${err instanceof Error && err.message ? `: ${err.message}` : ""}`);
     }
   }
 
   private fail(message: string): void {
     if (this.failed) return;
     this.failed = true;
+    console.warn("[voice]", message);
     this.options.onError?.(message);
     this.finished?.();
   }
@@ -132,6 +156,7 @@ export class LiveTranscriber {
       case "final":
         this.assembler.apply(message as unknown as TranscriptEvent);
         this.options.onText(this.assembler.text());
+        this.options.onPending?.(this.assembler.pending());
         break;
       case "error":
         // The text gathered so far is kept, only new text stops arriving.

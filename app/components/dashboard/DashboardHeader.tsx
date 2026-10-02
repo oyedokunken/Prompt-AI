@@ -28,7 +28,7 @@ export function DashboardHeaderView({
   label, actions, avatarUrl, username = "User", onOpenMenu, onOpenSettings,
 }: DashboardHeaderViewProps) {
   return (
-    <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14 md:h-10 border-b border-border bg-surface shrink-0">
+    <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-14 md:h-12 border-b border-border bg-surface shrink-0">
       <div className="flex items-center gap-1 sm:gap-2 min-w-0">
         <button
           onClick={onOpenMenu}
@@ -39,28 +39,28 @@ export function DashboardHeaderView({
         </button>
         <Link href="/dashboard" aria-label="Prompt AI home" className="shrink-0 rounded-md min-h-[44px] md:min-h-0 flex items-center focus-visible:outline-accent">
           <Logo variant="color" size={30} className="md:hidden" />
-          <Logo variant="color" size={18} className="hidden md:inline-flex" />
+          <Logo variant="color" size={22} className="hidden md:inline-flex" />
         </Link>
         {label && (
           <>
             <span className="text-border" aria-hidden="true">/</span>
-            <span className="font-mono text-xs md:text-[11px] text-text-faint truncate">{label}</span>
+            <span className="font-mono text-xs md:text-[13px] text-text-faint truncate">{label}</span>
           </>
         )}
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {actions}
-        <ThemeToggle size={18} className="w-11 h-11 md:w-7 md:h-7 [&_svg]:md:w-[13px] [&_svg]:md:h-[13px]" />
+        <ThemeToggle size={18} className="w-11 h-11 md:w-9 md:h-9 [&_svg]:md:w-[16px] [&_svg]:md:h-[16px]" />
         <button
           onClick={onOpenSettings}
-          className="w-10 h-10 md:w-7 md:h-7 rounded-full overflow-hidden border border-border hover:border-accent/40 transition-colors shrink-0"
+          className="w-10 h-10 md:w-9 md:h-9 rounded-full overflow-hidden border border-border hover:border-accent/40 transition-colors shrink-0"
           aria-label="Open settings"
         >
           {avatarUrl ? (
             <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-accent/15 flex items-center justify-center text-xs md:text-[10px] text-accent font-mono">
+            <div className="w-full h-full bg-accent/15 flex items-center justify-center text-xs md:text-xs text-accent font-mono">
               {username[0]?.toUpperCase()}
             </div>
           )}

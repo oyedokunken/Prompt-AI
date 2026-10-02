@@ -87,7 +87,7 @@ export default function ExportsPage() {
               <button
                 key={id}
                 onClick={() => setFilter(id)}
-                className={`px-3.5 py-2.5 md:px-2.5 md:py-1 rounded-md text-xs md:text-[10px] font-mono uppercase tracking-wide transition-colors ${
+                className={`px-3.5 py-2.5 md:px-2.5 md:py-1 rounded-md text-xs md:text-xs font-mono uppercase tracking-wide transition-colors ${
                   filter === id
                     ? "bg-accent/10 text-accent border border-accent/20"
                     : "text-text-faint border border-transparent hover:text-text-muted"
@@ -117,7 +117,7 @@ export default function ExportsPage() {
                     </div>
                     <div className="min-w-0 w-full">
                       <p className="text-xs text-text-primary font-medium truncate">{record.session_title}</p>
-                      <p className="text-xs md:text-[10px] text-text-faint font-mono mt-0.5">
+                      <p className="text-xs md:text-xs text-text-faint font-mono mt-0.5">
                         {record.format}, {new Date(record.created_at).toLocaleDateString()}
                       </p>
                     </div>

@@ -43,6 +43,11 @@ export class TranscriptAssembler {
       .join(" ");
   }
 
+  // Phrases that have been heard and are still being decoded.
+  pending(): number {
+    return this.items.filter((i) => !i.final).length;
+  }
+
   hasText(): boolean {
     return this.text().length > 0;
   }

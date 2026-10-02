@@ -24,7 +24,7 @@ export default function HistoryPage() {
           <p className="text-sm text-text-muted mb-4">Every conversation, most recent first.</p>
 
           <div className="flex items-center gap-2 px-3 py-3 md:py-2 rounded-lg border border-border bg-surface mb-4">
-            <Search size={18} className="text-text-faint shrink-0 md:!w-[13px] md:!h-[13px]" />
+            <Search size={18} className="text-text-faint shrink-0 md:!w-[16px] md:!h-[16px]" />
             <input
               type="text"
               value={search}

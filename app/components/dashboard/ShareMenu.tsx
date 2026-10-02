@@ -33,7 +33,7 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
         aria-label="Share conversation"
       >
         <Share2 size={11} />
-        <span className="font-mono text-xs md:text-[10px]">Share</span>
+        <span className="font-mono text-xs md:text-xs">Share</span>
       </button>
 
       {open && (
@@ -42,7 +42,7 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
           <div className="absolute right-0 top-full mt-1 w-72 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden p-3">
             {activeLink ? (
               <div className="space-y-2.5">
-                <p className="text-[13px] md:text-[11px] text-text-muted">
+                <p className="text-[13px] md:text-[13px] text-text-muted">
                   Anyone with this link can view a read-only copy of this conversation. No account needed.
                 </p>
                 <div className="flex items-center gap-1.5">
@@ -50,7 +50,7 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
                     readOnly
                     value={shareUrl}
                     onFocus={(e) => e.target.select()}
-                    className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-border bg-raised text-xs md:text-[10px] font-mono text-text-primary outline-none"
+                    className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-border bg-raised text-xs md:text-xs font-mono text-text-primary outline-none"
                   />
                   <button
                     onClick={handleCopy}
@@ -62,7 +62,7 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
                 </div>
                 <button
                   onClick={() => { onRevoke(activeLink.id); setOpen(false); }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md border border-red-400/30 text-[13px] md:text-[11px] text-red-400 hover:bg-red-400/10 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md border border-red-400/30 text-[13px] md:text-[13px] text-red-400 hover:bg-red-400/10 transition-colors"
                 >
                   <Ban size={11} />
                   Revoke link
@@ -70,12 +70,12 @@ export function ShareMenu({ disabled, activeLink, onCreate, onRevoke, siteUrl }:
               </div>
             ) : (
               <div className="space-y-2.5">
-                <p className="text-[13px] md:text-[11px] text-text-muted">
+                <p className="text-[13px] md:text-[13px] text-text-muted">
                   Create a read-only link to this conversation. Anyone with the link can view it without an account, and you can revoke it any time.
                 </p>
                 <button
                   onClick={() => { onCreate(); }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-accent-fill text-accent-fill-foreground text-[13px] md:text-[11px] font-semibold hover:bg-accent-fill/90 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-accent-fill text-accent-fill-foreground text-[13px] md:text-[13px] font-semibold hover:bg-accent-fill/90 transition-colors"
                 >
                   Create share link
                 </button>

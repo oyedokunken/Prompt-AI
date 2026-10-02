@@ -15,7 +15,7 @@ const PERSONAS = [
     title: "Developers",
     subtitle: "Solo and in teams",
     description:
-      "Stop burning tokens on poorly structured prompts. Get precise, role-correct prompts for coding, architecture, debugging, code review, and documentation, targeted to the model you're using.",
+      "Stop burning tokens on poorly structured prompts. Get precise, role-correct prompts for coding, architecture, debugging, code review, and documentation.",
     tags: ["Code generation", "Architecture", "Debugging", "Code review"],
     accent: ACCENT,
   },
@@ -33,8 +33,8 @@ const PERSONAS = [
     title: "AI power users",
     subtitle: "Heavy model users",
     description:
-      "You know the models well. Prompt AI knows their internals. Get the most out of every model without babysitting the prompt structure manually for each one.",
-    tags: ["Multi-model", "Prompt tuning", "Score tracking", "Library"],
+      "You know the models well. Get the most out of the model without babysitting the prompt structure by hand.",
+    tags: ["Prompt tuning", "Score tracking", "Library"],
     accent: ACCENT,
   },
   {

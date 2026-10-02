@@ -81,6 +81,8 @@ model ChatSession {
   userId    String    @map("user_id")
   title     String    @default("New Chat")
   model     String    @default("claude-3-5-sonnet")
+  isPinned  Boolean   @default(false) @map("is_pinned")
+  pinnedAt  DateTime? @map("pinned_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 

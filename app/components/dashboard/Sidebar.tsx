@@ -59,7 +59,7 @@ function AnimatedSessionTitle({ title, mobile = false }: { title: string; mobile
     <motion.span
       animate={justTitled ? { opacity: [0, 1], x: [-6, 0] } : undefined}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className={`${mobile ? "text-[16px]" : "text-[10px]"} truncate flex-1 transition-colors ${justTitled ? "text-accent" : ""}`}
+      className={`${mobile ? "text-[16px]" : "text-[13px]"} truncate flex-1 transition-colors ${justTitled ? "text-accent" : ""}`}
     >
       {title}
     </motion.span>
@@ -154,7 +154,7 @@ function SessionItem({
     setEditing(false);
   };
 
-  const rowSize = mobile ? "gap-3 px-3 py-2.5 min-h-[44px]" : "gap-2 px-2 py-1.5";
+  const rowSize = mobile ? "gap-3 px-3 py-2.5 min-h-[44px]" : "gap-2.5 px-2.5 py-2";
   const iconSize = mobile ? 16 : 10;
 
   if (editing) {
@@ -170,7 +170,7 @@ function SessionItem({
             if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
             if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
           }}
-          className={`flex-1 w-0 bg-transparent text-text-primary outline-none ${mobile ? "text-[16px]" : "text-[10px]"}`}
+          className={`flex-1 w-0 bg-transparent text-text-primary outline-none ${mobile ? "text-[16px]" : "text-[13px]"}`}
         />
       </div>
     );
@@ -215,7 +215,7 @@ function SessionItem({
             className={`p-0.5 transition-colors ${session.is_favorite ? "text-accent" : "text-text-faint hover:text-accent"}`}
             aria-label={session.is_favorite ? "Remove from favorites" : "Add to favorites"}
           >
-            <Star size={mobile ? 14 : 9} fill={session.is_favorite ? "currentColor" : "none"} />
+            <Star size={mobile ? 14 : 12} fill={session.is_favorite ? "currentColor" : "none"} />
           </button>
         )}
         {!mobile && hovered && (
@@ -267,7 +267,7 @@ function SessionGroup({
   if (!items.length) return null;
   return (
     <div className="mb-2">
-      <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint flex items-center gap-1.5 ${mobile ? "text-[11px]" : "text-[9px]"}`}>
+      <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint flex items-center gap-1.5 ${mobile ? "text-[11px]" : "text-[11px]"}`}>
         {icon}{label}
       </p>
       {items.map((s) => (
@@ -326,13 +326,13 @@ function CollapsedRail({
   pathname: string;
 } & Pick<SidebarProps, "onSettings" | "onSignOut" | "avatarUrl" | "username">) {
   const pinnedPart = partitionPinned(sessions, pinnedIds);
-  const iconButton = "w-8 h-8 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors";
+  const iconButton = "w-10 h-10 rounded-md flex items-center justify-center text-text-faint hover:text-text-muted hover:bg-raised transition-colors";
   return (
-    <aside className="w-14 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
-      <Tooltip id="sidebar-tip" place="right" className="!text-[10px] !py-1 !px-2 !z-50" />
+    <aside className="w-16 shrink-0 border-r border-border bg-surface flex-col items-center hidden md:flex py-2.5">
+      <Tooltip id="sidebar-tip" place="right" className="!text-[13px] !py-1 !px-2 !z-50" />
 
       <Link href="/dashboard" aria-label="Prompt AI home" className="mb-2">
-        <Logo variant="color" size={26} iconOnly />
+        <Logo variant="color" size={30} iconOnly />
       </Link>
 
       <div className="flex flex-col items-center gap-0.5 pb-2 mb-2 border-b border-border w-full">
@@ -343,7 +343,7 @@ function CollapsedRail({
           className={iconButton}
           aria-label="Expand sidebar"
         >
-          <PanelLeftOpen size={14} />
+          <PanelLeftOpen size={17} />
         </button>
         <button
           data-tooltip-id="sidebar-tip"
@@ -358,10 +358,10 @@ function CollapsedRail({
           data-tooltip-id="sidebar-tip"
           data-tooltip-content="New chat"
           onClick={onNewChat}
-          className="w-8 h-8 rounded-md flex items-center justify-center bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 transition-colors mt-0.5"
+          className="w-10 h-10 rounded-md flex items-center justify-center bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 transition-colors mt-0.5"
           aria-label="New chat"
         >
-          <Plus size={14} />
+          <Plus size={17} />
         </button>
       </div>
 
@@ -382,7 +382,7 @@ function CollapsedRail({
                 data-tooltip-content={isPinned ? `${s.title} (pinned)` : s.title}
                 aria-label={isPinned ? `${s.title}, pinned` : s.title}
                 aria-current={isActive ? "page" : undefined}
-                className={`relative w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-[11px] font-mono transition-colors border ${
+                className={`relative w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-[13px] font-mono transition-colors border ${
                   isActive
                     ? "bg-accent/15 border-accent/40 text-accent"
                     : "bg-raised/60 border-transparent text-text-faint hover:text-text-primary hover:border-border"
@@ -395,7 +395,7 @@ function CollapsedRail({
             </div>
           );
         })}
-        {sessions.length === 0 && <span className="text-[9px] text-text-faint mt-2">None</span>}
+        {sessions.length === 0 && <span className="text-[11px] text-text-faint mt-2">None</span>}
       </nav>
 
       <div className="flex flex-col items-center gap-0.5 pt-2 mt-1 border-t border-border w-full">
@@ -408,7 +408,7 @@ function CollapsedRail({
             className={`${iconButton} ${pathname === href ? "!text-accent bg-accent/10" : ""}`}
             aria-label={label}
           >
-            <Icon size={13} />
+            <Icon size={16} />
           </Link>
         ))}
         <button
@@ -418,7 +418,7 @@ function CollapsedRail({
           className={iconButton}
           aria-label="Settings"
         >
-          <Settings size={13} />
+          <Settings size={16} />
         </button>
         <button
           data-tooltip-id="sidebar-tip"
@@ -427,7 +427,7 @@ function CollapsedRail({
           className={`${iconButton} hover:!text-red-400`}
           aria-label="Sign out"
         >
-          <LogOut size={13} />
+          <LogOut size={16} />
         </button>
         <button
           onClick={onSettings}
@@ -437,9 +437,9 @@ function CollapsedRail({
           className="mt-1"
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+            <img src={avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-border" />
           ) : (
-            <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center text-[9px] text-accent font-mono border border-accent/20">
+            <div className="w-8 h-8 rounded-full bg-accent/15 flex items-center justify-center text-xs text-accent font-mono border border-accent/20">
               {username[0]?.toUpperCase()}
             </div>
           )}
@@ -507,13 +507,13 @@ export function Sidebar({
     const groupProps = { activeSessionId, pinnedSet, mobile, actions };
     const navRow = mobile
       ? "flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors"
-      : "flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors";
+      : "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors";
     const libRow = mobile
       ? "w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg transition-colors"
-      : "w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors";
+      : "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors";
     const footerButton = mobile
       ? "w-11 h-11 flex items-center justify-center rounded-lg text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
-      : "p-1 text-text-faint hover:text-text-muted transition-colors";
+      : "p-2 text-text-faint hover:text-text-muted transition-colors";
 
     return (
       <>
@@ -525,7 +525,7 @@ export function Sidebar({
               mobile ? "px-3 py-3 min-h-[48px] text-[16px] rounded-xl" : "px-2 py-1.5 text-[11px]"
             }`}
           >
-            <Plus size={mobile ? 18 : 11} /> New chat
+            <Plus size={mobile ? 18 : 15} /> New chat
           </button>
         </div>
 
@@ -540,7 +540,7 @@ export function Sidebar({
                 pathname === href ? "text-accent bg-accent/10" : "text-text-muted hover:text-text-primary hover:bg-raised"
               } ${mobile ? "text-[16px]" : ""}`}
             >
-              <Icon size={mobile ? 18 : 12} />
+              <Icon size={mobile ? 18 : 16} />
               {label}
             </Link>
           ))}
@@ -552,23 +552,23 @@ export function Sidebar({
         <div className={`flex-1 overflow-y-auto scrollbar-hide py-2 ${mobile ? "px-3" : "px-2"}`}>
           {searchOpen && (
             <div className={`flex items-center gap-2 rounded-lg border border-border bg-raised mb-2 ${mobile ? "px-3 py-2.5" : "px-2 py-1.5"}`}>
-              <Search size={mobile ? 16 : 9} className="text-text-faint shrink-0" />
+              <Search size={mobile ? 16 : 12} className="text-text-faint shrink-0" />
               <input
                 autoFocus
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search chats..."
-                className={`text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0 ${mobile ? "text-[16px]" : "text-[10px]"}`}
+                className={`text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0 ${mobile ? "text-[16px]" : "text-[13px]"}`}
               />
             </div>
           )}
 
           {filtered.length === 0 ? (
-            <p className={`text-text-faint text-center mt-6 ${mobile ? "text-sm" : "text-[10px]"}`}>No chats yet</p>
+            <p className={`text-text-faint text-center mt-6 ${mobile ? "text-sm" : "text-[13px]"}`}>No chats yet</p>
           ) : (
             <>
-              <SessionGroup label="Pinned" items={pinned} icon={<Pin size={mobile ? 12 : 9} className="text-accent" />} {...groupProps} />
+              <SessionGroup label="Pinned" items={pinned} icon={<Pin size={mobile ? 12 : 12} className="text-accent" />} {...groupProps} />
               <SessionGroup label="Today" items={today} {...groupProps} />
               <SessionGroup label="Yesterday" items={yesterday} {...groupProps} />
               <SessionGroup label="Older" items={older} {...groupProps} />
@@ -576,7 +576,7 @@ export function Sidebar({
           )}
 
           <div className="mt-3 pt-2 border-t border-border">
-            <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint ${mobile ? "text-[11px]" : "text-[9px]"}`}>
+            <p className={`px-2 mb-1 font-mono uppercase tracking-widest text-text-faint ${mobile ? "text-[11px]" : "text-[11px]"}`}>
               Library
             </p>
             {LIBRARY_ITEMS.map(({ href, icon: Icon, label }) => (
@@ -588,8 +588,8 @@ export function Sidebar({
                   pathname === href ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised/50"
                 }`}
               >
-                <Icon size={mobile ? 16 : 10} className="shrink-0" />
-                <span className={mobile ? "text-[16px]" : "text-[10px]"}>{label}</span>
+                <Icon size={mobile ? 16 : 14} className="shrink-0" />
+                <span className={mobile ? "text-[16px]" : "text-[13px]"}>{label}</span>
               </Link>
             ))}
           </div>
@@ -608,26 +608,26 @@ export function Sidebar({
               <img
                 src={avatarUrl}
                 alt="Avatar"
-                className={`rounded-full object-cover border border-border shrink-0 ${mobile ? "w-10 h-10" : "w-6 h-6"}`}
+                className={`rounded-full object-cover border border-border shrink-0 ${mobile ? "w-10 h-10" : "w-8 h-8"}`}
               />
             ) : (
-              <div className={`rounded-full bg-accent/15 flex items-center justify-center text-accent font-mono shrink-0 border border-accent/20 ${mobile ? "w-10 h-10 text-sm" : "w-6 h-6 text-[9px]"}`}>
+              <div className={`rounded-full bg-accent/15 flex items-center justify-center text-accent font-mono shrink-0 border border-accent/20 ${mobile ? "w-10 h-10 text-sm" : "w-8 h-8 text-xs"}`}>
                 {displayName[0]?.toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
-              <p className={`text-text-primary font-medium truncate leading-tight ${mobile ? "text-sm" : "text-[10px]"}`}>{displayName}</p>
+              <p className={`text-text-primary font-medium truncate leading-tight ${mobile ? "text-sm" : "text-[13px]"}`}>{displayName}</p>
               {roleDisplay && (
-                <p className={`text-text-faint truncate leading-tight ${mobile ? "text-xs" : "text-[9px]"}`}>{roleDisplay}</p>
+                <p className={`text-text-faint truncate leading-tight ${mobile ? "text-xs" : "text-[11px]"}`}>{roleDisplay}</p>
               )}
             </div>
           </button>
           <div className="flex items-center gap-0.5 shrink-0">
             <button onClick={onSettings} className={footerButton} aria-label="Settings">
-              <Settings size={mobile ? 20 : 11} />
+              <Settings size={mobile ? 20 : 15} />
             </button>
             <button onClick={onSignOut} className={`${footerButton} hover:!text-red-400`} aria-label="Sign out">
-              <LogOut size={mobile ? 20 : 11} />
+              <LogOut size={mobile ? 20 : 15} />
             </button>
           </div>
         </div>
@@ -650,26 +650,26 @@ export function Sidebar({
       username={username}
     />
   ) : (
-    <aside className="w-56 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
+    <aside className="w-64 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
       {/* Brand + collapse + search, one row */}
       <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <Logo variant="color" size={18} />
+        <Logo variant="color" size={22} />
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setSearchOpen((v) => !v)}
-            className={`p-1.5 rounded-md transition-colors ${
+            className={`p-2 rounded-md transition-colors ${
               searchOpen ? "text-accent bg-accent/10" : "text-text-faint hover:text-text-muted hover:bg-raised"
             }`}
             aria-label="Search chats"
           >
-            <Search size={13} />
+            <Search size={16} />
           </button>
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
+            className="p-2 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
             aria-label="Collapse sidebar"
           >
-            <PanelLeftClose size={13} />
+            <PanelLeftClose size={16} />
           </button>
         </div>
       </div>

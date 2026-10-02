@@ -11,8 +11,8 @@ const FAQS = [
     a: "When you prompt ChatGPT or Claude directly, the model fills the gap between what you wrote and what it needs with guesses. Prompt AI makes those guesses visible, corrects them, and structures the full prompt before it ever reaches the target model. You get better outputs because the model gets better inputs.",
   },
   {
-    q: "Does it work with all AI models?",
-    a: "Yes. Prompt AI generates structured prompts that work with any text-based AI model. We also have model-specific optimizations for Claude, GPT-4o, Gemini, Mistral, Llama, and others, tuning the format and instruction style to match each model's preferred parsing structure.",
+    q: "Which AI models does it work with?",
+    a: "Prompt AI builds your prompts with GPT-4o, which is the only model you can pick today. The prompts it writes are plain text by default, so you can paste them into any chat tool, and it uses tagged sections for Claude and markdown where the destination renders it. More build targets are on the list and marked coming soon in the app.",
   },
   {
     q: "Can I edit the generated prompt before using it?",
@@ -20,7 +20,7 @@ const FAQS = [
   },
   {
     q: "What is the completeness score?",
-    a: "Every generated prompt is scored from 0 to 100 across dimensions including role clarity, context depth, task specificity, constraint coverage, and output format completeness. The score tells you where the prompt is strong and exactly what to add to push it higher.",
+    a: "Every generated prompt gets a rough completeness estimate from 0 to 100, plus a flag for whether it is ready to use or still needs context. It is an estimate, not a grade, and it is there to help you decide whether to add more detail.",
   },
   {
     q: "Is my data private?",

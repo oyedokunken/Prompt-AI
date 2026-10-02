@@ -28,7 +28,7 @@ export default function FavoritesPage() {
             <div className="space-y-6">
               {favSessions.length > 0 && (
                 <div>
-                  <p className="font-mono text-xs md:text-[10px] uppercase tracking-widest text-text-faint mb-2">Chats</p>
+                  <p className="font-mono text-xs md:text-xs uppercase tracking-widest text-text-faint mb-2">Chats</p>
                   <div className="space-y-2">
                     {favSessions.map((s) => (
                       <Link
@@ -47,7 +47,7 @@ export default function FavoritesPage() {
 
               {favPrompts.length > 0 && (
                 <div>
-                  <p className="font-mono text-xs md:text-[10px] uppercase tracking-widest text-text-faint mb-2">Saved prompts</p>
+                  <p className="font-mono text-xs md:text-xs uppercase tracking-widest text-text-faint mb-2">Saved prompts</p>
                   <div className="space-y-2">
                     {favPrompts.map((p) => (
                       <div key={p.id} className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-surface">

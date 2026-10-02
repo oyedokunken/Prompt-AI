@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
-import { transcribeVoice } from "@/lib/api/chatApi";
+import { transcribeVoice, warmTranscription } from "@/lib/api/chatApi";
 import { LiveTranscriber, liveTranscriptionSupported } from "@/lib/voice/liveTranscriber";
 import dynamic from "next/dynamic";
 import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square, ChevronDown } from "lucide-react";
@@ -36,11 +36,11 @@ function ModelSelector({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-2 md:py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
+        className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-3 md:py-1.5 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
-        <span className="font-mono text-xs md:text-[10px] text-text-muted">{model.label}</span>
-        <ChevronDown size={14} className="text-text-faint md:!w-[10px] md:!h-[10px]" />
+        <span className="font-mono text-xs md:text-xs text-text-muted">{model.label}</span>
+        <ChevronDown size={14} className="text-text-faint md:!w-[14px] md:!h-[14px]" />
       </button>
 
       {open && (
@@ -53,7 +53,7 @@ function ModelSelector({
                 type="button"
                 disabled={!m.available}
                 onClick={() => { onSelect(m); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-3 md:py-2 text-sm md:text-[11px] transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-3 md:py-2 text-sm md:text-[13px] transition-colors ${
                   !m.available
                     ? "text-text-faint cursor-not-allowed"
                     : m.id === model.id
@@ -63,7 +63,7 @@ function ModelSelector({
               >
                 <span>{m.label}</span>
                 {!m.available && (
-                  <span className="text-[10px] md:text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
+                  <span className="text-[10px] md:text-[11px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
                     Coming soon
                   </span>
                 )}
@@ -86,7 +86,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   onSend,
   onAttach,
   disabled = false,
-  placeholder = "Describe what you need, plain language works best",
+  placeholder = "Start a new chat",
   model,
   onModelChange,
 }, ref) {
@@ -112,10 +112,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const liveRef = useRef<LiveTranscriber | null>(null);
   const baseTextRef = useRef("");
   const [liveFailed, setLiveFailed] = useState(false);
+  const [liveReason, setLiveReason] = useState<string | null>(null);
+  const [pending, setPending] = useState(0);
+  const [level, setLevel] = useState(0);
 
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+
+  // Start waking the data service as soon as the composer is on screen.
+  useEffect(() => {
+    void warmTranscription();
+  }, []);
 
   // Auto-resize textarea up to ~5 lines
   useEffect(() => {
@@ -149,10 +157,39 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   // still transcribed the older way when recording stops.
   const startRecording = async () => {
     setVoiceError(null);
+    // Made straight from the tap, before any await, so a phone lets the audio
+    // run, and so the socket can open while the permission prompt is answered.
+    baseTextRef.current = valueRef.current;
+    liveRef.current = null;
+    setLiveFailed(false);
+    setLiveReason(null);
+    setPending(0);
+    let live: LiveTranscriber | null = null;
+    if (liveTranscriptionSupported()) {
+      live = new LiveTranscriber({
+        onText: (text) => {
+          const base = baseTextRef.current;
+          onChange(base && text ? `${base} ${text}` : base || text);
+        },
+        onPending: setPending,
+        onLevel: (v) => setLevel(v),
+        onError: (message) => {
+          setLiveFailed(true);
+          setLiveReason(message);
+        },
+      });
+      try {
+        live.prime();
+      } catch {
+        live = null;
+      }
+    }
+
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      live?.dispose();
       setVoiceError("Microphone access was denied");
       return;
     }
@@ -166,21 +203,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     recorder.start();
     mediaRecorderRef.current = recorder;
 
-    baseTextRef.current = valueRef.current;
-    liveRef.current = null;
-    setLiveFailed(false);
-    if (liveTranscriptionSupported()) {
-      const live = new LiveTranscriber({
-        onText: (text) => {
-          const base = baseTextRef.current;
-          onChange(base && text ? `${base} ${text}` : base || text);
-        },
-        onError: () => setLiveFailed(true),
-      });
+    if (live) {
       try {
         await live.start(stream);
         liveRef.current = live;
-      } catch {
+      } catch (err) {
+        console.warn("[voice] could not start live transcription", err);
+        setLiveFailed(true);
+        setLiveReason("Could not start live transcription on this device");
         live.dispose();
       }
     }
@@ -230,10 +260,26 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         <ModelSelector model={model} onSelect={onModelChange} />
       </div>
       {voiceError && (
-        <p className="text-xs md:text-[10px] text-red-400 mb-1.5">{voiceError}</p>
+        <p className="text-xs md:text-xs text-red-400 mb-1.5">{voiceError}</p>
+      )}
+      {isRecording && !liveFailed && (
+        <div className="flex items-center gap-2 mb-1.5 text-xs md:text-xs text-text-muted" role="status" aria-live="polite">
+          <span className="flex items-end gap-0.5 h-3" aria-hidden="true">
+            {[0.25, 0.5, 0.8, 0.5, 0.25].map((weight, i) => (
+              <span
+                key={i}
+                className="w-0.5 rounded-full bg-red-400 transition-[height] duration-100"
+                style={{ height: `${Math.max(3, Math.round(12 * Math.min(1, level * (0.6 + weight))))}px` }}
+              />
+            ))}
+          </span>
+          <span>{pending > 0 ? "Writing what you said..." : "Listening, speak and the text appears as you go"}</span>
+        </div>
       )}
       {isRecording && liveFailed && (
-        <p className="text-xs md:text-[10px] text-text-faint mb-1.5">Live text is unavailable, your message will be transcribed when you stop.</p>
+        <p className="text-xs md:text-xs text-text-faint mb-1.5">
+          Live text is unavailable{liveReason ? ` (${liveReason.replace(/^Live transcription /, "")})` : ""}. Your message will be transcribed when you stop.
+        </p>
       )}
       <div
         className={`flex items-end gap-1 md:gap-2 rounded-xl border bg-raised px-2 md:px-3 py-1.5 md:py-2.5 transition-colors ${
@@ -241,8 +287,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         }`}
       >
         {/* Attach */}
-        <label className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 md:mb-0.5" aria-label="Attach files">
-          <Paperclip size={20} className="md:!w-[14px] md:!h-[14px]" />
+        <label className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-2 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 md:mb-0.5" aria-label="Attach files">
+          <Paperclip size={20} className="md:!w-[18px] md:!h-[18px]" />
           <input
             type="file"
             multiple
@@ -259,10 +305,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             type="button"
             onClick={() => setShowEmoji((v) => !v)}
             disabled={busy}
-            className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 text-text-faint hover:text-text-muted transition-colors"
+            className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-2 text-text-faint hover:text-text-muted transition-colors"
             aria-label="Insert emoji"
           >
-            <Smile size={20} className="md:!w-[14px] md:!h-[14px]" />
+            <Smile size={20} className="md:!w-[18px] md:!h-[18px]" />
           </button>
           {showEmoji && (
             <>
@@ -284,7 +330,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           readOnly={isRecording}
           disabled={busy}
           rows={1}
-          className="flex-1 bg-transparent outline-none text-[16px] md:text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
+          className="flex-1 bg-transparent outline-none text-[16px] md:text-[15px] text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
           style={{ maxHeight: 140 }}
         />
 
@@ -293,7 +339,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
           disabled={disabled || isTranscribing}
-          className={`shrink-0 md:mb-0.5 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 transition-colors ${
+          className={`shrink-0 md:mb-0.5 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-2 transition-colors ${
             isRecording ? "text-red-400" : "text-text-faint hover:text-text-muted"
           }`}
           aria-label={isRecording ? "Stop recording" : "Record a voice message"}
@@ -301,31 +347,31 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           {isRecording ? (
             <span className="relative flex items-center justify-center w-5 h-5 md:w-3.5 md:h-3.5">
               <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
-              <Square size={14} className="relative fill-current md:!w-[10px] md:!h-[10px]" />
+              <Square size={14} className="relative fill-current md:!w-[14px] md:!h-[14px]" />
             </span>
           ) : (
-            <Mic size={20} className="md:!w-[14px] md:!h-[14px]" />
+            <Mic size={20} className="md:!w-[18px] md:!h-[18px]" />
           )}
         </button>
 
         {/* Send */}
         <div className="flex items-center gap-2 shrink-0 md:mb-0.5">
-          <span className="font-mono text-[10px] text-text-faint hidden sm:block">⏎</span>
+          <span className="font-mono text-xs text-text-faint hidden sm:block">⏎</span>
           <button
             onClick={onSend}
             disabled={busy || !value.trim()}
-            className="w-11 h-11 md:w-7 md:h-7 rounded-xl md:rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent-fill/90 transition-colors"
+            className="w-11 h-11 md:w-9 md:h-9 rounded-xl md:rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent-fill/90 transition-colors"
             aria-label="Send"
           >
             {busy ? (
-              <Loader2 size={18} className="animate-spin md:!w-[13px] md:!h-[13px]" />
+              <Loader2 size={18} className="animate-spin md:!w-[16px] md:!h-[16px]" />
             ) : (
-              <ArrowRight size={18} className="md:!w-[13px] md:!h-[13px]" />
+              <ArrowRight size={18} className="md:!w-[16px] md:!h-[16px]" />
             )}
           </button>
         </div>
       </div>
-      <p className="text-center text-xs md:text-[9px] text-text-faint mt-1.5 md:truncate">
+      <p className="text-center text-xs md:text-xs text-text-faint mt-1.5 md:truncate">
         <span className="hidden md:inline">Shift+Enter for new line · Enter to send · </span>Review outputs and generated code before use.
       </p>
     </div>

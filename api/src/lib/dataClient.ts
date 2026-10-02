@@ -138,3 +138,12 @@ export function mintTranscribeTicket(userId: string, nowMs: number = Date.now())
   const base = env.DATA_SERVICE_URL.replace(/\/+$/, "").replace(/^http/, "ws");
   return { ticket: `${payload}.${signature}`, url: `${base}/transcribe/stream` };
 }
+
+/** Sends /data a health check so a sleeping instance starts waking. Never throws. */
+export async function warmData(): Promise<void> {
+  try {
+    await fetch(url("/health"), { signal: AbortSignal.timeout(4000) });
+  } catch {
+    // waking up takes longer than this, the request has still been sent
+  }
+}

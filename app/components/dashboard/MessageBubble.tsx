@@ -49,7 +49,7 @@ export function ScoreBadge({ score }: { score: number }) {
     : "text-red-400 border-red-400/30 bg-red-400/10";
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border text-xs md:text-[9px] font-mono font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border text-xs md:text-xs font-mono font-medium ${color}`}>
       ~{score}/100 estimate
     </span>
   );
@@ -58,13 +58,13 @@ export function ScoreBadge({ score }: { score: number }) {
 export function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   if (status === "ready") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-xs md:text-[9px] font-mono font-medium">
+      <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-xs md:text-xs font-mono font-medium">
         <CircleCheck size={9} /> Ready to build
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-xs md:text-[9px] font-mono font-medium">
+    <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-xs md:text-xs font-mono font-medium">
       <CircleHelp size={9} /> Needs context
     </span>
   );
@@ -76,9 +76,9 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
     <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2">
       {stated.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
+          <p className="text-xs md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
           {stated.map((a, i) => (
-            <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
+            <p key={i} className="text-xs md:text-xs text-text-muted flex gap-2">
               <span className="text-green-400 shrink-0">·</span> {a}
             </p>
           ))}
@@ -86,9 +86,9 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
       )}
       {researched.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
+          <p className="text-xs md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
           {researched.map((a, i) => (
-            <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
+            <p key={i} className="text-xs md:text-xs text-text-muted flex gap-2">
               <span className="text-signal shrink-0">&middot;</span> {a}
             </p>
           ))}
@@ -96,9 +96,9 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
       )}
       {inferred.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
+          <p className="text-xs md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
           {inferred.map((a, i) => (
-            <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
+            <p key={i} className="text-xs md:text-xs text-text-muted flex gap-2">
               <span className="text-accent shrink-0">·</span> {a}
             </p>
           ))}
@@ -218,21 +218,21 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
               {onEdit && (
                 <button
                   onClick={() => { setDraft(message.content); setEditing(true); }}
-                  className="p-3 -m-2.5 md:p-0.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+                  className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
                   aria-label="Edit message"
                 >
-                  <Pencil size={16} className="md:!w-[10px] md:!h-[10px]" />
+                  <Pencil size={16} className="md:!w-[14px] md:!h-[14px]" />
                 </button>
               )}
               <button
                 onClick={() => handleCopy()}
-                className="p-3 -m-2.5 md:p-0.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+                className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
                 aria-label="Copy message"
               >
-                {copied ? <Check size={16} className="text-green-400 md:!w-[10px] md:!h-[10px]" /> : <Copy size={16} className="md:!w-[10px] md:!h-[10px]" />}
+                {copied ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
               </button>
             </div>
-            <p className="text-xs md:text-[10px] text-text-faint font-mono">{formatMessageTimestamp(message.created_at, now)}</p>
+            <p className="text-xs md:text-xs text-text-faint font-mono">{formatMessageTimestamp(message.created_at, now)}</p>
           </div>
         </div>
       </div>
@@ -252,11 +252,11 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
             <p className="text-sm text-red-400 leading-relaxed">{message.content}</p>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
-            <p className="font-mono text-xs md:text-[10px] text-text-faint">Prompt AI, generation failed</p>
+            <p className="font-mono text-xs md:text-xs text-text-faint">Prompt AI, generation failed</p>
             {onRetry && (
               <button
                 onClick={onRetry}
-                className="inline-flex items-center gap-1 text-xs md:text-[10px] font-medium text-accent hover:text-accent/80 transition-colors"
+                className="inline-flex items-center gap-1 text-xs md:text-xs font-medium text-accent hover:text-accent/80 transition-colors"
               >
                 <RefreshCw size={10} /> Try again
               </button>
@@ -272,7 +272,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
     <div className="flex gap-3">
       {/* Avatar */}
       <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30 bg-signal/10">
-        <span className="font-mono text-xs md:text-[10px] text-signal">P</span>
+        <span className="font-mono text-xs md:text-xs text-signal">P</span>
       </div>
 
       <div className="max-w-[92%] sm:max-w-[72%] min-w-0">
@@ -289,15 +289,15 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           /* The deliverable, visually distinct and independently copyable */
           <div className="rounded-xl border border-accent/25 bg-surface overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-accent/15 bg-accent/5">
-              <p className="font-mono text-xs md:text-[10px] uppercase tracking-widest text-accent">
+              <p className="font-mono text-xs md:text-xs uppercase tracking-widest text-accent">
                 Your prompt <span className="text-text-faint normal-case tracking-normal">, {styleLabel}</span>
               </p>
               <button
                 onClick={handleCopyPrompt}
-                className="inline-flex items-center gap-1.5 px-3 py-2.5 md:px-2 md:py-1 rounded-md border border-border bg-raised text-xs md:text-[10px] font-medium text-text-muted hover:text-text-primary transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 md:px-2 md:py-1 rounded-md border border-border bg-raised text-xs md:text-xs font-medium text-text-muted hover:text-text-primary transition-colors"
                 aria-label="Copy prompt"
               >
-                {copiedPrompt ? <Check size={16} className="text-green-400 md:!w-[11px] md:!h-[11px]" /> : <Copy size={16} className="md:!w-[11px] md:!h-[11px]" />}
+                {copiedPrompt ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
                 {copiedPrompt ? "Copied" : "Copy prompt"}
               </button>
             </div>
@@ -315,15 +315,15 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
 
         {/* Explanation, ready mode only */}
         {!isClarify && meta.explanation && (
-          <p className="text-[13px] md:text-[11px] text-text-muted italic mt-1.5 px-0.5 leading-relaxed">
+          <p className="text-[13px] md:text-[13px] text-text-muted italic mt-1.5 px-0.5 leading-relaxed">
             {meta.explanation}
           </p>
         )}
 
         {/* Footer row */}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <p className="font-mono text-xs md:text-[10px] text-text-faint">Prompt AI</p>
-          <p className="font-mono text-xs md:text-[9px] text-text-faint">{formatMessageTimestamp(message.created_at, now)}</p>
+          <p className="font-mono text-xs md:text-xs text-text-faint">Prompt AI</p>
+          <p className="font-mono text-xs md:text-xs text-text-faint">{formatMessageTimestamp(message.created_at, now)}</p>
 
           {!isClarify && meta.readiness?.status && <ReadinessBadge status={meta.readiness.status} />}
           {!isClarify && meta.score !== undefined && <ScoreBadge score={meta.score} />}
@@ -331,10 +331,10 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {/* Copy */}
           <button
             onClick={() => handleCopy()}
-            className="p-3 -m-2.5 md:p-0.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
+            className="p-3 -m-2.5 md:p-1.5 md:m-0 text-text-faint hover:text-text-muted transition-colors"
             aria-label="Copy response"
           >
-            {copied ? <Check size={16} className="text-green-400 md:!w-[11px] md:!h-[11px]" /> : <Copy size={16} className="md:!w-[11px] md:!h-[11px]" />}
+            {copied ? <Check size={16} className="text-green-400 md:!w-[14px] md:!h-[14px]" /> : <Copy size={16} className="md:!w-[14px] md:!h-[14px]" />}
           </button>
 
           {/* Save to library, ready mode only */}
@@ -342,10 +342,10 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
             <button
               onClick={handleSave}
               disabled={saved}
-              className={`p-3 -m-2.5 md:p-0.5 md:m-0 transition-colors ${saved ? "text-accent" : "text-text-faint hover:text-text-muted"}`}
+              className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${saved ? "text-accent" : "text-text-faint hover:text-text-muted"}`}
               aria-label={saved ? "Saved to library" : "Save to library"}
             >
-              {saved ? <BookmarkCheck size={16} className="md:!w-[11px] md:!h-[11px]" /> : <BookmarkPlus size={16} className="md:!w-[11px] md:!h-[11px]" />}
+              {saved ? <BookmarkCheck size={16} className="md:!w-[14px] md:!h-[14px]" /> : <BookmarkPlus size={16} className="md:!w-[14px] md:!h-[14px]" />}
             </button>
           )}
 
@@ -357,18 +357,18 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
                 aria-pressed={meta.feedback?.rating === "up"}
                 aria-label="Helpful"
                 title="Helpful"
-                className={`p-3 -m-2.5 md:p-0.5 md:m-0 transition-colors ${meta.feedback?.rating === "up" ? "text-green-400" : "text-text-faint hover:text-green-400"}`}
+                className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${meta.feedback?.rating === "up" ? "text-green-400" : "text-text-faint hover:text-green-400"}`}
               >
-                <ThumbsUp size={16} className="md:!w-[11px] md:!h-[11px]" fill={meta.feedback?.rating === "up" ? "currentColor" : "none"} />
+                <ThumbsUp size={16} className="md:!w-[14px] md:!h-[14px]" fill={meta.feedback?.rating === "up" ? "currentColor" : "none"} />
               </button>
               <button
                 onClick={() => onFeedback(message, meta.feedback?.rating === "down" ? null : "down")}
                 aria-pressed={meta.feedback?.rating === "down"}
                 aria-label="Not helpful"
                 title="Not helpful"
-                className={`p-3 -m-2.5 md:p-0.5 md:m-0 transition-colors ${meta.feedback?.rating === "down" ? "text-red-400" : "text-text-faint hover:text-red-400"}`}
+                className={`p-3 -m-2.5 md:p-1.5 md:m-0 transition-colors ${meta.feedback?.rating === "down" ? "text-red-400" : "text-text-faint hover:text-red-400"}`}
               >
-                <ThumbsDown size={16} className="md:!w-[11px] md:!h-[11px]" fill={meta.feedback?.rating === "down" ? "currentColor" : "none"} />
+                <ThumbsDown size={16} className="md:!w-[14px] md:!h-[14px]" fill={meta.feedback?.rating === "down" ? "currentColor" : "none"} />
               </button>
             </span>
           )}
@@ -377,7 +377,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {hasBreakdown && (
             <button
               onClick={() => setShowMeta((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMeta ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {statedItems.length} stated, {researchedItems.length > 0 ? `${researchedItems.length} found, ` : ""}{inferredItems.length} inferred
@@ -388,7 +388,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {sources.length > 0 && (
             <button
               onClick={() => setShowSources((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {sources.length} source{sources.length > 1 ? "s" : ""}
@@ -399,7 +399,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {patternsUsed.length > 0 && (
             <button
               onClick={() => setShowPatterns((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showPatterns ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {patternsUsed.length} pattern{patternsUsed.length > 1 ? "s" : ""}
@@ -410,7 +410,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {memoryUsed.length > 0 && (
             <button
               onClick={() => setShowMemory((v) => !v)}
-              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-xs font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMemory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               <Brain size={9} /> used {memoryUsed.length} from memory
@@ -428,15 +428,15 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2.5">
             {sources.map((src, i) => (
               <div key={i} className="space-y-0.5">
-                <p className="text-xs md:text-[10px] text-text-primary font-medium flex items-center gap-1.5">
+                <p className="text-xs md:text-xs text-text-primary font-medium flex items-center gap-1.5">
                   {src.kind === "attachment" ? <FileText size={10} className="text-text-faint shrink-0" /> : <Globe size={10} className="text-text-faint shrink-0" />}
                   <span className="truncate">{src.kind === "attachment" ? `Read ${src.label}` : `Searched: ${src.label}`}</span>
                 </p>
-                {src.summary && <p className="text-xs md:text-[10px] text-text-muted leading-relaxed pl-4">{src.summary}</p>}
+                {src.summary && <p className="text-xs md:text-xs text-text-muted leading-relaxed pl-4">{src.summary}</p>}
                 {src.links && src.links.length > 0 && (
                   <div className="pl-4 flex flex-wrap gap-x-3 gap-y-0.5">
                     {src.links.map((l) => (
-                      <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="text-xs md:text-[10px] text-accent underline underline-offset-2 truncate max-w-[220px]">
+                      <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="text-xs md:text-xs text-accent underline underline-offset-2 truncate max-w-[220px]">
                         {l.title || l.url}
                       </a>
                     ))}
@@ -449,22 +449,22 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
 
         {showPatterns && patternsUsed.length > 0 && (
           <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
-            <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Known effective patterns used</p>
+            <p className="text-xs md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1">Known effective patterns used</p>
             {patternsUsed.map((name) => (
-              <p key={name} className="text-xs md:text-[10px] text-text-muted flex gap-2">
+              <p key={name} className="text-xs md:text-xs text-text-muted flex gap-2">
                 <span className="text-accent shrink-0">&middot;</span> {name}
               </p>
             ))}
-            <p className="text-xs md:text-[9px] text-text-faint pt-1">Guidance for this kind of task, adapted to your request.</p>
+            <p className="text-xs md:text-xs text-text-faint pt-1">Guidance for this kind of task, adapted to your request.</p>
           </div>
         )}
 
         {/* The stored details this reply drew on */}
         {showMemory && memoryUsed.length > 0 && (
           <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
-            <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">From your memory</p>
+            <p className="text-xs md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1">From your memory</p>
             {memoryUsed.map((m, i) => (
-              <p key={i} className="text-xs md:text-[10px] text-text-muted">
+              <p key={i} className="text-xs md:text-xs text-text-muted">
                 <span className="text-text-primary font-medium">{m.key}:</span> {m.value}
               </p>
             ))}
@@ -473,7 +473,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
 
         {/* Saved automatically, reported quietly, nothing to approve */}
         {memorySaved.length > 0 && (
-          <p className="mt-2 flex items-center gap-1.5 text-xs md:text-[10px] text-text-faint">
+          <p className="mt-2 flex items-center gap-1.5 text-xs md:text-xs text-text-faint">
             <Brain size={10} className="text-accent shrink-0" />
             <span>
               {memorySaved.some((m) => m.action === "updated") && memorySaved.every((m) => m.action === "updated") ? "Updated in memory" : "Saved to memory"}: {memorySaved.map((m) => m.key).join(", ")}

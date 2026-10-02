@@ -86,7 +86,7 @@ function MemoryRow({
       <div className="min-w-0">
         <p className="text-sm font-medium text-text-primary">
           {memory.key}
-          <span className="ml-2 font-mono text-[11px] md:text-[9px] uppercase tracking-wider text-text-faint">
+          <span className="ml-2 font-mono text-[11px] md:text-xs uppercase tracking-wider text-text-faint">
             {memory.source === "manual" ? "added by you" : memory.source === "onboarding" ? "from onboarding" : "saved from a chat"}
           </span>
         </p>
@@ -189,7 +189,7 @@ export function MemoryTab() {
             .filter((g) => g.items.length > 0)
             .map((group) => (
               <div key={group.id}>
-                <p className="px-0.5 mb-2 font-mono text-xs md:text-[10px] uppercase tracking-widest text-text-faint">
+                <p className="px-0.5 mb-2 font-mono text-xs md:text-xs uppercase tracking-widest text-text-faint">
                   {group.label}
                 </p>
                 <div className="space-y-2">

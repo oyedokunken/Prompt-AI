@@ -53,24 +53,11 @@ function brandColour(hex: string): string | undefined {
 export function IntegrationsTab() {
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-xl font-semibold text-text-primary mb-2">Integrations</h1>
-      <p className="text-sm text-text-muted mb-5">
-        Where Prompt AI is heading. These are planned, and none of them can be connected yet.
-      </p>
-
-      <div className="rounded-xl border border-dashed border-border bg-raised/40 px-4 py-3 mb-8 flex items-start gap-3">
-        <span className="mt-0.5 shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-xs md:text-[10px] uppercase tracking-wider text-text-faint">
-          Preview
-        </span>
-        <p className="text-sm text-text-muted">
-          Nothing on this page is switched on. Everything under the other tabs works today, this one is a look at what is next.
-        </p>
-      </div>
-
+      <h1 className="text-xl font-semibold text-text-primary mb-6">Integrations</h1>
       <div className="space-y-8">
         {PLANNED.map(({ group, items }) => (
           <section key={group} aria-label={group}>
-            <h2 className="font-mono text-[13px] md:text-[11px] uppercase tracking-widest text-text-faint mb-3">{group}</h2>
+            <h2 className="font-mono text-[13px] md:text-[13px] uppercase tracking-widest text-text-faint mb-3">{group}</h2>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {items.map(({ icon, name, summary }) => (
                 <li
@@ -93,7 +80,7 @@ export function IntegrationsTab() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-text-primary">{name}</p>
-                      <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs md:text-[10px] font-mono uppercase tracking-wide text-text-faint">
+                      <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs md:text-xs font-mono uppercase tracking-wide text-text-faint">
                         Planned
                       </span>
                     </div>

@@ -10,6 +10,8 @@ export interface UserProfile {
   preferredName: string | null;
   avatarUrl: string | null;
   provider: string;
+  // True when the account can sign in with an email and password.
+  hasPassword: boolean;
   role: string | null;
   about: string | null;
   workingOn: string | null;
@@ -22,6 +24,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
   github: "GitHub",
 };
+
+// An account has a password when email is one of its sign in methods. Someone
+// who only ever signs in with Google or GitHub has none to change.
+export function hasEmailLogin(appMetadata: { provider?: string; providers?: string[] } | undefined): boolean {
+  const providers = appMetadata?.providers ?? (appMetadata?.provider ? [appMetadata.provider] : ["email"]);
+  return providers.includes("email");
+}
 
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider;
@@ -60,6 +69,7 @@ export function useUserProfile() {
       preferredName: user.user_metadata?.preferred_name ?? null,
       avatarUrl: user.user_metadata?.avatar_url ?? null,
       provider: user.app_metadata?.provider ?? "email",
+      hasPassword: hasEmailLogin(user.app_metadata),
       role: user.user_metadata?.role ?? null,
       about: user.user_metadata?.about ?? null,
       workingOn: user.user_metadata?.working_on ?? null,

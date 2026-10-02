@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2, ChevronDown, Check, ArrowLeft, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { passwordRules } from "@/lib/schemas/password";
 import { DisposableEmailModal } from "@/components/DisposableEmailModal";
 import { cn } from "@/lib/utils";
 
@@ -23,13 +24,7 @@ const schema = z
       .min(1, "Email is required")
       .email("Enter a valid email address")
       .transform((v) => v.trim().toLowerCase()),
-    password: z
-      .string()
-      .min(10, "Password must be at least 10 characters")
-      .regex(/[A-Z]/, "Password needs at least one uppercase letter")
-      .regex(/[a-z]/, "Password needs at least one lowercase letter")
-      .regex(/[0-9]/, "Password needs at least one number")
-      .regex(/[^A-Za-z0-9]/, "Password needs at least one symbol"),
+    password: passwordRules,
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {

@@ -1,3 +1,4 @@
+import { createClient, type User } from "@supabase/supabase-js";
 import crypto from "crypto";
 import disposableDomains from "disposable-email-domains";
 import { prisma } from "../lib/prisma";
@@ -234,4 +235,33 @@ export const authService = {
       throw new Error("PASSWORD_RESET_FAILED");
     }
   },
+
+  // -------------------------------------------------------------------------
+  // Signed in password change
+  // -------------------------------------------------------------------------
+  // The caller has already been verified against Supabase by requireUser. This
+  // proves the current password as well, so an unattended open session cannot
+  // be used to take over the account, then sets the new one.
+  async changePassword(user: User, currentPassword: string, newPassword: string): Promise<void> {
+    const providers = ((user.app_metadata?.providers as string[] | undefined) ?? [user.app_metadata?.provider as string]).filter(Boolean);
+    if (!user.email || !providers.includes("email")) throw new Error("NO_PASSWORD");
+
+    // A throwaway client, so checking the password never touches any stored session.
+    const verifier = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: verifyError } = await verifier.auth.signInWithPassword({ email: user.email, password: currentPassword });
+    if (verifyError) {
+      if (/invalid login credentials/i.test(verifyError.message)) throw new Error("WRONG_PASSWORD");
+      console.error("[authService] current password check failed:", verifyError);
+      throw new Error("PASSWORD_CHANGE_FAILED");
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+    if (error) {
+      console.error("[authService] password change updateUserById failed:", error);
+      throw new Error("PASSWORD_CHANGE_FAILED");
+    }
+  },
 };
+

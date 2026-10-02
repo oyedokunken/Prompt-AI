@@ -56,9 +56,9 @@ const features = [
   },
   {
     icon: Cpu,
-    title: "Multi-model targeting",
+    title: "Formatted for where it is going",
     description:
-      "Adjust formatting, token budgeting, and instruction style based on the model you're targeting: Claude, GPT-4, Gemini, or others.",
+      "Prompts come out as clean plain text by default so they paste anywhere, with tagged sections when the destination is Claude and markdown when you name a place that renders it. GPT-4o is the model Prompt AI builds with today, and more targets are planned.",
     accent: "accent",
   },
   {
@@ -90,7 +90,7 @@ export function Capabilities() {
           <p className="text-text-muted text-base mt-4 leading-relaxed max-w-2xl">
             Prompt AI fills the gap between what you can describe and what a
             model actually needs. Every transformation is auditable, editable,
-            and targeted to the model you're running.
+            and formatted for where you are going to use it.
           </p>
         </motion.div>
 

@@ -10,9 +10,10 @@ import { useTheme } from "@/lib/theme/ThemeProvider";
 import { UsageTab } from "@/components/settings/UsageTab";
 import { MemoryTab } from "@/components/settings/MemoryTab";
 import { IntegrationsTab } from "@/components/settings/IntegrationsTab";
+import { AccountsTab } from "@/components/settings/AccountsTab";
 import { Upload, Loader2, X, Pencil, Check } from "lucide-react";
 
-type SettingsTab = "profile" | "memory" | "usage" | "integrations";
+type SettingsTab = "profile" | "memory" | "usage" | "integrations" | "accounts";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -24,7 +25,7 @@ export default function SettingsPage() {
   // Lets other screens link straight to a tab, such as the memory toast.
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tab");
-    if (requested === "memory" || requested === "usage" || requested === "profile" || requested === "integrations") setTab(requested);
+    if (requested === "memory" || requested === "usage" || requested === "profile" || requested === "integrations" || requested === "accounts") setTab(requested);
   }, []);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +120,8 @@ export default function SettingsPage() {
           { id: "memory", label: "Memory" },
           { id: "usage", label: "Usage" },
           { id: "integrations", label: "Integrations" },
+          // Last, and only for accounts that sign in with a password.
+          ...(profile.hasPassword ? [{ id: "accounts", label: "Accounts" }] : []),
         ] as { id: SettingsTab; label: string }[]).map(({ id, label }) => (
           <button
             key={id}
@@ -183,7 +186,7 @@ export default function SettingsPage() {
                       </p>
 
                       <div className="flex items-center gap-3">
-                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[13px] md:text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[13px] md:text-[13px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
                           {uploading ? (
                             <>
                               <Loader2 size={12} className="animate-spin" />
@@ -204,7 +207,7 @@ export default function SettingsPage() {
                           />
                         </label>
 
-                        <span className="text-xs md:text-[10px] text-text-faint">Max 2MB</span>
+                        <span className="text-xs md:text-xs text-text-faint">Max 2MB</span>
                       </div>
                     </>
                   )}
@@ -243,7 +246,7 @@ export default function SettingsPage() {
                 {!editingRole && (
                   <button
                     onClick={() => setEditingRole(true)}
-                    className="inline-flex items-center gap-1.5 text-sm md:text-[11px] text-accent hover:text-accent/80 transition-colors px-3 py-3 -mx-3 -my-3 md:p-0 md:m-0"
+                    className="inline-flex items-center gap-1.5 text-sm md:text-[13px] text-accent hover:text-accent/80 transition-colors px-3 py-3 -mx-3 -my-3 md:p-0 md:m-0"
                   >
                     <Pencil size={11} /> Edit
                   </button>
@@ -303,6 +306,8 @@ export default function SettingsPage() {
         {tab === "usage" && <UsageTab />}
 
         {tab === "integrations" && <IntegrationsTab />}
+
+        {tab === "accounts" && profile.hasPassword && <AccountsTab />}
       </div>
     </div>
   );

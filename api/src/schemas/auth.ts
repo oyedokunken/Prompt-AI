@@ -25,6 +25,16 @@ export const verifySignupOtpSchema = z.object({ email, otp, password });
 
 export const verifyResetOtpSchema = z.object({ email, otp, newPassword: password });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password"),
+    newPassword: password,
+  })
+  .refine((d) => d.currentPassword !== d.newPassword, {
+    message: "Choose a password different from your current one",
+    path: ["newPassword"],
+  });
+
 export type OtpRequestInput = z.infer<typeof otpRequestSchema>;
 export type VerifySignupOtpInput = z.infer<typeof verifySignupOtpSchema>;
 export type VerifyResetOtpInput = z.infer<typeof verifyResetOtpSchema>;

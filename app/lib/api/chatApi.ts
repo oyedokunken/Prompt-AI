@@ -151,3 +151,18 @@ export async function fetchTranscribeTicket(): Promise<{ ticket: string; url: st
   if (!res.ok) throw new Error(await errorMessageFrom(res, "Live transcription is unavailable"));
   return (await res.json()) as { ticket: string; url: string };
 }
+
+// Wakes the data service ahead of a voice message. The free host it runs on
+// sleeps when idle and takes many seconds to come back, which would otherwise
+// land in the middle of the first sentence.
+let lastWarm = 0;
+export async function warmTranscription(): Promise<void> {
+  if (Date.now() - lastWarm < 4 * 60_000) return;
+  lastWarm = Date.now();
+  try {
+    const token = await accessToken();
+    await fetch(`${API_URL}/chat/warm`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    // best effort
+  }
+}

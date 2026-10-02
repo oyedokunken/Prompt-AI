@@ -11,6 +11,7 @@ import {
   openGenerateStream,
   transcribeAudio,
   mintTranscribeTicket,
+  warmData,
   type GenerateRequestBody,
 } from "../lib/dataClient";
 import { isReadable, toDataAttachments } from "../services/attachments";
@@ -316,4 +317,12 @@ chatRouter.post("/transcribe/ticket", chatLimiter, requireUser, (req: Request, r
     return;
   }
   res.json(mintTranscribeTicket(user.id));
+});
+
+// POST /chat/warm
+// Pokes /data so it is awake by the time a voice message starts. Waits briefly
+// so the request is actually sent before this function returns.
+chatRouter.post("/warm", chatLimiter, requireUser, async (_req: Request, res: Response): Promise<void> => {
+  await warmData();
+  res.status(204).end();
 });

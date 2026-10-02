@@ -1,11 +1,13 @@
 import { Router, type Request, type Response } from "express";
 import { authService } from "../services/authService";
 import { validate } from "../middleware/validate";
+import { requireUser } from "../middleware/requireUser";
 import { authLimiter } from "../middleware/rateLimit";
 import {
   otpRequestSchema,
   verifySignupOtpSchema,
   verifyResetOtpSchema,
+  changePasswordSchema,
 } from "../schemas/auth";
 
 export const authRouter = Router();
@@ -140,5 +142,40 @@ authRouter.post(
       console.error("[POST /auth/send-welcome]", err);
     }
     res.json({ message: "ok" });
+  }
+);
+
+// POST /auth/change-password
+// For a signed in user with an email and password account. requireUser checks
+// the bearer token against Supabase on every call, so an expired or revoked
+// session is refused here, not trusted from the browser. The current password
+// is proven again before the new one is set.
+authRouter.post(
+  "/change-password",
+  authLimiter,
+  requireUser,
+  validate(changePasswordSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: "UNAUTHORIZED", message: "Your session has expired. Sign in again." });
+      return;
+    }
+    try {
+      await authService.changePassword(user, req.body.currentPassword as string, req.body.newPassword as string);
+      res.json({ message: "Password updated." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message === "WRONG_PASSWORD") {
+        res.status(400).json({ error: "WRONG_PASSWORD", message: "Your current password is not correct." });
+      } else if (message === "NO_PASSWORD") {
+        res.status(400).json({ error: "NO_PASSWORD", message: "This account signs in with Google or GitHub and has no password to change." });
+      } else if (message === "PASSWORD_CHANGE_FAILED") {
+        res.status(502).json({ error: "PASSWORD_CHANGE_FAILED", message: "Could not change your password. Try again." });
+      } else {
+        console.error("[POST /auth/change-password]", err);
+        res.status(500).json({ error: "INTERNAL_ERROR", message: "An unexpected error occurred." });
+      }
+    }
   }
 );

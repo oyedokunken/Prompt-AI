@@ -38,13 +38,13 @@ export function AttachmentCard({ name, type, url, size, onRemove, href, classNam
             {label.length > 4 ? label.slice(0, 4) : label}
           </div>
         )}
-        <span className={cn("absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[11px] md:text-[9px] font-mono font-bold tracking-wide shadow", styles.badge)}>
+        <span className={cn("absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[11px] md:text-xs font-mono font-bold tracking-wide shadow", styles.badge)}>
           {label}
         </span>
       </div>
       <div className="px-2.5 py-2 min-w-0">
-        <p className="text-[13px] md:text-[11px] text-text-primary font-medium truncate" title={name}>{name}</p>
-        <p className="text-[11px] md:text-[9px] text-text-faint font-mono mt-0.5 whitespace-pre">{meta}</p>
+        <p className="text-[13px] md:text-[13px] text-text-primary font-medium truncate" title={name}>{name}</p>
+        <p className="text-[11px] md:text-xs text-text-faint font-mono mt-0.5 whitespace-pre">{meta}</p>
       </div>
     </>
   );

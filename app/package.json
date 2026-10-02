@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test lib/usageSeries.test.ts lib/voice/voice.test.ts lib/pins.test.ts"
+    "test": "tsx --test lib/usageSeries.test.ts lib/voice/voice.test.ts lib/pins.test.ts lib/schemas/password.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

@@ -99,7 +99,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const { memories, refresh: refreshMemories } = useMemories();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  // Pins from the user's profile, used until the chat table has its own pinned column.
+  const [profilePins, setProfilePins] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [pendingFirstMessage, setPendingFirstMessage] = useState<PendingFirstMessage | null>(null);
@@ -108,6 +109,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  // Once the table has the is_pinned column, it is the source of truth. Until
+  // then pins live on the user's profile, so pinning works either way.
+  const columnPins = sessions.length > 0 && "is_pinned" in (sessions[0] as object);
+  const pinnedIds = columnPins
+    ? sessions
+        .filter((s) => s.is_pinned)
+        .sort((a, b) => (b.pinned_at ?? "").localeCompare(a.pinned_at ?? ""))
+        .map((s) => s.id)
+    : profilePins;
   const pinnedIdsRef = useRef<string[]>([]);
   pinnedIdsRef.current = pinnedIds;
 
@@ -137,7 +147,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [loadSessions]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setPinnedIds(readPinned(data.user?.user_metadata)));
+    supabase.auth.getUser().then(({ data }) => setProfilePins(readPinned(data.user?.user_metadata)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -202,19 +212,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Applied at once and saved to the profile, put back if the save fails.
+  // Applied at once and saved, put back if the save fails.
   const togglePin = useCallback(async (id: string) => {
     const previous = pinnedIdsRef.current;
     const next = togglePinned(previous, id);
-    setPinnedIds(next);
+    const nowPinned = next.includes(id);
+
+    if (columnPins) {
+      const pinnedAt = nowPinned ? new Date().toISOString() : null;
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_pinned: nowPinned, pinned_at: pinnedAt } : s)));
+      const { error: pinError } = await supabase
+        .from("chat_sessions")
+        .update({ is_pinned: nowPinned, pinned_at: pinnedAt })
+        .eq("id", id);
+      if (pinError) {
+        console.error("[dashboard] togglePin failed:", pinError);
+        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, is_pinned: !nowPinned, pinned_at: null } : s)));
+        setError("Could not update pinned chats. Try again.");
+      }
+      return;
+    }
+
+    setProfilePins(next);
     const { error: pinError } = await supabase.auth.updateUser({ data: { [PIN_KEY]: next } });
     if (pinError) {
       console.error("[dashboard] togglePin failed:", pinError);
-      setPinnedIds(previous);
+      setProfilePins(previous);
       setError("Could not update pinned chats. Try again.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [columnPins]);
 
   const cancelPendingDelete = useCallback(() => setPendingDelete(null), []);
 

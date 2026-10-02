@@ -84,7 +84,7 @@ export function ConversationModal({ session, onClose }: ConversationModalProps) 
             ].map((s) => (
               <div key={s.label} className="rounded-lg border border-border bg-base px-3 py-2">
                 <p className="text-base font-semibold text-text-primary">{s.value}</p>
-                <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint">{s.label}</p>
+                <p className="text-[11px] md:text-xs font-mono uppercase tracking-wider text-text-faint">{s.label}</p>
               </div>
             ))}
           </div>
@@ -92,7 +92,7 @@ export function ConversationModal({ session, onClose }: ConversationModalProps) 
           <p className="text-sm text-text-muted leading-relaxed">{summary.overview}</p>
 
           <div>
-            <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1.5">What Prompt AI gathered</p>
+            <p className="text-[11px] md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1.5">What Prompt AI gathered</p>
             {summary.learned.length === 0 ? (
               <p className="text-xs text-text-faint">Nothing beyond the conversation itself.</p>
             ) : (
@@ -107,7 +107,7 @@ export function ConversationModal({ session, onClose }: ConversationModalProps) 
           </div>
 
           <div>
-            <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1.5">Feedback you gave</p>
+            <p className="text-[11px] md:text-xs font-mono uppercase tracking-wider text-text-faint mb-1.5">Feedback you gave</p>
             {summary.feedback.length === 0 ? (
               <p className="text-xs text-text-faint">No feedback recorded on this conversation.</p>
             ) : (

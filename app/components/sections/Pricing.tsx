@@ -13,7 +13,7 @@ const PLANS = [
     description: "Get started. No credit card required.",
     features: [
       "20 prompt generations per day",
-      "3 models (GPT-4o mini, Claude Haiku, Gemini Flash)",
+      "GPT-4o, with more models planned",
       "Completeness scoring",
       "7-day prompt history",
       "Community support",

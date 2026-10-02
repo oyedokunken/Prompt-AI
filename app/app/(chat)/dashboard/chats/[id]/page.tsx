@@ -344,13 +344,13 @@ export default function ChatPage() {
           <>
           <button
             onClick={() => togglePin(session.id)}
-            className={`w-11 h-11 md:w-7 md:h-7 flex items-center justify-center rounded-lg transition-colors hover:bg-raised ${
+            className={`w-11 h-11 md:w-9 md:h-9 flex items-center justify-center rounded-lg transition-colors hover:bg-raised ${
               pinnedIds.includes(session.id) ? "text-accent" : "text-text-muted hover:text-text-primary"
             }`}
             aria-label={pinnedIds.includes(session.id) ? "Unpin this chat" : "Pin this chat"}
             aria-pressed={pinnedIds.includes(session.id)}
           >
-            {pinnedIds.includes(session.id) ? <PinOff size={18} className="md:w-[13px] md:h-[13px]" /> : <Pin size={18} className="md:w-[13px] md:h-[13px]" />}
+            {pinnedIds.includes(session.id) ? <PinOff size={18} className="md:w-[16px] md:h-[16px]" /> : <Pin size={18} className="md:w-[16px] md:h-[16px]" />}
           </button>
           <div className="hidden sm:flex items-center gap-2">
             <ShareMenu

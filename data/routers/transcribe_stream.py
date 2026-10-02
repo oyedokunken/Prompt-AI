@@ -28,6 +28,7 @@ import base64
 import json
 import logging
 import sys
+import time
 from array import array
 from typing import Any, Awaitable, Callable, Optional
 
@@ -51,8 +52,8 @@ FLUSH_TIMEOUT_SECONDS = 8
 # Server side voice detection only closes a phrase at a pause, so a long run of
 # speech would show nothing until the speaker breathes. These settings close a
 # phrase early at the next small dip in volume, so text keeps arriving.
-SEGMENT_SOFT_SECONDS = 2.5
-SEGMENT_HARD_SECONDS = 5.0
+SEGMENT_SOFT_SECONDS = 1.5
+SEGMENT_HARD_SECONDS = 3.2
 QUIET_LEVEL = 350
 QUIET_RUN_SECONDS = 0.12
 
@@ -128,7 +129,7 @@ def session_config(model: str, language: Optional[str]) -> dict[str, Any]:
                         "type": "server_vad",
                         "threshold": 0.5,
                         "prefix_padding_ms": 300,
-                        "silence_duration_ms": 400,
+                        "silence_duration_ms": 250,
                     },
                 }
             },
@@ -206,6 +207,7 @@ async def transcribe_stream(ws: WebSocket) -> None:
 
     state = {"bytes": 0, "speaking": False, "stopping": False, "segment_start": 0, "quiet": 0}
     pending: set[str] = set()
+    committed_at: dict[str, float] = {}
     drained = asyncio.Event()
     drained.set()
 
@@ -224,6 +226,7 @@ async def transcribe_stream(ws: WebSocket) -> None:
                 elif kind == "input_audio_buffer.committed":
                     item_id = event.get("item_id", "")
                     pending.add(item_id)
+                    committed_at[item_id] = time.monotonic()
                     drained.clear()
                     state["segment_start"] = state["bytes"]
                     await _send(ws, {"type": "order", "itemId": item_id, "previousItemId": event.get("previous_item_id")})
@@ -232,6 +235,9 @@ async def transcribe_stream(ws: WebSocket) -> None:
                 elif kind == "conversation.item.input_audio_transcription.completed":
                     item_id = event.get("item_id", "")
                     pending.discard(item_id)
+                    started = committed_at.pop(item_id, None)
+                    if started is not None:
+                        logger.info("phrase decoded in %.0f ms, %d chars", (time.monotonic() - started) * 1000, len(event.get("transcript") or ""))
                     await _send(ws, {"type": "final", "itemId": item_id, "text": (event.get("transcript") or "").strip()})
                     if not pending:
                         drained.set()
@@ -243,12 +249,13 @@ async def transcribe_stream(ws: WebSocket) -> None:
                     code = (event.get("error") or {}).get("code")
                     # An empty buffer on a final commit is expected, not a failure.
                     if code != "input_audio_buffer_commit_empty":
-                        logger.error("realtime error code=%s", code)
+                        logger.error("realtime error code=%s message=%s", code, (event.get("error") or {}).get("message"))
                         await _send(ws, {"type": "error", "message": "Transcription failed"})
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
             # The upstream closed. If the client is finishing, that is fine.
+            logger.warning("upstream socket closed: %s", exc)
             drained.set()
 
     async def pump_client() -> None:

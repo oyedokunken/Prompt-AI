@@ -25,8 +25,8 @@ const STEPS = [
     number: "03",
     title: "Copy and use",
     description:
-      "Paste the structured prompt into Claude, GPT-4o, Gemini, or any model. Get the right output on the first try, without rewriting the prompt manually.",
-    example: "Works with Claude, GPT-4o, Gemini, Mistral, and 10+ more",
+      "Copy the structured prompt and paste it into the chat tool you use. It is plain text, so it works anywhere, and you do not have to rewrite it by hand.",
+    example: "Plain text that pastes into any chat tool",
     tag: "Model-ready output",
   },
 ];

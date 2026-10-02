@@ -57,7 +57,7 @@ export function ClarifyInterview({ intro, question, position, total, onAnswer }:
 
       <div className="max-w-[90%] sm:max-w-[80%] w-full rounded-xl border border-accent/20 bg-accent/5 overflow-hidden">
         <div className="px-4 pt-3 pb-2 border-b border-accent/10 flex items-center justify-between">
-          <p className="text-xs md:text-[10px] font-mono uppercase tracking-widest text-accent">
+          <p className="text-xs md:text-xs font-mono uppercase tracking-widest text-accent">
             Question {position} of {total}
           </p>
           <div className="flex gap-1">

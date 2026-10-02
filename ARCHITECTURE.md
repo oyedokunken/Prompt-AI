@@ -174,7 +174,7 @@ browser  --PCM----->  data  --PCM--> OpenAI realtime transcription
 browser  <--text----  data  <--text--
 ```
 
-Voice detection on its own only closes a phrase at a pause, so a long run of speech would show nothing until the speaker breathed. `data` therefore closes a phrase early at the next dip in volume once it has run past about two and a half seconds, and always by five seconds, so text keeps arriving. A normal recording is made at the same time, so if the socket cannot connect or fails before any text arrives, the whole message is transcribed with the original upload route.
+Voice detection on its own only closes a phrase at a pause, so a long run of speech would show nothing until the speaker breathed. `data` therefore closes a phrase early at the next dip in volume once it has run past about a second and a half, and always by about three seconds, so text keeps arriving. A normal recording is made at the same time, so if the socket cannot connect or fails before any text arrives, the whole message is transcribed with the original upload route.
 
 Cost follows audio sent, not how long the socket stays open. Silence that is sent is billed like speech, so each session is capped at 180 seconds, an idle socket is closed after 20 seconds, and the cheaper `gpt-4o-mini-transcribe` model is used, at half the per minute price of `whisper-1`. Each session logs its seconds and estimated cost.
 

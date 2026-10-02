@@ -14,7 +14,7 @@ export function GenerationStatus({ message }: GenerationStatusProps) {
   return (
     <div className="flex gap-3">
       <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30 bg-signal/10">
-        <span className="font-mono text-xs md:text-[10px] text-signal">P</span>
+        <span className="font-mono text-xs md:text-xs text-signal">P</span>
       </div>
       <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-tl-md bg-base border border-border max-w-[320px]">
         <div className="flex gap-1 shrink-0" aria-hidden="true">

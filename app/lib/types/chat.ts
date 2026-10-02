@@ -4,6 +4,9 @@ export interface ChatSession {
   title: string;
   model: string;
   is_favorite: boolean;
+  // Present once the pinned chats migration has been applied.
+  is_pinned?: boolean;
+  pinned_at?: string | null;
   title_is_custom: boolean;
   created_at: string;
   updated_at: string;
