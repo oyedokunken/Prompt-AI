@@ -6,6 +6,9 @@ All notable changes to this project are documented in this file. Format follows 
 
 ### Added
 
+- An Accounts tab in settings, last in the list and shown only to accounts that sign in with an email and password, for changing the password. It asks for the current password, validates with react-hook-form and Zod with no native validation, has the server verify the session and the current password before changing anything, updates the password through Supabase, and reports the result in a modal
+- A pinned column on chats, with a migration in `api/prisma/pinned_chats.sql`. The dashboard uses it as soon as it exists and uses the user's profile until then
+- A warm up call so the data service is awake before a voice message, a language hint for live transcription, and per phrase timing in the data service logs
 - Live transcription. Speech is streamed to the data service over a WebSocket and relayed to OpenAI realtime transcription, so text appears while the user is speaking. The recording is also made normally and used as a fallback if the live connection fails
 - A short lived, single use ticket for the live socket, minted by the api and checked by the data service
 - Pinned chats, with their own group at the top of the chat list and a pin control in the chat header and in each chat's menu
@@ -14,6 +17,10 @@ All notable changes to this project are documented in this file. Format follows 
 
 ### Changed
 
+- Marketing copy about models now matches the product: GPT-4o is the only model available, the others are listed as coming soon, and generated prompts are plain text that can be pasted anywhere
+- Live transcription closes phrases sooner, after about a second and a half of speech and by about three seconds at the latest, so text arrives every second or two
+- Desktop sizing was raised to the same standard as mobile, with a wider sidebar, larger text and larger controls
+- The Integrations tab no longer shows its preview explanation
 - The dashboard header is one shared component and always shows the logo beside the theme switcher, in a new chat and inside a conversation, and never a chat title
 - The marketing page previews are now built from the dashboard's own sidebar, header, message and composer components, so they match the product by construction, and the three bar completeness card shows the real score badges
 - A mobile sizing pass over the dashboard, the drawer, the composer, messages, modals and settings, with larger text and tap targets, and message actions that no longer depend on hover

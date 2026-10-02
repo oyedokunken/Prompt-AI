@@ -10,6 +10,7 @@ This service is deployed on Vercel, as its own project, separate from `/api`.
 - Live status while a reply is generated, taken from the real stage events the server streams
 - Showing the finished prompt in its own card with a copy button, apart from the conversational reply, with the stated, found and inferred breakdown and the sources it drew on
 - Attachments and voice input: attaching files and images, and speaking a message that appears as text while you talk
+- An Accounts tab for changing a password, shown only to email and password accounts
 - Pinned chats, shown as their own group at the top of the chat list, in the sidebar and in the phone drawer
 - A dashboard that works on a phone, with larger text and tap targets and every chat action reachable by touch
 - The library: history, saved prompts, favorites, media, exports and shareable read only links
