@@ -33,11 +33,11 @@ export function MemoryToast({ items, onDismiss, onManage }: MemoryToastProps) {
     >
       <Brain size={13} className="text-accent shrink-0 mt-0.5" />
       <div className="min-w-0">
-        <p className="text-[11px] text-text-primary leading-snug">
+        <p className="text-[13px] md:text-[11px] text-text-primary leading-snug">
           {allUpdated ? "Updated in memory" : "Saved to memory"}
         </p>
-        <p className="text-[10px] text-text-muted truncate">{label}</p>
-        <button onClick={onManage} className="mt-1 text-[10px] text-accent underline underline-offset-2 hover:text-accent/80">
+        <p className="text-xs md:text-[10px] text-text-muted truncate">{label}</p>
+        <button onClick={onManage} className="mt-1 text-xs md:text-[10px] text-accent underline underline-offset-2 hover:text-accent/80">
           Manage memory
         </button>
       </div>

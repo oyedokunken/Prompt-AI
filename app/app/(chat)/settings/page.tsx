@@ -160,7 +160,7 @@ export default function SettingsPage() {
                   {profile.avatarUrl && (
                     <button
                       onClick={handleRemoveAvatar}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-red-400 hover:border-red-400/40 transition-colors"
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-red-400 hover:border-red-400/40 transition-colors before:absolute before:-inset-3 before:content-[''] md:before:hidden"
                       aria-label="Remove profile picture"
                       title="Remove picture"
                     >
@@ -183,7 +183,7 @@ export default function SettingsPage() {
                       </p>
 
                       <div className="flex items-center gap-3">
-                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 text-[13px] md:text-[11px] font-medium text-accent hover:bg-accent/15 transition-colors cursor-pointer">
                           {uploading ? (
                             <>
                               <Loader2 size={12} className="animate-spin" />
@@ -204,7 +204,7 @@ export default function SettingsPage() {
                           />
                         </label>
 
-                        <span className="text-[10px] text-text-faint">Max 2MB</span>
+                        <span className="text-xs md:text-[10px] text-text-faint">Max 2MB</span>
                       </div>
                     </>
                   )}
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                     {theme === "dark" ? "Dark" : "Light"} is currently active. This applies everywhere and is remembered on this device.
                   </p>
                 </div>
-                <ThemeToggle />
+                <ThemeToggle className="w-11 h-11 md:w-8 md:h-8" />
               </div>
             </div>
 
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                 {!editingRole && (
                   <button
                     onClick={() => setEditingRole(true)}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm md:text-[11px] text-accent hover:text-accent/80 transition-colors px-3 py-3 -mx-3 -my-3 md:p-0 md:m-0"
                   >
                     <Pencil size={11} /> Edit
                   </button>

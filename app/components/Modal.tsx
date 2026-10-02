@@ -45,17 +45,17 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide =
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-border">
           <div className="min-w-0">
-            <h2 id="modal-title" className="text-sm font-semibold text-text-primary truncate">
+            <h2 id="modal-title" className="text-base md:text-sm font-semibold text-text-primary truncate">
               {title}
             </h2>
-            {subtitle && <p className="text-[11px] text-text-faint font-mono mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-[13px] md:text-[11px] text-text-faint font-mono mt-0.5">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
-            className="p-1 -mr-1 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors shrink-0"
+            className="p-3 -m-2 md:p-1 md:-m-0 md:-mr-1 rounded-md text-text-faint hover:text-text-muted hover:bg-raised transition-colors shrink-0"
             aria-label="Close"
           >
-            <X size={15} />
+            <X size={20} className="md:!w-[15px] md:!h-[15px]" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>

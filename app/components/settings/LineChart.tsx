@@ -151,7 +151,7 @@ export function LineChart({ points, format, color = "rgb(var(--color-accent-fill
       {activePoint && active !== null && (
         <div
           role="status"
-          className="pointer-events-none absolute z-10 px-2.5 py-1.5 rounded-md border border-border bg-raised shadow-lg text-[11px] leading-tight whitespace-nowrap"
+          className="pointer-events-none absolute z-10 px-2.5 py-1.5 rounded-md border border-border bg-raised shadow-lg text-[13px] md:text-[11px] leading-tight whitespace-nowrap"
           style={{
             left: `${(x(active) / W) * 100}%`,
             top: 0,

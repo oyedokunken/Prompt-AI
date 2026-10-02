@@ -36,24 +36,24 @@ function ModelSelector({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
+        className="flex items-center gap-2 md:gap-1.5 px-3 py-2.5 md:px-2 md:py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
-        <span className="font-mono text-[10px] text-text-muted">{model.label}</span>
-        <ChevronDown size={10} className="text-text-faint" />
+        <span className="font-mono text-xs md:text-[10px] text-text-muted">{model.label}</span>
+        <ChevronDown size={14} className="text-text-faint md:!w-[10px] md:!h-[10px]" />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 bottom-full mb-1 w-52 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
+          <div className="absolute left-0 bottom-full mb-1 w-60 md:w-52 rounded-lg border border-border bg-surface shadow-xl z-20 overflow-hidden">
             {MODELS.map((m) => (
               <button
                 key={m.id}
                 type="button"
                 disabled={!m.available}
                 onClick={() => { onSelect(m); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-[11px] transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-3 md:py-2 text-sm md:text-[11px] transition-colors ${
                   !m.available
                     ? "text-text-faint cursor-not-allowed"
                     : m.id === model.id
@@ -63,7 +63,7 @@ function ModelSelector({
               >
                 <span>{m.label}</span>
                 {!m.available && (
-                  <span className="text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
+                  <span className="text-[10px] md:text-[8px] font-mono uppercase tracking-wide border border-border rounded px-1 py-0.5">
                     Coming soon
                   </span>
                 )}
@@ -225,24 +225,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const busy = disabled || isTranscribing;
 
   return (
-    <div className="px-4 sm:px-6 pb-4 pt-2">
+    <div className="px-3 sm:px-6 pb-3 md:pb-4 pt-2">
       <div className="flex items-center mb-1.5">
         <ModelSelector model={model} onSelect={onModelChange} />
       </div>
       {voiceError && (
-        <p className="text-[10px] text-red-400 mb-1.5">{voiceError}</p>
+        <p className="text-xs md:text-[10px] text-red-400 mb-1.5">{voiceError}</p>
       )}
       {isRecording && liveFailed && (
-        <p className="text-[10px] text-text-faint mb-1.5">Live text is unavailable, your message will be transcribed when you stop.</p>
+        <p className="text-xs md:text-[10px] text-text-faint mb-1.5">Live text is unavailable, your message will be transcribed when you stop.</p>
       )}
       <div
-        className={`flex items-end gap-2 rounded-xl border bg-raised px-3 py-2.5 transition-colors ${
+        className={`flex items-end gap-1 md:gap-2 rounded-xl border bg-raised px-2 md:px-3 py-1.5 md:py-2.5 transition-colors ${
           busy ? "border-border opacity-60" : "border-border focus-within:border-accent/40"
         }`}
       >
         {/* Attach */}
-        <label className="p-1 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 mb-0.5" aria-label="Attach files">
-          <Paperclip size={14} />
+        <label className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 text-text-faint hover:text-text-muted transition-colors cursor-pointer shrink-0 md:mb-0.5" aria-label="Attach files">
+          <Paperclip size={20} className="md:!w-[14px] md:!h-[14px]" />
           <input
             type="file"
             multiple
@@ -254,15 +254,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         </label>
 
         {/* Emoji */}
-        <div className="relative shrink-0 mb-0.5">
+        <div className="relative shrink-0 md:mb-0.5">
           <button
             type="button"
             onClick={() => setShowEmoji((v) => !v)}
             disabled={busy}
-            className="p-1 text-text-faint hover:text-text-muted transition-colors"
+            className="w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 text-text-faint hover:text-text-muted transition-colors"
             aria-label="Insert emoji"
           >
-            <Smile size={14} />
+            <Smile size={20} className="md:!w-[14px] md:!h-[14px]" />
           </button>
           {showEmoji && (
             <>
@@ -284,8 +284,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           readOnly={isRecording}
           disabled={busy}
           rows={1}
-          className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed"
-          style={{ maxHeight: 120 }}
+          className="flex-1 bg-transparent outline-none text-base md:text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
+          style={{ maxHeight: 140 }}
         />
 
         {/* Voice */}
@@ -293,40 +293,40 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           type="button"
           onClick={isRecording ? stopRecording : startRecording}
           disabled={disabled || isTranscribing}
-          className={`shrink-0 mb-0.5 p-1 transition-colors ${
+          className={`shrink-0 md:mb-0.5 w-10 h-10 md:w-auto md:h-auto flex items-center justify-center md:p-1 transition-colors ${
             isRecording ? "text-red-400" : "text-text-faint hover:text-text-muted"
           }`}
           aria-label={isRecording ? "Stop recording" : "Record a voice message"}
         >
           {isRecording ? (
-            <span className="relative flex items-center justify-center w-3.5 h-3.5">
+            <span className="relative flex items-center justify-center w-5 h-5 md:w-3.5 md:h-3.5">
               <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
-              <Square size={10} className="relative fill-current" />
+              <Square size={14} className="relative fill-current md:!w-[10px] md:!h-[10px]" />
             </span>
           ) : (
-            <Mic size={14} />
+            <Mic size={20} className="md:!w-[14px] md:!h-[14px]" />
           )}
         </button>
 
         {/* Send */}
-        <div className="flex items-center gap-2 shrink-0 mb-0.5">
+        <div className="flex items-center gap-2 shrink-0 md:mb-0.5">
           <span className="font-mono text-[10px] text-text-faint hidden sm:block">⏎</span>
           <button
             onClick={onSend}
             disabled={busy || !value.trim()}
-            className="w-7 h-7 rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent-fill/90 transition-colors"
+            className="w-11 h-11 md:w-7 md:h-7 rounded-xl md:rounded-lg bg-accent-fill text-accent-fill-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-accent-fill/90 transition-colors"
             aria-label="Send"
           >
             {busy ? (
-              <Loader2 size={13} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin md:!w-[13px] md:!h-[13px]" />
             ) : (
-              <ArrowRight size={13} />
+              <ArrowRight size={18} className="md:!w-[13px] md:!h-[13px]" />
             )}
           </button>
         </div>
       </div>
-      <p className="text-center text-[9px] text-text-faint mt-1.5 truncate">
-        Shift+Enter for new line · Enter to send · Review outputs and generated code before use.
+      <p className="text-center text-[11px] md:text-[9px] text-text-faint mt-1.5 md:truncate">
+        <span className="hidden md:inline">Shift+Enter for new line · Enter to send · </span>Review outputs and generated code before use.
       </p>
     </div>
   );

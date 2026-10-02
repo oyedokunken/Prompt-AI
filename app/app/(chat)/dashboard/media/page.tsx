@@ -84,7 +84,7 @@ export default function MediaPage() {
               <button
                 key={id}
                 onClick={() => setFilter(id)}
-                className={`px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-wide transition-colors ${
+                className={`px-3.5 py-2.5 md:px-2.5 md:py-1 rounded-md text-xs md:text-[10px] font-mono uppercase tracking-wide transition-colors ${
                   filter === id
                     ? "bg-accent/10 text-accent border border-accent/20"
                     : "text-text-faint border border-transparent hover:text-text-muted"
@@ -130,11 +130,11 @@ export default function MediaPage() {
                           {fileTypeLabel(item.name, item.type).slice(0, 4)}
                         </div>
                       )}
-                      <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wide shadow ${KIND_STYLES[fileKind(item.type, item.name)].badge}`}>
+                      <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[11px] md:text-[9px] font-mono font-bold tracking-wide shadow ${KIND_STYLES[fileKind(item.type, item.name)].badge}`}>
                         {fileTypeLabel(item.name, item.type)}
                       </span>
                     </div>
-                    <p className="text-[11px] text-text-muted truncate px-2.5 py-2">{item.name}</p>
+                    <p className="text-[13px] md:text-[11px] text-text-muted truncate px-2.5 py-2">{item.name}</p>
                   </button>
                 );
               })}

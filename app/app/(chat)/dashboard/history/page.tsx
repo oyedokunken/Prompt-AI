@@ -23,14 +23,14 @@ export default function HistoryPage() {
           <h1 className="text-xl font-semibold text-text-primary mb-1">All history</h1>
           <p className="text-sm text-text-muted mb-4">Every conversation, most recent first.</p>
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface mb-4">
-            <Search size={13} className="text-text-faint shrink-0" />
+          <div className="flex items-center gap-2 px-3 py-3 md:py-2 rounded-lg border border-border bg-surface mb-4">
+            <Search size={18} className="text-text-faint shrink-0 md:!w-[13px] md:!h-[13px]" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search your chats..."
-              className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-faint"
+              className="flex-1 bg-transparent outline-none text-base md:text-sm text-text-primary placeholder:text-text-faint"
             />
           </div>
 

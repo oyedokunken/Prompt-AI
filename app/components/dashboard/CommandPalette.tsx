@@ -122,7 +122,7 @@ export function CommandPalette({
                   placeholder="Search chats or jump to an action..."
                   className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-faint"
                 />
-                <kbd className="hidden sm:inline text-[10px] font-mono text-text-faint border border-border rounded px-1.5 py-0.5">
+                <kbd className="hidden sm:inline text-xs md:text-[10px] font-mono text-text-faint border border-border rounded px-1.5 py-0.5">
                   Esc
                 </kbd>
               </div>
@@ -143,7 +143,7 @@ export function CommandPalette({
                       <action.icon size={13} className="shrink-0 text-text-faint" />
                       <span className="text-[13px] truncate flex-1">{action.label}</span>
                       {action.hint && (
-                        <span className="text-[10px] font-mono text-text-faint shrink-0">{action.hint}</span>
+                        <span className="text-xs md:text-[10px] font-mono text-text-faint shrink-0">{action.hint}</span>
                       )}
                     </button>
                   ))

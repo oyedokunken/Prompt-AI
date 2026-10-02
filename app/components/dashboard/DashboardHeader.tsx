@@ -37,7 +37,7 @@ export function DashboardHeaderView({
         >
           <Menu size={22} />
         </button>
-        <Link href="/dashboard" aria-label="Prompt AI home" className="shrink-0 rounded-md focus-visible:outline-accent">
+        <Link href="/dashboard" aria-label="Prompt AI home" className="shrink-0 rounded-md min-h-[44px] md:min-h-0 flex items-center focus-visible:outline-accent">
           <Logo variant="color" size={24} className="md:hidden" />
           <Logo variant="color" size={18} className="hidden md:inline-flex" />
         </Link>

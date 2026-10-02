@@ -26,7 +26,7 @@ export function PreviewModal({ title, subtitle, onClose, children }: PreviewModa
         <div className="flex items-center justify-between gap-3 px-4 h-11 border-b border-border shrink-0">
           <div className="min-w-0">
             <p className="text-sm font-medium text-text-primary truncate">{title}</p>
-            {subtitle && <p className="text-[10px] font-mono text-text-faint truncate">{subtitle}</p>}
+            {subtitle && <p className="text-xs md:text-[10px] font-mono text-text-faint truncate">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}

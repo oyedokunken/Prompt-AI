@@ -61,21 +61,21 @@ export default function SavedPromptsPage() {
                   <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); copyQuick(p); }}
-                      className="p-1.5 text-text-faint hover:text-text-muted transition-colors"
+                      className="p-3 md:p-1.5 text-text-faint hover:text-text-muted transition-colors"
                       aria-label="Copy prompt"
                     >
                       {copiedId === p.id ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleSavedFavorite(p.id, !p.is_favorite); }}
-                      className={`p-1.5 transition-colors ${p.is_favorite ? "text-accent" : "text-text-faint hover:text-accent"}`}
+                      className={`p-3 md:p-1.5 transition-colors ${p.is_favorite ? "text-accent" : "text-text-faint hover:text-accent"}`}
                       aria-label={p.is_favorite ? "Remove from favorites" : "Add to favorites"}
                     >
                       <Star size={13} fill={p.is_favorite ? "currentColor" : "none"} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); requestDeleteSavedPrompt(p.id); }}
-                      className="p-1.5 text-text-faint hover:text-red-400 transition-colors"
+                      className="p-3 md:p-1.5 text-text-faint hover:text-red-400 transition-colors"
                       aria-label="Delete saved prompt"
                     >
                       <Trash2 size={13} />

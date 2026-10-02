@@ -34,7 +34,7 @@ function EmptyState({ onStarter, name }: { onStarter: (text: string) => void; na
           <button
             key={s}
             onClick={() => onStarter(s)}
-            className="text-left px-3 py-2.5 rounded-lg border border-border bg-raised hover:border-accent/30 hover:bg-raised/80 transition-colors text-[11px] text-text-muted"
+            className="text-left px-4 py-3.5 md:px-3 md:py-2.5 rounded-lg border border-border bg-raised hover:border-accent/30 hover:bg-raised/80 transition-colors text-[13px] md:text-[11px] text-text-muted"
           >
             {s}
           </button>

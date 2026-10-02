@@ -66,10 +66,10 @@ export function SavedPromptModal({ prompt, onClose }: SavedPromptModalProps) {
           </div>
           {inferred.length > 0 && (
             <div>
-              <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1.5">Inferred when this was built</p>
+              <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1.5">Inferred when this was built</p>
               <ul className="space-y-1">
                 {inferred.map((a, i) => (
-                  <li key={i} className="text-[11px] text-text-muted flex gap-2">
+                  <li key={i} className="text-[13px] md:text-[11px] text-text-muted flex gap-2">
                     <span className="text-accent shrink-0">&middot;</span> {a}
                   </li>
                 ))}

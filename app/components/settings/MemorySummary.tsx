@@ -78,7 +78,7 @@ export function MemorySummary({ memories }: { memories: UserMemory[] }) {
   return (
     <div className="rounded-xl border border-accent/20 bg-accent/5 px-5 py-4 mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-mono uppercase tracking-widest text-accent flex items-center gap-1.5">
+        <p className="text-xs md:text-[10px] font-mono uppercase tracking-widest text-accent flex items-center gap-1.5">
           <Brain size={11} /> What Prompt AI knows about you
         </p>
         <button
