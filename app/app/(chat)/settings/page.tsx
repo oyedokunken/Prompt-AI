@@ -163,7 +163,7 @@ export default function SettingsPage() {
                   {profile.avatarUrl && (
                     <button
                       onClick={handleRemoveAvatar}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-red-400 hover:border-red-400/40 transition-colors before:absolute before:-inset-3 before:content-[''] md:before:hidden"
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-text-faint hover:text-red-400 hover:border-red-400/40 transition-colors before:absolute before:-inset-3 before:content-['']"
                       aria-label="Remove profile picture"
                       title="Remove picture"
                     >
@@ -246,7 +246,7 @@ export default function SettingsPage() {
                 {!editingRole && (
                   <button
                     onClick={() => setEditingRole(true)}
-                    className="inline-flex items-center gap-1.5 text-sm md:text-[13px] text-accent hover:text-accent/80 transition-colors px-3 py-3 -mx-3 -my-3 md:p-0 md:m-0"
+                    className="inline-flex items-center gap-1.5 text-sm md:text-[13px] text-accent hover:text-accent/80 transition-colors px-3 py-3 -mx-3 -my-3 md:px-3 md:py-2 md:-mx-3 md:-my-2"
                   >
                     <Pencil size={11} /> Edit
                   </button>

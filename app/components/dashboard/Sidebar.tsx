@@ -513,7 +513,7 @@ export function Sidebar({
       : "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors";
     const footerButton = mobile
       ? "w-11 h-11 flex items-center justify-center rounded-lg text-text-faint hover:text-text-muted hover:bg-raised transition-colors"
-      : "p-2 text-text-faint hover:text-text-muted transition-colors";
+      : "p-2.5 text-text-faint hover:text-text-muted transition-colors";
 
     return (
       <>
@@ -522,7 +522,7 @@ export function Sidebar({
           <button
             onClick={handleNewChat}
             className={`w-full flex items-center justify-center gap-2 rounded-md bg-accent/10 border border-accent/20 font-medium text-accent hover:bg-accent/15 transition-colors ${
-              mobile ? "px-3 py-3 min-h-[48px] text-[16px] rounded-xl" : "px-2 py-1.5 text-[11px]"
+              mobile ? "px-3 py-3 min-h-[48px] text-[16px] rounded-xl" : "px-3 py-2.5 text-[13px]"
             }`}
           >
             <Plus size={mobile ? 18 : 15} /> New chat
@@ -624,10 +624,10 @@ export function Sidebar({
           </button>
           <div className="flex items-center gap-0.5 shrink-0">
             <button onClick={onSettings} className={footerButton} aria-label="Settings">
-              <Settings size={mobile ? 20 : 15} />
+              <Settings size={mobile ? 20 : 16} />
             </button>
             <button onClick={onSignOut} className={`${footerButton} hover:!text-red-400`} aria-label="Sign out">
-              <LogOut size={mobile ? 20 : 15} />
+              <LogOut size={mobile ? 20 : 16} />
             </button>
           </div>
         </div>
@@ -653,7 +653,7 @@ export function Sidebar({
     <aside className="w-64 shrink-0 border-r border-border bg-surface flex-col hidden md:flex">
       {/* Brand + collapse + search, one row */}
       <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <Logo variant="color" size={22} />
+        <Logo variant="color" size={26} />
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setSearchOpen((v) => !v)}
