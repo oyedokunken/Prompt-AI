@@ -1,30 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Container } from "@/components/Container";
+import { MessageBubble, ReadinessBadge, ScoreBadge } from "@/components/dashboard/MessageBubble";
+import type { ChatMessage } from "@/lib/types/chat";
 
-const USER_MESSAGE = "write a jwt refresh token endpoint";
+// The conversation on the left is the product's own message component, fed a
+// sample reply with every disclosure open. The notes on the right explain the
+// parts of it that are real features, using the real badges.
 
-// CSS variable references rather than fixed hex, so this syntax highlighting
-// switches with the theme instead of staying tuned for a dark background only.
-const ACCENT = "rgb(var(--color-accent))";
-const SIGNAL = "rgb(var(--color-signal))";
-const MUTED = "rgb(var(--color-ink-muted))";
+const PROMPT = [
+  "Role",
+  "You are a senior backend engineer working in Node.js and Express.",
+  "",
+  "Task",
+  "Build a POST /auth/refresh endpoint that reads the refresh token from an httpOnly cookie, checks it against the stored hash, rotates it and issues a new access token.",
+  "",
+  "Rules",
+  "Rate limit the route. Use parameterized SQL. Return 401 with a structured error code when the token is invalid or reused.",
+  "",
+  "Output format",
+  "The route handler, the middleware and short JSDoc comments.",
+].join("\n");
 
-const OUTPUT_LINES = [
-  { color: ACCENT, text: "ROLE: Senior backend engineer" },
-  { color: SIGNAL, text: "CONTEXT: Node.js 20, Express 5, PostgreSQL 16" },
-  { color: SIGNAL, text: "TASK: Build a POST /api/auth/refresh endpoint:" },
-  { color: MUTED, text: "  - Read refresh token from httpOnly cookie" },
-  { color: MUTED, text: "  - Validate against stored hash in the DB" },
-  { color: MUTED, text: "  - Rotate token, issue new access token" },
-  { color: ACCENT, text: "CONSTRAINTS: Rate limited, parameterized SQL" },
-  { color: SIGNAL, text: "OUTPUT: Route handler + middleware + JSDoc" },
-];
-
-const PROMPT_OUTPUT = OUTPUT_LINES.map((l) => l.text).join("\n");
+function sample(): ChatMessage[] {
+  const at = new Date().toISOString();
+  return [
+    { id: "u", session_id: "preview", role: "user", content: "write a jwt refresh token endpoint", metadata: {}, created_at: at },
+    {
+      id: "a",
+      session_id: "preview",
+      role: "assistant",
+      content: PROMPT,
+      created_at: at,
+      metadata: {
+        mode: "ready",
+        formatStyle: "plain",
+        preamble: "Here is a structured prompt for a refresh token endpoint.",
+        score: 82,
+        readiness: { status: "ready" },
+        diff: {
+          stated: ["A JWT refresh token endpoint"],
+          inferred: ["Node.js with Express", "Refresh token in an httpOnly cookie", "Rotate the token on every use", "401 with a structured error code"],
+          researched: [],
+        },
+        memoryUsed: [{ category: "skills", key: "Stack", value: "Node.js, Express, PostgreSQL" }],
+        patternsUsed: ["Role, rules and output format"],
+      },
+    },
+  ];
+}
 
 const gridVariants = {
   hidden: {},
@@ -36,202 +62,71 @@ const cardVariant = {
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
 };
 
-function CopyButton({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <button
-      onClick={handleCopy}
-      className="flex items-center gap-1.5 text-xs text-text-faint hover:text-text-primary transition-colors focus-visible:outline-accent rounded"
-      aria-label="Copy prompt to clipboard"
-    >
-      {copied ? (
-        <>
-          <Check size={12} className="text-accent" />
-          <span className="text-accent">Copied</span>
-        </>
-      ) : (
-        <>
-          <Copy size={12} />
-          Copy
-        </>
-      )}
-    </button>
-  );
-}
+const NOTES = [
+  {
+    title: "Stated and inferred, kept apart",
+    body: "Open the count under any reply to see what you said and what Prompt AI filled in for you. Nothing is added silently.",
+    badge: null,
+  },
+  {
+    title: "An estimate, not a grade",
+    body: "Each prompt gets a rough completeness estimate and a readiness flag, so you can tell a prompt that is ready to use from one that still needs context.",
+    badge: "score",
+  },
+  {
+    title: "Your memory, in plain view",
+    body: "When stored details about you shaped a reply, they are listed beneath it, and you can edit or remove them from Settings.",
+    badge: null,
+  },
+];
 
 export function ChatPreview() {
+  // Built after mount so the message timestamp matches the visitor's own clock.
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  useEffect(() => setMessages(sample()), []);
+
   return (
     <section id="chat-preview" className="py-16 lg:py-24 border-t border-border-subtle">
       <Container>
-        <motion.div
-          variants={gridVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
-        >
-          {/* Centered heading */}
-          <motion.div
-            variants={cardVariant}
-            className="text-center mb-10 max-w-2xl mx-auto"
-          >
-            <p className="font-mono text-xs uppercase tracking-widest text-text-faint mb-3">
-              In practice
-            </p>
+        <motion.div variants={gridVariants} initial="hidden" whileInView="show" viewport={{ once: true }}>
+          <motion.div variants={cardVariant} className="text-center mb-10 max-w-2xl mx-auto">
+            <p className="font-mono text-xs uppercase tracking-widest text-text-faint mb-3">In practice</p>
             <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary tracking-tight mb-4">
               What you type. What you get.
             </h2>
             <p className="text-text-muted text-base leading-relaxed">
-              You write a sentence. Prompt AI returns a complete prompt with
-              every field filled: role, context, task breakdown, constraints,
-              and output format, ready to paste into any model.
+              You write a sentence. Prompt AI returns a complete prompt with a role, the task, rules and an output
+              format, and shows you which parts were yours and which it added.
             </p>
           </motion.div>
 
-          {/* Equal-height panels */}
-          <motion.div
-            variants={cardVariant}
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch"
-          >
-            {/* Left: Chat exchange */}
-            <div className="rounded-xl border border-border bg-surface flex flex-col">
-              <div className="flex items-center justify-between px-4 h-11 border-b border-border bg-raised shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-base border border-border flex items-center justify-center font-mono text-[10px] text-accent font-semibold">
-                    &gt;_
-                  </span>
-                  <span className="text-xs font-semibold text-text-primary">
-                    Prompt AI
-                  </span>
-                </div>
-                <CopyButton code={PROMPT_OUTPUT} />
-              </div>
-
-              <div className="flex-1 p-5 flex flex-col gap-4">
-                {/* User message */}
-                <div className="flex justify-end">
-                  <div className="max-w-[85%]">
-                    <div className="rounded-2xl rounded-br-md bg-raised border border-border px-4 py-2.5">
-                      <p className="text-sm text-text-primary leading-relaxed">
-                        {USER_MESSAGE}
-                      </p>
-                    </div>
-                    <p className="text-[10px] text-text-faint text-right mt-1.5 font-mono">
-                      You
-                    </p>
-                  </div>
-                </div>
-
-                {/* AI response */}
-                <div className="flex gap-3">
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30"
-                    style={{ background: "rgb(var(--color-signal) / 0.1)" }}
-                    aria-hidden="true"
-                  >
-                    <span className="font-mono text-[10px] text-signal">P</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="rounded-2xl rounded-tl-md bg-base border border-border overflow-hidden">
-                      <div className="px-4 py-2 border-b border-border-subtle">
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-text-faint">
-                          Structured prompt
-                        </span>
-                      </div>
-                      <div className="px-4 py-3 space-y-0.5 overflow-x-auto scrollbar-hide">
-                        {OUTPUT_LINES.map((line, i) => (
-                          <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: -4 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.3, delay: i * 0.06 }}
-                            className="font-mono text-xs leading-[1.7] whitespace-pre"
-                            style={{ color: line.color }}
-                          >
-                            {line.text}
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-text-faint mt-1.5 font-mono">
-                      Prompt AI
-                    </p>
-                  </div>
-                </div>
+          <motion.div variants={cardVariant} className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
+            <div
+              className="lg:col-span-3 rounded-xl border border-border bg-base p-4 sm:p-6 flex flex-col gap-5 select-none"
+              role="img"
+              aria-label="A sample conversation in Prompt AI: a request, and the structured prompt returned with its stated and inferred details open"
+            >
+              <div className="contents pointer-events-none" aria-hidden="true" {...({ inert: "" } as object)}>
+                {messages.map((m) => (
+                  <MessageBubble key={m.id} message={m} defaultExpanded onSave={m.role === "assistant" ? () => {} : undefined} onFeedback={() => {}} />
+                ))}
               </div>
             </div>
 
-            {/* Right: Inferred details + completeness */}
-            <div className="flex flex-col gap-4">
-              <div className="rounded-xl border border-border bg-surface p-5 flex-1">
-                <p className="text-xs text-text-faint font-mono uppercase tracking-widest mb-3">
-                  What Prompt AI inferred
-                </p>
-                <div className="space-y-3">
-                  {[
-                    {
-                      label: "Stack context",
-                      value: "Node.js 20, Express 5, PostgreSQL",
-                    },
-                    {
-                      label: "Auth pattern",
-                      value: "httpOnly cookie with token rotation",
-                    },
-                    {
-                      label: "Error contract",
-                      value: "401 + structured error code",
-                    },
-                    {
-                      label: "Output format",
-                      value: "Route handler + middleware + JSDoc",
-                    },
-                  ].map((row) => (
-                    <div
-                      key={row.label}
-                      className="flex items-start justify-between gap-4 py-2 border-b border-border-subtle last:border-0"
-                    >
-                      <span className="text-xs text-text-faint font-mono shrink-0">
-                        {row.label}
-                      </span>
-                      <span className="text-xs text-text-muted text-right leading-relaxed">
-                        {row.value}
-                      </span>
-                      <span className="shrink-0 text-xs font-mono px-1.5 py-0.5 rounded border border-signal/30 text-signal bg-signal/5">
-                        inferred
-                      </span>
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              {NOTES.map((note) => (
+                <div key={note.title} className="rounded-xl border border-border bg-surface p-5">
+                  <p className="font-mono text-xs uppercase tracking-widest text-text-faint mb-2">{note.title}</p>
+                  <p className="text-sm text-text-muted leading-relaxed">{note.body}</p>
+                  {note.badge === "score" && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <ReadinessBadge status="ready" />
+                      <ScoreBadge score={82} />
+                      <ReadinessBadge status="needs_context" />
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-surface p-5">
-                <p className="text-xs text-text-faint font-mono uppercase tracking-widest mb-3">
-                  Completeness
-                </p>
-                <div className="flex items-end gap-2 mb-3">
-                  <span className="text-3xl font-semibold text-text-primary">
-                    94
-                  </span>
-                  <span className="text-sm text-text-faint mb-1">/100</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-raised overflow-hidden mb-2">
-                  <motion.div
-                    className="h-full rounded-full bg-signal-fill"
-                    initial={{ width: 0 }}
-                    whileInView={{ width: "94%" }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.9, ease: "easeOut", delay: 0.3 }}
-                  />
-                </div>
-                <p className="text-xs text-text-faint">
-                  Add specific DB schema details to reach 100.
-                </p>
-              </div>
+              ))}
             </div>
           </motion.div>
         </motion.div>

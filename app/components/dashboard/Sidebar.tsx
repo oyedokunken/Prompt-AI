@@ -31,6 +31,8 @@ interface SidebarProps {
   onRenameSession?: (id: string, title: string) => void;
   pinnedIds?: string[];
   onTogglePin?: (id: string) => void;
+  // Marks a chat as the open one when there is no chat route to read it from, as in the marketing preview.
+  previewActiveId?: string;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
@@ -467,11 +469,12 @@ export function Sidebar({
   onRenameSession,
   pinnedIds = [],
   onTogglePin,
+  previewActiveId,
   mobileOpen = false,
   onMobileClose = () => {},
 }: SidebarProps) {
   const pathname = usePathname();
-  const activeSessionId = pathname?.startsWith("/dashboard/chats/") ? pathname.split("/").pop() : undefined;
+  const activeSessionId = previewActiveId ?? (pathname?.startsWith("/dashboard/chats/") ? pathname.split("/").pop() : undefined);
 
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);

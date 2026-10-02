@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import {
   Brain,
   LayoutTemplate,
@@ -11,7 +10,8 @@ import {
   FileText,
   Paperclip,
 } from "lucide-react";
-import { motion, useInView } from "framer-motion";
+import { motion } from "framer-motion";
+import { ReadinessBadge, ScoreBadge } from "@/components/dashboard/MessageBubble";
 import { Container } from "@/components/Container";
 
 const container = {
@@ -25,36 +25,6 @@ const item = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
 };
-
-const SCORES = [
-  { label: "Role clarity", pct: 95, delay: 0.1 },
-  { label: "Context depth", pct: 82, delay: 0.25 },
-  { label: "Output spec", pct: 90, delay: 0.4 },
-];
-
-function ScoreBar({ label, pct, delay }: { label: string; pct: number; delay: number }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-40px" });
-
-  return (
-    <div ref={ref} className="flex items-center gap-3">
-      <span className="font-mono text-xs text-text-faint w-24 shrink-0">
-        {label}
-      </span>
-      <div className="flex-1 h-1.5 rounded-full bg-raised overflow-hidden">
-        <motion.div
-          className="h-full rounded-full bg-signal-fill"
-          initial={{ width: 0 }}
-          animate={inView ? { width: `${pct}%` } : { width: 0 }}
-          transition={{ duration: 0.9, ease: "easeOut", delay }}
-        />
-      </div>
-      <span className="font-mono text-xs text-text-faint w-8 text-right">
-        {pct}
-      </span>
-    </div>
-  );
-}
 
 const CARD_HOVER = {
   y: -3,
@@ -165,15 +135,15 @@ export function Capabilities() {
                 Completeness score
               </h3>
               <p className="text-sm text-text-muted leading-relaxed">
-                Every generated prompt gets a score across dimensions like role
-                clarity, context depth, and output specificity, so you know
-                where it's strong and where to add detail.
+                Every generated prompt gets a rough completeness estimate and a
+                readiness flag, so you can tell a prompt that is ready to use
+                from one that still needs more context.
               </p>
             </div>
-            <div className="mt-auto pt-4 border-t border-border-subtle space-y-2.5">
-              {SCORES.map((s) => (
-                <ScoreBar key={s.label} {...s} />
-              ))}
+            <div className="mt-auto pt-4 border-t border-border-subtle flex flex-wrap items-center gap-2">
+              <ReadinessBadge status="ready" />
+              <ScoreBadge score={78} />
+              <ReadinessBadge status="needs_context" />
             </div>
           </motion.div>
 

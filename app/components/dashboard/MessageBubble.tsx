@@ -16,6 +16,8 @@ interface MessageBubbleProps {
   onEdit?: (messageId: string, newContent: string) => void;
   // Records a thumbs up or down on this response, or clears it with null.
   onFeedback?: (message: ChatMessage, rating: "up" | "down" | null) => void;
+  // Opens the stated and inferred, pattern and memory details at first render. Used where the whole reply is on show, such as the marketing page.
+  defaultExpanded?: boolean;
 }
 
 // Re-renders every minute so a timestamp actually flips from "Today at..."
@@ -40,7 +42,7 @@ function attachmentUrl(path: string): string | null {
   return createClient().storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
 }
 
-function ScoreBadge({ score }: { score: number }) {
+export function ScoreBadge({ score }: { score: number }) {
   const color =
     score >= 80 ? "text-green-400 border-green-400/30 bg-green-400/10"
     : score >= 55 ? "text-accent border-accent/30 bg-accent/10"
@@ -53,7 +55,7 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
-function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
+export function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   if (status === "ready") {
     return (
       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-[9px] font-mono font-medium">
@@ -68,13 +70,52 @@ function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   );
 }
 
-export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback }: MessageBubbleProps) {
+// What the user said, against what was found and what was filled in for them.
+export function BreakdownPanel({ stated, researched, inferred }: { stated: string[]; researched: string[]; inferred: string[] }) {
+  return (
+    <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2">
+      {stated.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
+          {stated.map((a, i) => (
+            <p key={i} className="text-[10px] text-text-muted flex gap-2">
+              <span className="text-green-400 shrink-0">·</span> {a}
+            </p>
+          ))}
+        </div>
+      )}
+      {researched.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
+          {researched.map((a, i) => (
+            <p key={i} className="text-[10px] text-text-muted flex gap-2">
+              <span className="text-signal shrink-0">&middot;</span> {a}
+            </p>
+          ))}
+        </div>
+      )}
+      {inferred.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
+          {inferred.map((a, i) => (
+            <p key={i} className="text-[10px] text-text-muted flex gap-2">
+              <span className="text-accent shrink-0">·</span> {a}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, defaultExpanded = false }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
-  const [showMeta, setShowMeta] = useState(false);
+  const [showMeta, setShowMeta] = useState(defaultExpanded);
   const [showSources, setShowSources] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [showPatterns, setShowPatterns] = useState(false);
+  const [showMemory, setShowMemory] = useState(defaultExpanded);
+  const [showPatterns, setShowPatterns] = useState(defaultExpanded);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -379,38 +420,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback }: 
 
         {/* What the user said, against what was filled in for them */}
         {showMeta && hasBreakdown && (
-          <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2">
-            {statedItems.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
-                {statedItems.map((a, i) => (
-                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
-                    <span className="text-green-400 shrink-0">·</span> {a}
-                  </p>
-                ))}
-              </div>
-            )}
-            {researchedItems.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
-                {researchedItems.map((a, i) => (
-                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
-                    <span className="text-signal shrink-0">&middot;</span> {a}
-                  </p>
-                ))}
-              </div>
-            )}
-            {inferredItems.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
-                {inferredItems.map((a, i) => (
-                  <p key={i} className="text-[10px] text-text-muted flex gap-2">
-                    <span className="text-accent shrink-0">·</span> {a}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
+          <BreakdownPanel stated={statedItems} researched={researchedItems} inferred={inferredItems} />
         )}
 
         {/* Where the researched parts of this prompt came from */}
