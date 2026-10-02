@@ -55,3 +55,7 @@ data/evaluation/results/
 # Feedback exports hold real user content and stay on the machine that made them
 data/evaluation/feedback_export.json
 data/evaluation/feedback_candidates.json
+
+# Local tooling
+.claude/
+.vercel/
