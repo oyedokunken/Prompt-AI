@@ -55,7 +55,10 @@ const BRANDS = [
   },
 ];
 
-const LOGOS_DOUBLED = [...BRANDS, ...BRANDS];
+// Chat tools people paste a prompt into. This is where a prompt can be used, not
+// a list of models Prompt AI builds with, which is only GPT-4o today.
+const PASTE_TARGETS = BRANDS.filter((b) => ["Claude", "OpenAI", "Gemini", "Perplexity"].includes(b.name));
+const LOGOS_DOUBLED = [...PASTE_TARGETS, ...PASTE_TARGETS, ...PASTE_TARGETS];
 
 export function Integrations() {
   return (
