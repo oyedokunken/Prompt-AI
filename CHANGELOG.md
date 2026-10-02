@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-10-02
+
+### Added
+
+- Live transcription. Speech is streamed to the data service over a WebSocket and relayed to OpenAI realtime transcription, so text appears while the user is speaking. The recording is also made normally and used as a fallback if the live connection fails
+- A short lived, single use ticket for the live socket, minted by the api and checked by the data service
+- Pinned chats, with their own group at the top of the chat list and a pin control in the chat header and in each chat's menu
+- An Integrations tab in settings that previews planned integrations with their real brand icons, clearly marked as not yet available
+- A header call to action on the public pages that reads Dashboard and links there for a visitor who is already signed in
+
+### Changed
+
+- The dashboard header is one shared component and always shows the logo beside the theme switcher, in a new chat and inside a conversation, and never a chat title
+- The marketing page previews are now built from the dashboard's own sidebar, header, message and composer components, so they match the product by construction, and the three bar completeness card shows the real score badges
+- A mobile sizing pass over the dashboard, the drawer, the composer, messages, modals and settings, with larger text and tap targets, and message actions that no longer depend on hover
+
+### Removed
+
+- An unused hand drawn laptop mockup from the marketing sections
+
 ## [0.5.0] - 2026-10-01
 
 ### Added

@@ -14,7 +14,7 @@ This service is deployed on Render, chosen because it suits long running Python 
 - Constructing the prompt, scoring its completeness, and separating what the user stated from what was found and what was inferred
 - Conversational replies to everything that is not a prompt request, and noticing stable facts worth remembering
 - Writing a short prose description of a user from their stored details
-- Short conversation titles and audio transcription
+- Short conversation titles, audio transcription, and live transcription over a streaming socket
 - Logging the tokens and estimated cost of every model call
 
 ## What this service does NOT do
@@ -33,7 +33,8 @@ All except `/health` require `Authorization: Bearer <API_SHARED_SECRET>`.
 | `POST /generate` | Streams stage events, then one clarifying question, a direct answer, a finished prompt or an error |
 | `POST /memory-summary` | A short prose description of what is stored about a user |
 | `POST /title` | A short inferred conversation title |
-| `POST /transcribe` | Audio to text |
+| `POST /transcribe` | Audio to text, for a finished recording |
+| `WS /transcribe/stream` | Live transcription. The first message carries a ticket minted by `/api`, then 24kHz PCM audio goes up and partial and final text comes back |
 
 ## How a request is processed
 
@@ -57,7 +58,7 @@ The index is an in-process vector index over that file, built with the same embe
 data/
   main.py            entrypoint, startup validation
   config.py          settings, validated at startup
-  routers/           generate, memory, title, transcribe, health
+  routers/           generate, memory, title, transcribe, transcribe_stream, health
   core/
     context.py       the one place memory, files and searches join the context
     events.py        stage events and their message pools

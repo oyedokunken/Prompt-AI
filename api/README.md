@@ -30,6 +30,7 @@ This service is deployed on Vercel, as its own project, separate from `/app`.
 | `POST /auth/send-welcome` | Welcome email after OAuth sign in |
 | `POST /chat/stream` | One chat turn, streamed |
 | `POST /chat/transcribe` | Voice message to text, through `/data` |
+| `POST /chat/transcribe/ticket` | A short lived, single use ticket and the address of the live transcription socket on `/data` |
 
 ## Tech Stack
 

@@ -135,7 +135,7 @@ Images arrive as data URLs and are read with vision. PDFs are fetched from stora
 data/
   main.py            app entrypoint, startup validation
   config.py          settings, validated at startup
-  routers/           generate, transcribe, title, health
+  routers/           generate, transcribe, transcribe_stream, title, health
   core/
     context.py       the one place memory, files and searches join the context
     events.py        stage events and their message pools
@@ -158,8 +158,25 @@ Prompt templates are versioned in directories and one version is active at a tim
 | `POST /auth/otp/request-reset`, `/auth/otp/verify-reset` | Password reset with a one time code |
 | `POST /auth/send-welcome` | Welcome email after OAuth sign in |
 | `POST /chat/stream` | A chat turn, streamed |
-| `POST /chat/transcribe` | Voice message to text, via `data` |
+| `POST /chat/transcribe` | Voice message to text, via `data`, used when live transcription is unavailable |
+| `POST /chat/transcribe/ticket` | A short lived ticket and the address of the live transcription socket on `data` |
 | `GET /chat/memory-summary` | A short prose description of what is stored about the signed in user, written by `data` |
+
+## Live transcription
+
+Voice input streams. The browser captures microphone audio, resamples it to 24kHz mono PCM on the device, and sends it over a WebSocket to `data`, which relays it to OpenAI realtime transcription and returns text as each phrase is recognised. The text appears in the message box while the user is still speaking.
+
+A WebSocket cannot be held open by the serverless `api`, and a browser cannot send an Authorization header on one, so the socket is on `data` and `api` only mints the way in. `POST /chat/transcribe/ticket` returns a ticket signed with the shared secret that names the user, expires in a minute and is accepted once. The browser presents it as the first message on the socket, so it never appears in a URL or a log. `data` remains the only service that talks to OpenAI.
+
+```
+browser  --ticket-->  api            mints a one use ticket
+browser  --PCM----->  data  --PCM--> OpenAI realtime transcription
+browser  <--text----  data  <--text--
+```
+
+Voice detection on its own only closes a phrase at a pause, so a long run of speech would show nothing until the speaker breathed. `data` therefore closes a phrase early at the next dip in volume once it has run past about two and a half seconds, and always by five seconds, so text keeps arriving. A normal recording is made at the same time, so if the socket cannot connect or fails before any text arrives, the whole message is transcribed with the original upload route.
+
+Cost follows audio sent, not how long the socket stays open. Silence that is sent is billed like speech, so each session is capped at 180 seconds, an idle socket is closed after 20 seconds, and the cheaper `gpt-4o-mini-transcribe` model is used, at half the per minute price of `whisper-1`. Each session logs its seconds and estimated cost.
 
 ## Data stores
 

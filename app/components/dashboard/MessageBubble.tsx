@@ -49,7 +49,7 @@ export function ScoreBadge({ score }: { score: number }) {
     : "text-red-400 border-red-400/30 bg-red-400/10";
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border text-[11px] md:text-[9px] font-mono font-medium ${color}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border text-xs md:text-[9px] font-mono font-medium ${color}`}>
       ~{score}/100 estimate
     </span>
   );
@@ -58,13 +58,13 @@ export function ScoreBadge({ score }: { score: number }) {
 export function ReadinessBadge({ status }: { status: "ready" | "needs_context" }) {
   if (status === "ready") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-[11px] md:text-[9px] font-mono font-medium">
+      <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-green-400/30 bg-green-400/10 text-green-400 text-xs md:text-[9px] font-mono font-medium">
         <CircleCheck size={9} /> Ready to build
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-[11px] md:text-[9px] font-mono font-medium">
+    <span className="inline-flex items-center gap-1 px-2 py-1 md:px-1.5 md:py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-xs md:text-[9px] font-mono font-medium">
       <CircleHelp size={9} /> Needs context
     </span>
   );
@@ -76,7 +76,7 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
     <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-2">
       {stated.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
+          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Stated</p>
           {stated.map((a, i) => (
             <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
               <span className="text-green-400 shrink-0">·</span> {a}
@@ -86,7 +86,7 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
       )}
       {researched.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
+          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Found</p>
           {researched.map((a, i) => (
             <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
               <span className="text-signal shrink-0">&middot;</span> {a}
@@ -96,7 +96,7 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
       )}
       {inferred.length > 0 && (
         <div className="space-y-1">
-          <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
+          <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Inferred</p>
           {inferred.map((a, i) => (
             <p key={i} className="text-xs md:text-[10px] text-text-muted flex gap-2">
               <span className="text-accent shrink-0">·</span> {a}
@@ -323,7 +323,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
         {/* Footer row */}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <p className="font-mono text-xs md:text-[10px] text-text-faint">Prompt AI</p>
-          <p className="font-mono text-[11px] md:text-[9px] text-text-faint">{formatMessageTimestamp(message.created_at, now)}</p>
+          <p className="font-mono text-xs md:text-[9px] text-text-faint">{formatMessageTimestamp(message.created_at, now)}</p>
 
           {!isClarify && meta.readiness?.status && <ReadinessBadge status={meta.readiness.status} />}
           {!isClarify && meta.score !== undefined && <ScoreBadge score={meta.score} />}
@@ -377,7 +377,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {hasBreakdown && (
             <button
               onClick={() => setShowMeta((v) => !v)}
-              className="flex items-center gap-1 py-2.5 -my-2 md:py-0 md:my-0 text-[11px] md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMeta ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {statedItems.length} stated, {researchedItems.length > 0 ? `${researchedItems.length} found, ` : ""}{inferredItems.length} inferred
@@ -388,7 +388,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {sources.length > 0 && (
             <button
               onClick={() => setShowSources((v) => !v)}
-              className="flex items-center gap-1 py-2.5 -my-2 md:py-0 md:my-0 text-[11px] md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showSources ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {sources.length} source{sources.length > 1 ? "s" : ""}
@@ -399,7 +399,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {patternsUsed.length > 0 && (
             <button
               onClick={() => setShowPatterns((v) => !v)}
-              className="flex items-center gap-1 py-2.5 -my-2 md:py-0 md:my-0 text-[11px] md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showPatterns ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               {patternsUsed.length} pattern{patternsUsed.length > 1 ? "s" : ""}
@@ -410,7 +410,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
           {memoryUsed.length > 0 && (
             <button
               onClick={() => setShowMemory((v) => !v)}
-              className="flex items-center gap-1 py-2.5 -my-2 md:py-0 md:my-0 text-[11px] md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
+              className="flex items-center gap-1 py-3 -my-2.5 md:py-0 md:my-0 text-xs md:text-[9px] font-mono text-text-faint hover:text-text-muted transition-colors"
             >
               {showMemory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
               <Brain size={9} /> used {memoryUsed.length} from memory
@@ -449,20 +449,20 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
 
         {showPatterns && patternsUsed.length > 0 && (
           <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
-            <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Known effective patterns used</p>
+            <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">Known effective patterns used</p>
             {patternsUsed.map((name) => (
               <p key={name} className="text-xs md:text-[10px] text-text-muted flex gap-2">
                 <span className="text-accent shrink-0">&middot;</span> {name}
               </p>
             ))}
-            <p className="text-[11px] md:text-[9px] text-text-faint pt-1">Guidance for this kind of task, adapted to your request.</p>
+            <p className="text-xs md:text-[9px] text-text-faint pt-1">Guidance for this kind of task, adapted to your request.</p>
           </div>
         )}
 
         {/* The stored details this reply drew on */}
         {showMemory && memoryUsed.length > 0 && (
           <div className="mt-2 px-3 py-2 rounded-lg border border-border bg-raised/50 space-y-1">
-            <p className="text-[11px] md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">From your memory</p>
+            <p className="text-xs md:text-[9px] font-mono uppercase tracking-wider text-text-faint mb-1">From your memory</p>
             {memoryUsed.map((m, i) => (
               <p key={i} className="text-xs md:text-[10px] text-text-muted">
                 <span className="text-text-primary font-medium">{m.key}:</span> {m.value}

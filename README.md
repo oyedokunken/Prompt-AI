@@ -386,9 +386,12 @@ Each folder is independently runnable and has its own dependency management, env
 - **Memory that works for you.** Stable facts about you are saved automatically as you chat, with a quiet notice and nothing to approve, and secrets are never stored. The memory that bears on each message is selected before every reply, and you can see which details informed it. A memory page in settings describes what is stored in a few natural sentences, and lets you add, edit and remove anything.
 - **Natural conversation.** Casual, off topic and personal messages get a real reply that uses your name when it fits, your stored context, and your conversation, instead of forcing every message into prompt construction.
 - **Honest about what it knows.** Asked what it knows about you, it answers only from what is stored, and says so plainly when it has nothing.
-- **Voice input.** Speak a message, review the transcript, then send it.
+- **Live voice input.** Speak a message and the text appears in the box as you talk, phrase by phrase, then review it and send. If live transcription cannot connect, the whole recording is transcribed when you stop instead.
+- **Pinned chats.** Pin a chat from its menu or from inside the chat and it moves to a Pinned group at the top of the chat list, above everything else. Unpin it to return it to its usual place.
 - **Feedback on every response.** A thumbs up or thumbs down is stored with the request, the score and the template version, so a person can review where the system falls short and decide what to change.
 - **Prompt history and library.** Every conversation is saved. History opens a summary of each conversation before you step into it, saved prompts open in full with copy and a link back to their chat, and there are favorites, shareable read only links, and export to PDF, Markdown, text and JSON.
+- **Built for a phone.** The dashboard and its drawer use larger text, icons and tap targets on small screens, and every chat action is reachable without hover.
+- **A preview of what is next.** The Integrations tab in settings lists the tools planned for Prompt AI. It is informational only, nothing there can be connected yet.
 - **Usage you can read.** A line graph of prompts, tokens, output length, completeness, clarifying questions and how helpful responses were, with 1 day, 3 day, 7 day, 1 month and 3 month ranges and exact values on hover.
 - **Model aware formatting.** The output style is chosen per destination, and the provider layer is built so more target models can be added without touching the pipeline.
 

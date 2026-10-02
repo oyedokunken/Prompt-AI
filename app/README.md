@@ -9,9 +9,11 @@ This service is deployed on Vercel, as its own project, separate from `/api`.
 - The chat, where users describe what they want. Clarifying questions arrive one at a time, and a single choice advances as soon as it is picked
 - Live status while a reply is generated, taken from the real stage events the server streams
 - Showing the finished prompt in its own card with a copy button, apart from the conversational reply, with the stated, found and inferred breakdown and the sources it drew on
-- Attachments and voice input: attaching files and images, and recording a voice message to review before sending
+- Attachments and voice input: attaching files and images, and speaking a message that appears as text while you talk
+- Pinned chats, shown as their own group at the top of the chat list, in the sidebar and in the phone drawer
+- A dashboard that works on a phone, with larger text and tap targets and every chat action reachable by touch
 - The library: history, saved prompts, favorites, media, exports and shareable read only links
-- Settings: the profile, the memory page where stored details can be added, edited and removed, and the usage page
+- Settings: the profile, the memory page where stored details can be added, edited and removed, the usage page, and an integrations page that previews what is planned
 - Sign up, sign in and password reset screens
 - Feedback on each response, with a thumbs up or thumbs down
 
