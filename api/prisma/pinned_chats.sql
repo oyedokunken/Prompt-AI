@@ -21,7 +21,7 @@ from (
        jsonb_array_elements_text(coalesce(u.raw_user_meta_data -> 'pinned_chats', '[]'::jsonb)) with ordinality as e(value, ordinality)
 ) p
 where s.id::text = p.chat_id
-  and s.user_id = p.user_id
+  and s.user_id::text = p.user_id::text
   and s.is_pinned = false;
 
 create index if not exists chat_sessions_user_pinned_idx
