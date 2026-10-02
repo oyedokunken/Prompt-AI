@@ -30,7 +30,7 @@ export default function HistoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search your chats..."
-              className="flex-1 bg-transparent outline-none text-base md:text-sm text-text-primary placeholder:text-text-faint"
+              className="flex-1 bg-transparent outline-none text-[16px] md:text-sm text-text-primary placeholder:text-text-faint"
             />
           </div>
 

@@ -59,7 +59,7 @@ function AnimatedSessionTitle({ title, mobile = false }: { title: string; mobile
     <motion.span
       animate={justTitled ? { opacity: [0, 1], x: [-6, 0] } : undefined}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className={`${mobile ? "text-base" : "text-[10px]"} truncate flex-1 transition-colors ${justTitled ? "text-accent" : ""}`}
+      className={`${mobile ? "text-[16px]" : "text-[10px]"} truncate flex-1 transition-colors ${justTitled ? "text-accent" : ""}`}
     >
       {title}
     </motion.span>
@@ -170,7 +170,7 @@ function SessionItem({
             if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
             if (e.key === "Escape") { e.preventDefault(); setEditing(false); }
           }}
-          className={`flex-1 w-0 bg-transparent text-text-primary outline-none ${mobile ? "text-base" : "text-[10px]"}`}
+          className={`flex-1 w-0 bg-transparent text-text-primary outline-none ${mobile ? "text-[16px]" : "text-[10px]"}`}
         />
       </div>
     );
@@ -522,7 +522,7 @@ export function Sidebar({
           <button
             onClick={handleNewChat}
             className={`w-full flex items-center justify-center gap-2 rounded-md bg-accent/10 border border-accent/20 font-medium text-accent hover:bg-accent/15 transition-colors ${
-              mobile ? "px-3 py-3 min-h-[48px] text-base rounded-xl" : "px-2 py-1.5 text-[11px]"
+              mobile ? "px-3 py-3 min-h-[48px] text-[16px] rounded-xl" : "px-2 py-1.5 text-[11px]"
             }`}
           >
             <Plus size={mobile ? 18 : 11} /> New chat
@@ -538,7 +538,7 @@ export function Sidebar({
               onClick={onMobileClose}
               className={`${navRow} ${
                 pathname === href ? "text-accent bg-accent/10" : "text-text-muted hover:text-text-primary hover:bg-raised"
-              } ${mobile ? "text-base" : ""}`}
+              } ${mobile ? "text-[16px]" : ""}`}
             >
               <Icon size={mobile ? 18 : 12} />
               {label}
@@ -559,7 +559,7 @@ export function Sidebar({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search chats..."
-                className={`text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0 ${mobile ? "text-base" : "text-[10px]"}`}
+                className={`text-text-primary bg-transparent outline-none placeholder:text-text-faint flex-1 w-0 ${mobile ? "text-[16px]" : "text-[10px]"}`}
               />
             </div>
           )}
@@ -589,7 +589,7 @@ export function Sidebar({
                 }`}
               >
                 <Icon size={mobile ? 16 : 10} className="shrink-0" />
-                <span className={mobile ? "text-base" : "text-[10px]"}>{label}</span>
+                <span className={mobile ? "text-[16px]" : "text-[10px]"}>{label}</span>
               </Link>
             ))}
           </div>

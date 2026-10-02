@@ -36,7 +36,7 @@ function ModelSelector({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 md:gap-1.5 px-3 py-2.5 md:px-2 md:py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
+        className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-2 md:py-1 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
         <span className="font-mono text-xs md:text-[10px] text-text-muted">{model.label}</span>
@@ -284,7 +284,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           readOnly={isRecording}
           disabled={busy}
           rows={1}
-          className="flex-1 bg-transparent outline-none text-base md:text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
+          className="flex-1 bg-transparent outline-none text-[16px] md:text-sm text-text-primary placeholder:text-text-faint resize-none overflow-hidden leading-relaxed py-2.5 md:py-0"
           style={{ maxHeight: 140 }}
         />
 
@@ -325,7 +325,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </button>
         </div>
       </div>
-      <p className="text-center text-[11px] md:text-[9px] text-text-faint mt-1.5 md:truncate">
+      <p className="text-center text-xs md:text-[9px] text-text-faint mt-1.5 md:truncate">
         <span className="hidden md:inline">Shift+Enter for new line · Enter to send · </span>Review outputs and generated code before use.
       </p>
     </div>

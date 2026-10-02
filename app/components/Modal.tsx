@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, wide =
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-border">
           <div className="min-w-0">
-            <h2 id="modal-title" className="text-base md:text-sm font-semibold text-text-primary truncate">
+            <h2 id="modal-title" className="text-[16px] md:text-sm font-semibold text-text-primary truncate">
               {title}
             </h2>
             {subtitle && <p className="text-[13px] md:text-[11px] text-text-faint font-mono mt-0.5">{subtitle}</p>}
