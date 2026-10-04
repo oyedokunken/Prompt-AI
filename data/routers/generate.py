@@ -116,8 +116,21 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             yield events.intent_parsing(has_pending_question=False)
             decision = await intent.detect(ctx, provider)
 
+        # A plain "who is <Name>" the intent model did not mark for lookup still is
+        # one. It is a question about the world, so it is searched, not recalled.
+        if decision.kind == "conversation" and not decision.lookup and not decision.about_user:
+            subject = research.lookup_subject(ctx.message)
+            if subject and not research.is_known_to_user(subject, ctx):
+                decision = dataclasses.replace(decision, lookup=True, search_queries=research.lookup_query(subject))
+
         if decision.kind == "conversation":
-            yield events.answering()
+            looked_up = False
+            if decision.lookup and decision.search_queries:
+                # Its own stage: the web is being searched for this answer.
+                yield events.lookup(decision.search_queries[0])
+                ctx = await run_research(ctx, decision.search_queries, provider, step="lookup")
+                looked_up = True
+            yield events.answering(from_web=looked_up)
             # A message about the user themselves makes everything stored relevant.
             if decision.about_user:
                 ctx = widen_memory(ctx)
@@ -129,6 +142,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
                 content=answered.text,
                 memory_candidates=fresh_memory_candidates(answered.memory_candidates, ctx.all_memories),
                 memory_used=_memory_used(ctx),
+                sources=_summaries([s for s in ctx.sources if s.kind == "search"]) if looked_up else [],
                 usage=UsageSummary(**meter.snapshot()),
                 clarify_state=state if pending else None,
                 pending_question=pending,

@@ -7,6 +7,7 @@ clarifying answers that were gathered, and the active template.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -15,15 +16,36 @@ from core.context import PipelineContext
 from core.pipeline import clarify
 from core.prompts.system_prompts import answer_system_prompt, construct_system_prompt
 from core.prompts.targets import FormatStyle, choose_format
-from core.providers.base import ModelProvider, ProviderMessage, ProviderResponseError
+from core.providers.base import ModelProvider, ProviderError, ProviderMessage, ProviderResponseError
 from schemas.requests import ClarifyState
 from schemas.responses import MemoryCandidate, Readiness, StructuredPrompt
 
-# A comprehensive, production ready prompt can legitimately run long. A
-# tighter budget cut detailed requests off mid JSON.
-# A finished prompt is a few hundred words. 2,500 leaves room for a long one
-# and stops a runaway answer from costing six times what it should.
-CONSTRUCT_MAX_TOKENS = 2500
+# A prompt for a task with real judgment runs to several hundred words, and a
+# complex agent to well over a thousand, written as JSON next to its notes. A
+# reasoning model also spends part of this budget thinking before it writes.
+# The old 2,500 token cap sat right under what a thorough prompt needs, and was
+# part of why output came back thin.
+CONSTRUCT_MAX_TOKENS = 8000
+
+
+logger = logging.getLogger("data.construct")
+
+
+async def complete_json_with_fallback(provider: ModelProvider, *, model: str, **kwargs: Any) -> dict[str, Any]:
+    """Run a step on its model, and once on the fallback model if that call fails.
+
+    A stronger model is slower and sometimes times out or is briefly
+    unavailable. The step is retried on a steadier model rather than failing
+    the whole request, and the retry is logged so it never goes unnoticed.
+    """
+    try:
+        return await provider.complete_json(model=model, **kwargs)
+    except (ProviderError, ProviderResponseError) as exc:
+        fallback = provider.fallback_model(model)
+        if fallback is None:
+            raise
+        logger.warning("step=%s failed on %s (%s), retrying on %s", kwargs.get("step"), model, exc, fallback)
+        return await provider.complete_json(model=fallback, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -72,12 +94,24 @@ def build_messages(ctx: PipelineContext, state: Optional[ClarifyState]) -> list[
     return messages
 
 
+_RANGE_DASH = re.compile(r"(?<=\d)\s*\u2013\s*(?=\d)")
 _DASHES = re.compile(r"\s*[\u2014\u2013]\s*")
+# Some models write non breaking hyphens and spaces, which look like ordinary
+# ones but break a search, a diff or a paste into another tool.
+_LOOKALIKES = str.maketrans(
+    {
+        "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u00a0": " ", "\u202f": " ", "\u2009": " ",
+        "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+    }
+)
 
 
 def plain_dashes(text: str) -> str:
     """Replace em and en dashes with a comma, house style, enforced in code
-    because a model does not reliably obey a rule against them."""
+    because a model does not reliably obey a rule against them. A numeric
+    range such as 2 to 3 keeps a plain hyphen instead, a comma would split it."""
+    text = text.translate(_LOOKALIKES)
+    text = _RANGE_DASH.sub("-", text)
     return _DASHES.sub(", ", text)
 
 
@@ -207,7 +241,8 @@ async def construct(
 
     # One corrective retry at most, never a loop.
     for attempt in range(2):
-        raw = await provider.complete_json(
+        raw = await complete_json_with_fallback(
+            provider,
             model=provider.resolve_model(ctx.target_model, step="construct"),
             system=construct_system_prompt(ctx, style, patterns),
             messages=messages,
@@ -251,11 +286,12 @@ async def answer_directly(ctx: PipelineContext, provider: ModelProvider) -> Answ
     """
     messages = [ProviderMessage(role=m.role, text=m.content) for m in ctx.history]
     messages.append(ProviderMessage(role="user", text=ctx.message))
-    raw = await provider.complete_json(
+    raw = await complete_json_with_fallback(
+        provider,
         model=provider.resolve_model(ctx.target_model, step="answer"),
         system=answer_system_prompt(ctx),
         messages=messages,
-        max_tokens=600,
+        max_tokens=1200,
         temperature=0.7,
         step="answer",
     )

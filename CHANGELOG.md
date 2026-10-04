@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-10-04
+
+### Added
+
+- Web lookup for questions about the outside world. A question such as who a named person is is classified separately from a question about the user, searched on the web in its own status stage, answered from what the search found, and shown with its sources open. A plain "who is" followed by a name is caught even when the intent model misses it. A name that is the user's own or already stored is answered from memory
+- Support for the GPT-5 family in the model provider, with a configurable reasoning effort and a one time retry on a steadier model when a step fails
+- A hand review tool for building the same requests with several models, and a live probe for running one message through the real pipeline
+- Four eval cases for lookups, and a filler allowance that grows with the length of a prompt
+
+### Changed
+
+- Construction runs on gpt-5.1, and intent and conversational replies on gpt-4.1. Prompts are several times more specific, with decision rules, edge cases and exact output shapes, for about two cents more a turn
+- The construction template (v6) asks for depth that fits the job, faithfulness to the situation the user described, and no new scope, instead of pushing for short. The construction token budget rose from 2,500 to 8,000 and direct answers from 600 to 1,200
+- Quotation marks, non breaking hyphens and spaces are normalised to plain ones, and a numeric range keeps its hyphen instead of becoming a comma
+- The assistant avatar in a chat is the Prompt AI logo mark on its own, and the logo mark switches between a dark badge on a light page and a light badge on a dark page
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

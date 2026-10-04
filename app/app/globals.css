@@ -28,6 +28,14 @@
   --color-signal: 90 74 191;
   --color-signal-fill: 139 124 246;
   --color-signal-fill-foreground: 10 10 11;
+
+  /* The logo mark. On a light page it is the dark badge with the amber prompt
+     glyph. On a dark page that badge would vanish, so it flips to a light
+     badge with the glyph darkened to hold contrast. */
+  --logo-badge: 17 17 19;
+  --logo-stroke: 35 35 39;
+  --logo-glyph: 242 169 59;
+  --logo-ink: 237 237 239;
 }
 
 .dark {
@@ -44,6 +52,11 @@
   --color-accent-fill: 242 169 59;
   --color-signal: 139 124 246;
   --color-signal-fill: 139 124 246;
+
+  --logo-badge: 244 244 245;
+  --logo-stroke: 212 212 216;
+  --logo-glyph: 154 105 8;
+  --logo-ink: 17 17 19;
 }
 
 html {

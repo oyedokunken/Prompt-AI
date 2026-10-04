@@ -898,7 +898,7 @@ def test_em_and_en_dashes_are_replaced_in_every_user_facing_field():
     )
     for text in (built.message, built.content, built.explanation):
         assert dash not in text and en not in text
-    assert built.content == "Role, reviewer. Range 1, 5."
+    assert built.content == "Role, reviewer. Range 1-5."
 
     provider = FakeProvider([{"kind": "conversation"}, {"reply": f"Rust{dash}huh.", "memory_candidates": []}])
     out = collect(assemble_context(make_request(message="hi")), provider)
@@ -1095,9 +1095,31 @@ def test_reference_text_is_bounded_across_all_sources_together():
     assert len(block) < system_prompts.MAX_TOTAL_SOURCE_CHARS + 600
 
 
-def test_output_budgets_are_capped():
-    assert construct.CONSTRUCT_MAX_TOKENS <= 2500
+def test_output_budgets_leave_room_for_a_thorough_prompt_but_stay_bounded():
+    # Enough for a long prompt plus a reasoning model's thinking, and still a ceiling.
+    assert 4000 <= construct.CONSTRUCT_MAX_TOKENS <= 10000
     assert ingest.MAX_CHARS_PER_SOURCE <= 8000
+
+
+def test_lookalike_hyphens_and_spaces_are_normalised_and_a_numeric_range_keeps_its_hyphen():
+    text = construct.plain_dashes("non" + chr(0x2011) + "technical, read in 2" + chr(0x2013) + "3 minutes" + chr(0xA0) + "ok")
+    assert text == "non-technical, read in 2-3 minutes ok"
+    assert construct.plain_dashes("I" + chr(0x2019) + "m " + chr(0x201C) + "sure" + chr(0x201D)) == "I'm \"sure\""
+
+
+def test_a_failed_step_is_retried_once_on_the_fallback_model():
+    class Flaky(FakeProvider):
+        def fallback_model(self, model):
+            return "steady" if model != "steady" else None
+
+    provider = Flaky([ProviderError("timeout", code="timeout"), {"reply": "ok"}])
+    raw = asyncio.run(construct.complete_json_with_fallback(provider, model="big", system="s", messages=[], max_tokens=10, temperature=0.1, step="answer"))
+    assert raw == {"reply": "ok"}
+    assert [c["model"] for c in provider.calls] == ["big", "steady"]
+
+    lone = FakeProvider([ProviderError("down", status=500)])
+    with pytest.raises(ProviderError):
+        asyncio.run(construct.complete_json_with_fallback(lone, model="big", system="s", messages=[], max_tokens=10, temperature=0.1, step="answer"))
 
 
 # ---------------------------------------------------------------------------
@@ -1299,3 +1321,88 @@ def test_a_clarified_request_retrieves_on_the_request_and_the_answers_together()
     state = clarify.record_answer(clarify.start("write a prompt for a bot", "", [ClarifyQuestion(id="q1", text="What kind?")]), "customer support for billing questions")
     ctx = assemble_context(make_request(message="customer support for billing questions", clarify_state=state, is_clarify_answer=True))
     assert construct.pattern_query(ctx, state) == "write a prompt for a bot customer support for billing questions"
+
+
+# ---------------------------------------------------------------------------
+# Questions about the outside world are searched, not recalled
+# ---------------------------------------------------------------------------
+
+def test_a_question_about_a_real_person_is_looked_up_in_its_own_stage_and_answered_from_the_findings():
+    findings = SearchOutcome(
+        summary="Lila Ibrahim is Chief Operating Officer of Google DeepMind since 2018.",
+        sources=[SearchSource("Axios", "https://www.axios.com/2018/04/11/exclusive-deepmind-hires-lila-ibrahim-as-first-coo")],
+    )
+    provider = FakeProvider(
+        [
+            {"kind": "conversation", "lookup": True, "search_queries": ["Lila Ibrahim biography"], "about_user": False},
+            findings,
+            {"reply": "Lila Ibrahim is the COO of Google DeepMind."},
+        ]
+    )
+    out = collect(assemble_context(make_request(message="who is Lila Ibrahim")), provider)
+
+    assert [e.stage for e in out[:-1]] == ["intent", "lookup", "answering"]
+    assert [c["kind"] for c in provider.calls if c["kind"] != "embed"] == ["json", "search", "json"]
+    # The findings reach the model that writes the answer, as reference material.
+    assert "Chief Operating Officer of Google DeepMind" in provider.calls[2]["system"]
+    answer = out[-1]
+    assert answer.type == "answer"
+    assert [(s.kind, s.label) for s in answer.sources] == [("search", "Lila Ibrahim biography")]
+    assert answer.sources[0].links[0].title == "Axios"
+
+
+def test_a_plain_who_is_a_named_person_is_searched_even_when_the_intent_model_forgot():
+    provider = FakeProvider(
+        [
+            {"kind": "conversation", "about_user": False},
+            SearchOutcome(summary="Ada Lovelace was a mathematician."),
+            {"reply": "Ada Lovelace was a mathematician."},
+        ]
+    )
+    out = collect(assemble_context(make_request(message="Who was Ada Lovelace?")), provider)
+    assert [e.stage for e in out[:-1]] == ["intent", "lookup", "answering"]
+    assert provider.calls[1]["query"] == "Ada Lovelace"
+
+
+def test_questions_about_the_user_or_general_knowledge_are_never_searched():
+    for message, raw in [
+        ("who am I?", {"kind": "conversation", "about_user": True}),
+        ("who is my manager", {"kind": "conversation", "about_user": True}),
+        ("how does a b-tree work", {"kind": "conversation", "about_user": False}),
+        ("tell me about recursion", {"kind": "conversation", "about_user": False}),
+    ]:
+        provider = FakeProvider([raw, {"reply": "ok"}])
+        out = collect(assemble_context(make_request(message=message)), provider)
+        assert "lookup" not in [getattr(e, "stage", None) for e in out], message
+        assert all(c["kind"] != "search" for c in provider.calls), message
+        assert out[-1].sources == []
+
+
+def test_a_name_that_is_the_users_own_or_already_stored_is_answered_from_memory():
+    provider = FakeProvider([{"kind": "conversation", "about_user": False}, {"reply": "That is you."}])
+    request = make_request(message="who is Kenny", profile={"preferred_name": "Kenny"})
+    out = collect(assemble_context(request), provider)
+    assert all(c["kind"] != "search" for c in provider.calls)
+    assert "lookup" not in [getattr(e, "stage", None) for e in out]
+
+
+def test_a_failed_lookup_is_reported_to_the_answering_model_not_papered_over():
+    provider = FakeProvider(
+        [
+            {"kind": "conversation", "lookup": True, "search_queries": ["Some Person"]},
+            ProviderError("down", status=500),
+            {"reply": "I could not look that up right now."},
+        ]
+    )
+    out = collect(assemble_context(make_request(message="who is Some Person")), provider)
+    assert "The search failed" in provider.calls[2]["system"]
+    assert out[-1].type == "answer"
+
+
+def test_lookup_subject_only_fires_on_a_named_subject():
+    from core.pipeline.research import lookup_subject
+
+    assert lookup_subject("who is Lila Ibrahim") == "Lila Ibrahim"
+    assert lookup_subject("Tell me about Chinua Achebe") == "Chinua Achebe"
+    for plain in ["who am I", "who is my boss", "tell me about recursion", "who is responsible for this bug", "who is it"]:
+        assert lookup_subject(plain) == "", plain

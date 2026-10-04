@@ -221,13 +221,15 @@ async def read_attachments(ctx: PipelineContext, provider: "ModelProvider") -> P
     return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes), attachments=[])
 
 
-async def run_research(ctx: PipelineContext, queries: list[str], provider: "ModelProvider") -> PipelineContext:
+async def run_research(
+    ctx: PipelineContext, queries: list[str], provider: "ModelProvider", step: str = "search"
+) -> PipelineContext:
     """Run the planned web searches and add the findings to the context."""
     if not queries:
         return ctx
     from core.pipeline import research
 
-    notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model, step="search"))
+    notes = await research.search(queries, provider, provider.resolve_model(ctx.target_model, step="search"), step)
     return dataclasses.replace(ctx, sources=_merge_sources(ctx.sources, notes))
 
 

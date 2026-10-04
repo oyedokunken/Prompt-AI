@@ -7,13 +7,19 @@ What one chat turn costs, where the money goes, what was changed, and how to kee
 | Step | Own call | Model | Runs |
 |---|---|---|---|
 | Memory selection | Embeddings | text-embedding-3-small | Every turn, vectors cached in process |
-| Intent | Yes | gpt-4o | Every turn, except when a question card is answered |
-| Web search | Yes, at most one | gpt-4o with the search tool | Only when intent plans one |
+| Intent | Yes | gpt-4.1 | Every turn, except when a question card is answered |
+| Web search | Yes, at most one | gpt-4o with the search tool | When intent plans one for a prompt, or to answer a question about a real person, place or fact |
 | Attachment reading | One vision call per image | gpt-4o | Only with images. PDF and Word use no model |
-| Construction | Yes | gpt-4o | Prompt requests |
-| Conversational reply | Yes | gpt-4o | Casual messages and messages about the user |
+| Construction | Yes | gpt-5.1, low reasoning effort, gpt-4.1 if it fails | Prompt requests |
+| Conversational reply | Yes | gpt-4.1 | Casual messages, messages about the user, and answers from a web search |
 | Scoring | No call, computed in code | none | Always free |
 | Title (in `api`) | Yes | gpt-4o-mini | First turn and first finished prompt |
+
+## Why construction moved to gpt-5.1
+
+The same six requests were built on three models and read by hand. gpt-4o wrote 150 to 200 words per prompt, thin and generic, partly because the template told it to be short and the token cap sat at 2,500. gpt-4.1 wrote 200 to 400. gpt-5.1 at low reasoning effort wrote prompts with real decision rules, edge cases and exact output shapes. gpt-5.1 is cheaper per token than gpt-4o ($1.25 input, $10 output, against $2.50 and $10), so a whole turn including intent costs about $0.02 to $0.03, against about $0.014 before, for output several times longer and far more specific. A turn takes 12 to 25 seconds, and medium effort was no better to read at about 40 percent more cost and 30 percent more time, so low is the default. Extra token budget, a stronger model and a template that asks for depth only pay off together.
+
+Prices used: gpt-4.1 $2.00 and $8.00, gpt-5.1 $1.25 and $10.00 per million tokens in and out.
 
 ## What was found, and what changed
 

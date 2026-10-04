@@ -138,6 +138,8 @@ export function recordFromTerminalEvent(event: string, data: unknown): Assistant
         mode: "answer",
         usage: usageFrom(d),
         memoryUsed: d.memory_used ?? [],
+        // What a web search found, for an answer to a question about the outside world.
+        ...(Array.isArray(d.sources) && d.sources.length > 0 ? { sources: d.sources } : {}),
         ...(pending
           ? {
               interviewQuestions: [pending],

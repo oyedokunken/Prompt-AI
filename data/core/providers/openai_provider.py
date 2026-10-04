@@ -36,6 +36,14 @@ def _strip_tracking(url: str) -> str:
 _SUPPORTED_MODELS = {"gpt-4o", "gpt-4o-mini"}
 
 
+_REASONING_MODEL = re.compile(r"^(gpt-5|o[0-9])")
+
+
+def is_reasoning_model(model: str) -> bool:
+    """The GPT-5 family and the o series take different parameters from earlier chat models."""
+    return bool(_REASONING_MODEL.match(model)) and "chat-latest" not in model
+
+
 class OpenAIProvider(ModelProvider):
     name = "openai"
 
@@ -49,7 +57,11 @@ class OpenAIProvider(ModelProvider):
         embed_model: str,
         timeout_seconds: float,
         step_models: Optional[dict[str, str]] = None,
+        reasoning_effort: str = "low",
+        fallback_model: Optional[str] = None,
     ) -> None:
+        self._fallback_model = fallback_model
+        self._reasoning_effort = reasoning_effort
         self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=1)
         self._default_model = default_model
         self._fast_model = fast_model
@@ -65,6 +77,9 @@ class OpenAIProvider(ModelProvider):
         # Older sessions can still carry a target model with no provider
         # behind it, those run on the default model.
         return requested if requested in _SUPPORTED_MODELS else self._default_model
+
+    def fallback_model(self, model: str) -> Optional[str]:
+        return self._fallback_model if self._fallback_model and self._fallback_model != model else None
 
     @staticmethod
     def _to_openai_messages(system: str, messages: list[ProviderMessage]) -> list[dict[str, Any]]:
@@ -106,9 +121,15 @@ class OpenAIProvider(ModelProvider):
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": self._to_openai_messages(system, messages),
-            "max_tokens": max_tokens,
-            "temperature": temperature,
         }
+        if is_reasoning_model(model):
+            # Reasoning models spend part of the budget thinking before they
+            # write, so the cap covers both. They fix their own temperature.
+            kwargs["max_completion_tokens"] = max_tokens
+            kwargs["reasoning_effort"] = self._reasoning_effort
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["temperature"] = temperature
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
@@ -189,16 +210,28 @@ class OpenAIProvider(ModelProvider):
         The model decides what to read and answers from it, and the
         citations it attaches are returned as the sources.
         """
+        # A lookup answers a question about a real person, place or fact, so it
+        # reads wider and reports more than the short research note that only
+        # feeds a prompt.
+        lookup = step == "lookup"
+        if lookup:
+            instruction = (
+                "Search the web and report what is publicly known about the query below, drawing on more than one source. "
+                "Plain text, no markdown, at most 250 words. Give full names, current and past roles with the organisations and dates, "
+                "and the most notable facts. If more than one real person or thing matches the query, say so and describe each briefly. "
+                "Report only what the sources support, and leave out anything you cannot tie to a source.\n\n"
+            )
+        else:
+            instruction = (
+                "Search the web and report concise, factual findings for the query below. "
+                "Plain text, no markdown, at most 150 words. State dates where they matter.\n\n"
+            )
         try:
             response = await self._client.responses.create(
                 model=model,
-                tools=[{"type": "web_search_preview", "search_context_size": "low"}],
-                max_output_tokens=500,
-                input=(
-                    "Search the web and report concise, factual findings for the query below. "
-                    "Plain text, no markdown, at most 150 words. State dates where they matter.\n\n"
-                    f"Query: {query}"
-                ),
+                tools=[{"type": "web_search_preview", "search_context_size": "medium" if lookup else "low"}],
+                max_output_tokens=1000 if lookup else 500,
+                input=f"{instruction}Query: {query}",
             )
         except APIStatusError as exc:
             logger.error("OpenAI search error status=%s code=%s message=%s", exc.status_code, exc.code, exc.message)

@@ -1,6 +1,6 @@
 {
-  "saved_at": "2026-10-01T22:43:56+00:00",
-  "template_version": "v5",
+  "saved_at": "2026-10-04T16:01:57+00:00",
+  "template_version": "v6",
   "cases": {
     "vague-support-bot": true,
     "vague-blog": true,
@@ -52,11 +52,15 @@
     "hard-store-chatbot": true,
     "hard-conflicting-format": true,
     "hard-sensitive-support": true,
-    "hard-role-reversal": false,
+    "hard-role-reversal": true,
     "hard-injection-attempt": true,
     "hard-non-english": true,
     "hard-uses-the-conversation": true,
     "hard-vague-with-memory": true,
-    "hard-product-photo-variants": true
+    "hard-product-photo-variants": true,
+    "lookup-person": true,
+    "lookup-person-lowercase": true,
+    "lookup-not-for-self": true,
+    "lookup-not-for-general-knowledge": true
   }
 }

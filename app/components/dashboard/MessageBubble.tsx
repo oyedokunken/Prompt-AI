@@ -5,6 +5,7 @@ import { Copy, Check, ChevronDown, ChevronUp, BookmarkPlus, BookmarkCheck, Brain
 import type { ChatMessage } from "@/lib/types/chat";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { Markdown } from "@/components/dashboard/Markdown";
+import { Logo } from "@/components/Logo";
 import { copyText } from "@/lib/clipboard";
 import { AttachmentCard } from "@/components/dashboard/AttachmentCard";
 import { createClient } from "@/lib/supabase/client";
@@ -112,7 +113,8 @@ export function BreakdownPanel({ stated, researched, inferred }: { stated: strin
 export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, defaultExpanded = false }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showMeta, setShowMeta] = useState(defaultExpanded);
-  const [showSources, setShowSources] = useState(false);
+  // A reply that came from a web search shows what it found without being asked.
+  const [showSources, setShowSources] = useState(message.metadata.mode === "answer" && (message.metadata.sources ?? []).some((s) => s.kind === "search"));
   const [saved, setSaved] = useState(false);
   const [showMemory, setShowMemory] = useState(defaultExpanded);
   const [showPatterns, setShowPatterns] = useState(defaultExpanded);
@@ -271,9 +273,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
   return (
     <div className="flex gap-3">
       {/* Avatar */}
-      <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-signal/30 bg-signal/10">
-        <span className="font-mono text-xs md:text-xs text-signal">P</span>
-      </div>
+      <Logo variant="color" size={26} iconOnly className="shrink-0 mt-0.5" />
 
       <div className="max-w-[92%] sm:max-w-[72%] min-w-0">
         {/* The conversational wrapper, a normal chat bubble */}

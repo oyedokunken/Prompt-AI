@@ -17,7 +17,8 @@ interface LogoProps {
 // legible against whichever background it is placed on.
 export function Logo({ variant = "color", size = 32, className, iconOnly = false }: LogoProps) {
   const isMono = variant === "mono";
-  const glyphColor = isMono ? "#8B8B93" : "#F2A93B";
+  // Colours come from theme variables so the mark switches with the theme.
+  const glyphColor = isMono ? "rgb(var(--color-ink-faint))" : "rgb(var(--logo-glyph))";
 
   return (
     <span
@@ -37,8 +38,7 @@ export function Logo({ variant = "color", size = 32, className, iconOnly = false
           width="32"
           height="32"
           rx="8"
-          fill="#111113"
-          stroke="#232327"
+          style={{ fill: "rgb(var(--logo-badge))", stroke: "rgb(var(--logo-stroke))" }}
           strokeWidth="1"
         />
         <text
@@ -47,7 +47,7 @@ export function Logo({ variant = "color", size = 32, className, iconOnly = false
           fontFamily="'Geist Mono', monospace"
           fontSize="12"
           fontWeight="600"
-          fill={glyphColor}
+          style={{ fill: glyphColor }}
         >
           &gt;
         </text>
@@ -57,7 +57,7 @@ export function Logo({ variant = "color", size = 32, className, iconOnly = false
           fontFamily="'Geist Mono', monospace"
           fontSize="12"
           fontWeight="400"
-          fill="#EDEDEF"
+          style={{ fill: "rgb(var(--logo-ink))" }}
         >
           _
         </text>
@@ -67,7 +67,7 @@ export function Logo({ variant = "color", size = 32, className, iconOnly = false
           width="8"
           height="2"
           rx="1"
-          fill={glyphColor}
+          style={{ fill: glyphColor }}
           opacity="0.7"
         />
       </svg>

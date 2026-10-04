@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear. For ready results the prompt must be lightweight plain text unless expect.format is markdown. expect.search true means a web search must have run, false means it must not have. expect.decision may be a list of acceptable decisions. expect.memory_used and expect.memory_candidate check the memory behavior. expect.patterns_any lists pattern ids from core/patterns_library.json, at least one of which must be retrieved for the request.",
   "cases": [
     {
@@ -1391,6 +1391,95 @@
         ]
       },
       "good_prompt_notes": "Three variants that differ in one element at a time, concrete visual language and an exclusion list. Not three paraphrases of one description."
+    },
+    {
+      "id": "lookup-person",
+      "input": "who is Lila Ibrahim",
+      "profile": {
+        "preferred_name": "Kenny"
+      },
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "lookup": true,
+        "memory_used": false,
+        "must_include": [
+          [
+            "deepmind"
+          ]
+        ],
+        "must_not_include": [
+          "i don't have",
+          "i do not have"
+        ]
+      },
+      "good_prompt_notes": "A real, specific person that is not in memory. Must search, show the lookup stage, and answer from the findings with her actual role."
+    },
+    {
+      "id": "lookup-person-lowercase",
+      "input": "who is dario amodei",
+      "profile": {
+        "preferred_name": "Kenny"
+      },
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "lookup": true,
+        "memory_used": false,
+        "must_include": [
+          [
+            "anthropic"
+          ]
+        ]
+      },
+      "good_prompt_notes": "Typed in lowercase, still a named person. Must be looked up, not recalled."
+    },
+    {
+      "id": "lookup-not-for-self",
+      "input": "who am I?",
+      "profile": {
+        "preferred_name": "Kenny",
+        "role": "Backend engineer"
+      },
+      "memories": [
+        {
+          "category": "projects",
+          "key": "Current project",
+          "value": "A CLI that parses logs in Rust"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "lookup": false,
+        "memory_used": true,
+        "must_include": [
+          [
+            "rust",
+            "backend",
+            "kenny"
+          ]
+        ]
+      },
+      "good_prompt_notes": "A question about the user is answered from memory and never searched."
+    },
+    {
+      "id": "lookup-not-for-general-knowledge",
+      "input": "how does a b-tree work",
+      "profile": {
+        "preferred_name": "Kenny"
+      },
+      "memories": [],
+      "expect": {
+        "decision": "conversation",
+        "lookup": false,
+        "must_include": [
+          [
+            "node",
+            "key"
+          ]
+        ]
+      },
+      "good_prompt_notes": "General knowledge that depends on no specific named person or recent fact, answered directly."
     }
   ]
 }

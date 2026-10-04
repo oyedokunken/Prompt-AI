@@ -36,12 +36,17 @@ class Settings(BaseSettings):
     realtime_max_seconds: int = Field(180, alias="REALTIME_MAX_SECONDS")
     # Optional per step overrides. Each falls back to OPENAI_MODEL when unset,
     # so a step can be moved to a cheaper model by configuration alone.
-    openai_intent_model: Optional[str] = Field(None, alias="OPENAI_INTENT_MODEL")
-    openai_construct_model: Optional[str] = Field(None, alias="OPENAI_CONSTRUCT_MODEL")
-    openai_answer_model: Optional[str] = Field(None, alias="OPENAI_ANSWER_MODEL")
+    openai_intent_model: Optional[str] = Field("gpt-4.1", alias="OPENAI_INTENT_MODEL")
+    openai_construct_model: Optional[str] = Field("gpt-5.1", alias="OPENAI_CONSTRUCT_MODEL")
+    openai_answer_model: Optional[str] = Field("gpt-4.1", alias="OPENAI_ANSWER_MODEL")
+    # Used once, for the same step, when the model above fails or times out.
+    openai_fallback_model: str = Field("gpt-4.1", alias="OPENAI_FALLBACK_MODEL")
     openai_vision_model: Optional[str] = Field(None, alias="OPENAI_VISION_MODEL")
     openai_search_model: Optional[str] = Field(None, alias="OPENAI_SEARCH_MODEL")
     openai_embed_model: str = Field("text-embedding-3-small", alias="OPENAI_EMBED_MODEL")
+    # How hard a reasoning model thinks before it writes. Applies only to the
+    # GPT-5 family and the o series, and counts toward the output cost.
+    openai_reasoning_effort: str = Field("low", alias="OPENAI_REASONING_EFFORT")
     openai_timeout_seconds: float = Field(90.0, alias="OPENAI_TIMEOUT_SECONDS")
     # Retrieval of known effective prompt patterns for construction. On by
     # default, switchable so its effect can be measured against the eval set.

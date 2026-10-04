@@ -68,7 +68,13 @@ FILLER_PHRASES = [
     "high quality", "high-quality", "accurate and helpful", "maintain confidentiality", "user-friendly",
     "universally relatable", "easy to understand", "comprehensive", "thorough", "ensuring",
 ]
+# Longer prompts legitimately use a stock word or two, so the allowance grows
+# with length, one more hit for every 250 words beyond the first 250.
 MAX_FILLER_HITS = 3
+
+
+def filler_allowance(text: str) -> int:
+    return MAX_FILLER_HITS + max(0, len(text.split()) - 250) // 250
 
 JUDGE_PROMPT = """You are a strict but fair reviewer of prompts written for other AI models. You are given the request a user made and the prompt an assistant produced for it.
 
@@ -138,7 +144,7 @@ def check_case(case: dict[str, Any], events: list[Any]) -> tuple[bool, list[str]
             failures.append("prompt uses heavy markdown where plain text was expected")
         hits = filler_hits(final.content)
         detail["filler"] = hits
-        if len(hits) > MAX_FILLER_HITS:
+        if len(hits) > filler_allowance(final.content):
             failures.append(f"{len(hits)} stock filler phrases: {hits}")
         detail["has_message"] = bool(final.message)
         if expect.get("message", True) and not final.message:
@@ -149,6 +155,12 @@ def check_case(case: dict[str, Any], events: list[Any]) -> tuple[bool, list[str]
     elif final.type == "answer":
         detail["memory_candidates"] = [c.key for c in final.memory_candidates]
         text = final.content
+        looked_up = "lookup" in detail["stages"]
+        detail["looked_up"] = looked_up
+        if "lookup" in expect and looked_up != expect["lookup"]:
+            failures.append(f"web lookup ran: {looked_up}, expected {expect['lookup']}")
+        if expect.get("lookup") and not any(s.kind == "search" for s in final.sources):
+            failures.append("a lookup answer carries no search source")
         if text.lstrip().startswith("{"):
             failures.append("answer is JSON, expected plain text")
     elif final.type == "clarifying_question":
@@ -219,6 +231,8 @@ class MockProvider(ModelProvider):
                 return {"kind": "prompt_request", "sufficient": False, "intro": "Happy to help.",
                         "questions": [{"text": "Which one do you mean?", "options": ["First", "Second"]}]}
             if self.decision == "conversation":
+                if expect.get("lookup"):
+                    return {"kind": "conversation", "lookup": True, "search_queries": ["mock lookup"], "about_user": False}
                 return {"kind": "conversation", "about_user": bool(self.case.get("memories"))}
             return {"kind": "prompt_request", "sufficient": True,
                     "search_queries": ["mock query"] if expect.get("search") else []}

@@ -40,8 +40,8 @@ All except `/health` require `Authorization: Bearer <API_SHARED_SECRET>`.
 
 1. Memory selection by meaning, using embeddings. A message about the user themselves brings in everything stored
 2. Attachment reading, if any were sent
-3. Intent detection. A casual message gets a conversational reply, an underspecified request gets one clarifying question, and anything else goes on
-4. A web search, only if intent planned one
+3. Intent detection. A question about the user is answered from stored memory. A question about the outside world, such as who a named person is, is looked up on the web, in its own stage, and answered from what the search found with its sources shown, never from the model's recollection. An underspecified request gets one clarifying question, and anything else goes on
+4. A web search to feed the prompt, only if intent planned one
 5. Pattern retrieval, then construction, then scoring
 
 Every step that calls a model records its token usage, and each reply carries the totals.

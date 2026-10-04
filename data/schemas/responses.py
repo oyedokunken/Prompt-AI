@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from schemas.requests import ClarifyQuestion, ClarifyState, SourceLink
 
 Stage = Literal[
-    "intent", "reading", "searching", "clarifying", "answering", "constructing", "scoring", "finalizing"
+    "intent", "reading", "searching", "lookup", "clarifying", "answering", "constructing", "scoring", "finalizing"
 ]
 
 
@@ -73,6 +73,8 @@ class AnswerEvent(BaseModel):
     memory_candidates: list["MemoryCandidate"] = Field(default_factory=list)
     # The stored memory that informed this reply.
     memory_used: list[MemoryRef] = Field(default_factory=list)
+    # What a web search found, when the question was about the outside world.
+    sources: list["SourceSummary"] = Field(default_factory=list)
     usage: Optional[UsageSummary] = None
 
 

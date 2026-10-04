@@ -31,6 +31,8 @@ class IntentDecision:
     search_queries: list[str] = field(default_factory=list)
     # A conversational message about the user themselves, so everything stored is relevant.
     about_user: bool = False
+    # A conversational question about the outside world, answered from a web search.
+    lookup: bool = False
     reason: str = ""
 
     @property
@@ -79,7 +81,18 @@ def parse_intent(raw: dict[str, Any], *, has_pending_question: bool) -> IntentDe
     reason = str(raw.get("reason") or "").strip()
 
     if kind == "conversation":
-        return IntentDecision(kind="conversation", about_user=raw.get("about_user") is True, reason=reason)
+        lookup = raw.get("lookup") is True
+        queries = research.clean_queries(raw.get("search_queries")) if lookup else []
+        # Looking something up and asking about the user are different questions.
+        # If both came back, the lookup stands only when a query was planned.
+        lookup = lookup and bool(queries)
+        return IntentDecision(
+            kind="conversation",
+            about_user=raw.get("about_user") is True and not lookup,
+            lookup=lookup,
+            search_queries=queries,
+            reason=reason,
+        )
     if kind == "answer" and has_pending_question:
         return IntentDecision(kind="answer", reason=reason)
 
@@ -123,7 +136,7 @@ async def detect(ctx: PipelineContext, provider: ModelProvider) -> IntentDecisio
         model=provider.resolve_model(ctx.target_model, step="intent"),
         system=intent_system_prompt(ctx, pending),
         messages=build_messages(ctx),
-        max_tokens=500,
+        max_tokens=700,
         temperature=0.1,
         step="intent",
     )

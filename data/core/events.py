@@ -95,6 +95,23 @@ def searching() -> StageEvent:
     return StageEvent(stage="searching", message=_pick(SEARCHING_POOL))
 
 
+def lookup(query: str) -> StageEvent:
+    """A web search to answer a question directly, not to feed a prompt.
+
+    Its own stage, so the status says what is happening: the web is being
+    searched for this, not the user's memory being read.
+    """
+    subject = " ".join(query.split())
+    short = subject if len(subject) <= 48 else subject[:47].rstrip() + "..."
+    pool = [
+        "Searching the web",
+        "Looking this up on the web",
+        f"Searching the web for {short}",
+        f"Checking the web for {short}",
+    ]
+    return StageEvent(stage="lookup", message=_pick(pool))
+
+
 def clarifying_pool(position: int, total: int) -> list[str]:
     if position == 1:
         return CLARIFYING_FIRST_POOL
@@ -110,8 +127,16 @@ def clarifying_question(position: int, total: int) -> StageEvent:
     return StageEvent(stage="clarifying", message=_pick(clarifying_pool(position, total)))
 
 
-def answering() -> StageEvent:
-    return StageEvent(stage="answering", message=_pick(ANSWERING_POOL))
+ANSWERING_FROM_WEB_POOL = [
+    "Writing",
+    "Reading what came back",
+    "Writing the answer from what the search found",
+    "Putting the findings together",
+]
+
+
+def answering(from_web: bool = False) -> StageEvent:
+    return StageEvent(stage="answering", message=_pick(ANSWERING_FROM_WEB_POOL if from_web else ANSWERING_POOL))
 
 
 def constructing_pool(answer_count: int) -> list[str]:

@@ -86,6 +86,10 @@ class ModelProvider(ABC):
     ) -> str:
         """Run a completion that returns plain text."""
 
+    def fallback_model(self, model: str) -> Optional[str]:
+        """A model to retry a failed step on, or None when there is no other to try."""
+        return None
+
     @abstractmethod
     async def search(self, *, model: str, query: str, step: str = "search") -> SearchOutcome:
         """Search the web for current information and report what was found."""
