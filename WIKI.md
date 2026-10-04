@@ -27,6 +27,10 @@ The index for Prompt AI's documentation. Deeper guides live here or next to the 
 - **The eval set.** `data/evaluation/eval_set.json` holds requests with notes on what a good result looks like. `python evaluation/run_eval.py` checks decisions, required and forbidden content, formatting, filler and memory behavior. The default is a free mock mode, a real run needs `--live`, a scope and `--yes`, and it reports its spend. Add `--judge` to also score generated prompts with a reviewer model, and `--save-baseline` to record a run. Treat the judge as a signal, not a verdict, since a model grading a model has its own bias.
 - **Adding a model provider.** Implement the interface in `data/core/providers/base.py` and select it in `data/core/providers/__init__.py`. Pipeline code never names a provider.
 
+## Recent changes
+
+The changelog lists every change by version. The ones that changed how the system works are live transcription over a socket on `data`, web lookups for questions about the world, the move to gpt-5.1 for construction with template v6, pinned chats stored on the chat table, and the Accounts tab. ARCHITECTURE.md explains each, and `data/COST_AUDIT.md` explains the model choices and their cost.
+
 ## Planned
 
 These guides do not exist yet.

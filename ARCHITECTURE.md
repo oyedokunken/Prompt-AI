@@ -162,6 +162,25 @@ Prompt templates are versioned in directories and one version is active at a tim
 | `POST /chat/transcribe/ticket` | A short lived ticket and the address of the live transcription socket on `data` |
 | `GET /chat/memory-summary` | A short prose description of what is stored about the signed in user, written by `data` |
 
+## Questions about the world, and which model does what
+
+The data service separates two kinds of question that look alike. A question about the user, such as who am I, is answered from stored memory, and says so plainly when nothing is stored. A question about the outside world, such as who a named person is, is looked up. Intent classifies it, and a deterministic check on a plain "who is" followed by a name is the net beneath it. The lookup runs its own stage, which the interface shows as "Looking this up on the web", then a deeper web search, then an answer written only from the findings. The answer event carries the search sources, `api` stores them on the message, and the interface opens them by default. A name that is the user's own or already stored goes to memory, and a failed search is reported to the answering model so it says so instead of guessing.
+
+Each step has its own model, set by configuration and defaulting to the following.
+
+| Step | Model | Why |
+|---|---|---|
+| Intent | gpt-4.1 | Cheaper than gpt-4o and follows the classification rules better |
+| Construction | gpt-5.1, low reasoning effort | Prompts with real decision rules and exact output shapes, at a lower token price than gpt-4o |
+| Conversational reply | gpt-4.1 | Fast and grounded |
+| Search | gpt-4o with the search tool | A lookup reads wider and reports more than a research note for a prompt |
+
+A step that fails on its model is retried once on `OPENAI_FALLBACK_MODEL`. Reasoning models take `max_completion_tokens` and a reasoning effort instead of `max_tokens` and a temperature, and the provider handles that. The construction template is versioned (v6), its token budget is 8,000, and generated text has quotation marks, non breaking hyphens and spaces normalised in code.
+
+## Pinned chats and password changes
+
+Pinned chats live in `is_pinned` and `pinned_at` on `chat_sessions`, added by `api/prisma/pinned_chats.sql`. The dashboard falls back to the user's profile until the columns exist. Changing a password is `POST /auth/change-password` on `api`. It verifies the bearer token against Supabase on every call, proves the current password by signing in with it on a throwaway client, then sets the new one through the Supabase admin API. The Accounts tab appears only for accounts whose sign in methods include email.
+
 ## Live transcription
 
 Voice input streams. The browser captures microphone audio, resamples it to 24kHz mono PCM on the device, and sends it over a WebSocket to `data`, which relays it to OpenAI realtime transcription and returns text as each phrase is recognised. The text appears in the message box while the user is still speaking.
