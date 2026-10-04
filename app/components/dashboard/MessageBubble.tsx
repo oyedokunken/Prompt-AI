@@ -273,7 +273,7 @@ export function MessageBubble({ message, onSave, onRetry, onEdit, onFeedback, de
   return (
     <div className="flex gap-3">
       {/* Avatar */}
-      <Logo variant="color" size={26} iconOnly className="shrink-0 mt-0.5" />
+      <Logo variant="color" size={26} iconOnly className="shrink-0 mt-0.5 self-start" />
 
       <div className="max-w-[92%] sm:max-w-[72%] min-w-0">
         {/* The conversational wrapper, a normal chat bubble */}

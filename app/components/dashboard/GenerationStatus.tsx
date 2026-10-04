@@ -14,7 +14,7 @@ export function GenerationStatus({ message }: GenerationStatusProps) {
 
   return (
     <div className="flex gap-3">
-      <Logo variant="color" size={26} iconOnly className="shrink-0 mt-0.5" />
+      <Logo variant="color" size={26} iconOnly className="shrink-0 mt-0.5 self-start" />
       <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl rounded-tl-md bg-base border border-border max-w-[320px]">
         <div className="flex gap-1 shrink-0" aria-hidden="true">
           {[0, 1, 2].map((i) => (
