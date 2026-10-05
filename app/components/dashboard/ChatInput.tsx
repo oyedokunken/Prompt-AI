@@ -117,6 +117,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const [liveFailed, setLiveFailed] = useState(false);
   const [liveReason, setLiveReason] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
+  const [liveReady, setLiveReady] = useState(false);
   const [level, setLevel] = useState(0);
 
   useEffect(() => {
@@ -168,6 +169,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     setLiveFailed(false);
     setLiveReason(null);
     setPending(0);
+    setLiveReady(false);
     let live: LiveTranscriber | null = null;
     if (liveTranscriptionSupported()) {
       live = new LiveTranscriber({
@@ -177,6 +179,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           endpointRef.current?.noteText(Date.now());
         },
         onPending: setPending,
+        onReady: () => setLiveReady(true),
         onLevel: (v) => {
           setLevel(v);
           // The message ends when the speaker has stopped, no second press needed.
@@ -336,7 +339,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 />
               ))}
             </span>
-            <span className="hidden sm:inline">{liveFailed ? "Recording" : pending > 0 ? "Writing" : "Listening"}</span>
+            <span className="hidden sm:inline">{liveFailed ? "Recording" : !liveReady ? "Connecting" : "Listening"}</span>
           </div>
         )}
 

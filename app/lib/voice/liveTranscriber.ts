@@ -150,6 +150,7 @@ export class LiveTranscriber {
     switch (message.type) {
       case "ready":
         this.ready = true;
+        this.options.onReady?.();
         for (const chunk of this.pending) this.ws?.send(chunk);
         this.pending = [];
         break;
