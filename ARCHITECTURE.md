@@ -166,6 +166,8 @@ Prompt templates are versioned in directories and one version is active at a tim
 
 The data service separates two kinds of question that look alike. A question about the user, such as who am I, is answered from stored memory, and says so plainly when nothing is stored. A question about the outside world, such as who a named person is, is looked up. Intent classifies it, and a deterministic check on a plain "who is" followed by a name is the net beneath it. The lookup runs its own stage, which the interface shows as "Looking this up on the web", then a deeper web search, then an answer written only from the findings. The answer event carries the search sources, `api` stores them on the message, and the interface opens them by default. A name that is the user's own or already stored goes to memory, and a failed search is reported to the answering model so it says so instead of guessing.
 
+Memory, search and the conversation are inputs that combine, never alternatives. Memory is selected before anything else, and when a search is about to run the context is widened first: a request that refers to the user's own situation brings in everything stored, and any other keeps at least the four best stored items even when none matched its words. A question can be classified as needing both a lookup and memory, and then the answer is written from the findings, the stored details and the conversation together, with today's date in the context so current is judged against the real date.
+
 Each step has its own model, set by configuration and defaulting to the following.
 
 | Step | Model | Why |
@@ -183,7 +185,7 @@ Pinned chats live in `is_pinned` and `pinned_at` on `chat_sessions`, added by `a
 
 ## Live transcription
 
-Voice input streams. The browser captures microphone audio, resamples it to 24kHz mono PCM on the device, and sends it over a WebSocket to `data`, which relays it to OpenAI realtime transcription and returns text as each phrase is recognised. The text appears in the message box while the user is still speaking.
+Voice input streams, and ends by itself on silence. The default model, gpt-realtime-whisper, decodes continuously so words arrive while the speaker is still talking. Models that work in phrases are still supported and are handled with the phrase closing described below. The browser captures microphone audio, resamples it to 24kHz mono PCM on the device, and sends it over a WebSocket to `data`, which relays it to OpenAI realtime transcription and returns text as each phrase is recognised. The text appears in the message box while the user is still speaking.
 
 A WebSocket cannot be held open by the serverless `api`, and a browser cannot send an Authorization header on one, so the socket is on `data` and `api` only mints the way in. `POST /chat/transcribe/ticket` returns a ticket signed with the shared secret that names the user, expires in a minute and is accepted once. The browser presents it as the first message on the socket, so it never appears in a URL or a log. `data` remains the only service that talks to OpenAI.
 

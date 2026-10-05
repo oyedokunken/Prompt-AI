@@ -123,7 +123,7 @@ export function NotFoundScene({ isAuthenticated }: { isAuthenticated: boolean })
       {/* Backdrop */}
       <div
         className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 90% 60% at 50% 20%, rgba(139,124,246,0.08) 0%, transparent 60%)" }}
+        style={{ background: "radial-gradient(ellipse 90% 60% at 50% 20%, rgba(242,169,59,0.08) 0%, transparent 60%)" }}
       />
       <Starfield animate={animate} />
       <DriftingProbe animate={animate} />

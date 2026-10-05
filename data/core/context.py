@@ -278,7 +278,7 @@ async def embed_texts(texts: list[str], provider: "ModelProvider", step: str = "
 
 
 async def select_memories_semantic(
-    memories: list[Memory], message: str, recent_user_text: str, provider: "ModelProvider"
+    memories: list[Memory], message: str, recent_user_text: str, provider: "ModelProvider", floor: int = 0
 ) -> list[Memory]:
     """Rank stored memory against the request by meaning, keeping what is related."""
     if not memories:
@@ -295,18 +295,59 @@ async def select_memories_semantic(
     query_vector = vectors[query]
     keyword = {id(m) for m in select_relevant_memories(memories, message, limit=len(memories)) if m.category != "about"}
     scored = []
+    ranked = []
     for memory, text in zip(memories, texts):
         score = cosine_similarity(query_vector, vectors[text])
+        ranked.append((score, memory))
         if score >= RELEVANCE_THRESHOLD or id(memory) in keyword:
             scored.append((score, memory))
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [m for _, m in scored[:MAX_RELEVANT_MEMORIES_SEMANTIC]]
+    ranked.sort(key=lambda pair: pair[0], reverse=True)
+    chosen = scored[:MAX_RELEVANT_MEMORIES_SEMANTIC]
+    # A floor keeps the best few stored items in play even when none clears the
+    # threshold. A question that needs the web and the user's own context
+    # rarely repeats the words of the memory it needs.
+    if floor and len(chosen) < floor:
+        have = {id(m) for _, m in chosen}
+        chosen += [pair for pair in ranked if id(pair[1]) not in have][: floor - len(chosen)]
+    return [m for _, m in chosen]
 
 
 async def attach_memory(ctx: PipelineContext, provider: "ModelProvider") -> PipelineContext:
     """Select the stored memory that bears on this request and add it to the context."""
     recent = next((m.content for m in reversed(ctx.history) if m.role == "user"), "")
     selected = await select_memories_semantic(ctx.all_memories, ctx.message, recent, provider)
+    return dataclasses.replace(ctx, relevant_memories=selected)
+
+
+# First person references mean the request depends on the user's own situation.
+_PERSONAL_REFERENCE = re.compile(
+    r"\b(my|mine|our|ours|me|myself|i'm|i am|i've|i have|i'd|i'll|we're|we are|we have|for me|for us)\b", re.IGNORECASE
+)
+# With a web search in play, at least this many stored items stay in context.
+SEARCH_MEMORY_FLOOR = 4
+
+
+def personal_reference(message: str) -> bool:
+    return bool(_PERSONAL_REFERENCE.search(message))
+
+
+async def keep_memory_with_search(ctx: PipelineContext, provider: "ModelProvider", *, personal: bool) -> PipelineContext:
+    """Make sure running a web search does not leave the user's own context behind.
+
+    Memory, search results and the conversation are inputs that combine. When
+    the request refers to the user's own situation, everything stored comes
+    along. Otherwise the best few stored items are kept even if none matched
+    the words of the request, ahead of the search findings being added.
+    """
+    if not ctx.all_memories:
+        return ctx
+    if personal:
+        return widen_memory(ctx)
+    recent = next((m.content for m in reversed(ctx.history) if m.role == "user"), "")
+    selected = await select_memories_semantic(
+        ctx.all_memories, ctx.message, recent, provider, floor=SEARCH_MEMORY_FLOOR
+    )
     return dataclasses.replace(ctx, relevant_memories=selected)
 
 

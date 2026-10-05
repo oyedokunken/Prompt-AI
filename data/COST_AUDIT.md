@@ -19,6 +19,8 @@ What one chat turn costs, where the money goes, what was changed, and how to kee
 
 The same six requests were built on three models and read by hand. gpt-4o wrote 150 to 200 words per prompt, thin and generic, partly because the template told it to be short and the token cap sat at 2,500. gpt-4.1 wrote 200 to 400. gpt-5.1 at low reasoning effort wrote prompts with real decision rules, edge cases and exact output shapes. gpt-5.1 is cheaper per token than gpt-4o ($1.25 input, $10 output, against $2.50 and $10), so a whole turn including intent costs about $0.02 to $0.03, against about $0.014 before, for output several times longer and far more specific. A turn takes 12 to 25 seconds, and medium effort was no better to read at about 40 percent more cost and 30 percent more time, so low is the default. Extra token budget, a stronger model and a template that asks for depth only pay off together.
 
+Live voice costs about $0.017 a minute on gpt-realtime-whisper, which streams words as they are spoken, against $0.003 on the phrase based mini model. A session is capped at 180 seconds, so the most one can cost is about five cents, and a typical one is under half a cent.
+
 Prices used: gpt-4.1 $2.00 and $8.00, gpt-5.1 $1.25 and $10.00 per million tokens in and out.
 
 ## What was found, and what changed

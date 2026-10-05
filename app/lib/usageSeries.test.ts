@@ -88,3 +88,21 @@ test("the description only states what is in the totals", () => {
   assert.match(text, /built 1 prompt at an average completeness of 80/);
   assert.match(text, /1,200 tokens/);
 });
+
+test("direct answers are counted on their own, so a range of answers is not shown as zero activity", () => {
+  const answer = (agoMs: number, withSearch: boolean) =>
+    ({
+      role: "assistant",
+      content: "An answer.",
+      created_at: new Date(NOW - agoMs).toISOString(),
+      metadata: { mode: "answer", sources: withSearch ? [{ kind: "search" }] : [], usage: { promptTokens: 4000, completionTokens: 700, estCostUsd: 0.01 } },
+    }) as UsageMessage;
+  const series = buildSeries([answer(HOUR, true), answer(2 * HOUR, false), answer(3 * HOUR, false)], "7d", NOW);
+  assert.equal(series.totals.prompts, 0);
+  assert.equal(series.totals.answers, 3);
+  assert.equal(series.totals.lookups, 1);
+  assert.equal(series.totals.tokens, 14100);
+  const text = describeSeries(series, "7 days");
+  assert.match(text, /built 0 prompts/);
+  assert.match(text, /3 direct answers, 1 of them from a web search/);
+});

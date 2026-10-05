@@ -30,6 +30,7 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState(false);
+  const [customRole, setCustomRole] = useState("");
   const [savingRole, setSavingRole] = useState(false);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,13 +94,19 @@ export default function SettingsPage() {
   };
 
   const handleRoleChange = async (role: string) => {
+    const value = role.trim().slice(0, 80);
+    if (!value) return;
     setSavingRole(true);
     try {
-      await supabase.auth.updateUser({ data: { role } });
+      // updateUser reports failure in its result rather than throwing.
+      const { error: updateError } = await supabase.auth.updateUser({ data: { role: value } });
+      if (updateError) throw updateError;
       await refresh();
       setEditingRole(false);
+      setCustomRole("");
+      setError(null);
     } catch {
-      setError("Failed to update role");
+      setError("Could not update your role. Try again.");
     } finally {
       setSavingRole(false);
     }
@@ -269,6 +276,37 @@ export default function SettingsPage() {
                       {r.label}
                     </button>
                   ))}
+                  <form
+                    className="col-span-2 flex gap-2 mt-1"
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleRoleChange(customRole);
+                    }}
+                  >
+                    <input
+                      value={customRole}
+                      onChange={(e) => setCustomRole(e.target.value)}
+                      maxLength={80}
+                      placeholder="Or write your own, for example Staff engineer"
+                      aria-label="Write your own role"
+                      className="flex-1 min-w-0 rounded-lg border border-border bg-raised px-3 py-2.5 text-[16px] md:text-sm text-text-primary placeholder:text-text-faint outline-none focus:border-accent/50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingRole || !customRole.trim()}
+                      className="px-4 rounded-lg bg-accent-fill text-accent-fill-foreground text-sm font-semibold disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                  </form>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingRole(false); setCustomRole(""); }}
+                    className="col-span-2 text-sm md:text-xs text-text-muted hover:text-text-primary py-2"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
             </div>

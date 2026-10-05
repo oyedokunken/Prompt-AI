@@ -30,9 +30,10 @@ class Settings(BaseSettings):
     openai_model: str = Field("gpt-4o", alias="OPENAI_MODEL")
     openai_fast_model: str = Field("gpt-4o-mini", alias="OPENAI_FAST_MODEL")
     openai_transcribe_model: str = Field("whisper-1", alias="OPENAI_TRANSCRIBE_MODEL")
-    # Live transcription over a streaming socket. The mini model is half the
-    # price per minute of whisper-1, and the cap bounds one session's spend.
-    openai_realtime_transcribe_model: str = Field("gpt-4o-mini-transcribe", alias="OPENAI_REALTIME_TRANSCRIBE_MODEL")
+    # Live transcription over a streaming socket. gpt-realtime-whisper decodes
+    # continuously, so words appear while the speaker is still talking. It costs
+    # about $0.017 a minute, so the cap bounds one session's spend.
+    openai_realtime_transcribe_model: str = Field("gpt-realtime-whisper", alias="OPENAI_REALTIME_TRANSCRIBE_MODEL")
     realtime_max_seconds: int = Field(180, alias="REALTIME_MAX_SECONDS")
     # Optional per step overrides. Each falls back to OPENAI_MODEL when unset,
     # so a step can be moved to a cheaper model by configuration alone.

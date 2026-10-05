@@ -44,7 +44,8 @@ export const ROLE_OPTIONS = [
 ] as const;
 
 export function roleLabel(role: string | null): string {
-  return ROLE_OPTIONS.find((r) => r.id === role)?.label ?? "Not set";
+  // A role the user typed themselves is shown as written.
+  return ROLE_OPTIONS.find((r) => r.id === role)?.label ?? (role?.trim() ? role.trim() : "Not set");
 }
 
 // Single source of truth for the signed-in user's profile fields

@@ -88,7 +88,7 @@ def parse_intent(raw: dict[str, Any], *, has_pending_question: bool) -> IntentDe
         lookup = lookup and bool(queries)
         return IntentDecision(
             kind="conversation",
-            about_user=raw.get("about_user") is True and not lookup,
+            about_user=raw.get("about_user") is True,
             lookup=lookup,
             search_queries=queries,
             reason=reason,

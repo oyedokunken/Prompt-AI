@@ -4,7 +4,7 @@
 // messages, nothing is estimated or filled in.
 
 export type RangeId = "1d" | "3d" | "7d" | "1m" | "3m";
-export type MetricId = "prompts" | "tokens" | "outputLength" | "score" | "questions" | "approval";
+export type MetricId = "prompts" | "answers" | "tokens" | "outputLength" | "score" | "questions" | "approval";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -18,7 +18,8 @@ export const RANGES: { id: RangeId; label: string; windowMs: number; bucketMs: n
 ];
 
 export const METRICS: { id: MetricId; label: string; unit: string; hint: string }[] = [
-  { id: "prompts", label: "Prompts generated", unit: "", hint: "Finished prompts" },
+  { id: "prompts", label: "Prompts built", unit: "", hint: "Finished, structured prompts only. Direct answers and clarifying questions are counted on their own" },
+  { id: "answers", label: "Direct answers", unit: "", hint: "Replies that were not a built prompt, such as answers about you or from a web search" },
   { id: "tokens", label: "Tokens used", unit: "", hint: "Input plus output, as billed by the model provider" },
   { id: "outputLength", label: "Output length", unit: " words", hint: "Average length of a generated prompt" },
   { id: "score", label: "Completeness", unit: "/100", hint: "Average completeness score" },
@@ -32,6 +33,7 @@ export interface UsageMessage {
   created_at: string;
   metadata: {
     mode?: string;
+    sources?: { kind?: string }[];
     score?: number;
     usage?: { promptTokens?: number; completionTokens?: number; estCostUsd?: number };
     feedback?: { rating?: "up" | "down" };
@@ -43,6 +45,8 @@ export interface Bucket {
   end: number;
   label: string;
   prompts: number;
+  answers: number;
+  lookups: number;
   tokens: number;
   promptTokens: number;
   completionTokens: number;
@@ -73,7 +77,7 @@ function words(text: string): number {
 
 function emptyBucket(start: number, end: number, label = ""): Bucket {
   return {
-    start, end, label, prompts: 0, tokens: 0, promptTokens: 0, completionTokens: 0, tokenMessages: 0,
+    start, end, label, prompts: 0, answers: 0, lookups: 0, tokens: 0, promptTokens: 0, completionTokens: 0, tokenMessages: 0,
     words: 0, wordSamples: 0, scoreSum: 0, scoreSamples: 0, questions: 0, up: 0, down: 0, costUsd: 0,
   };
 }
@@ -164,6 +168,12 @@ export function buildSeries(messages: UsageMessage[], range: RangeId, now: numbe
       }
     } else if (mode === "clarify") {
       for (const x of targets) x.questions++;
+    } else if (mode === "answer") {
+      const searched = (m.metadata?.sources ?? []).some((s) => s.kind === "search");
+      for (const x of targets) {
+        x.answers++;
+        if (searched) x.lookups++;
+      }
     }
     const rating = m.metadata?.feedback?.rating;
     if (rating) for (const x of targets) rating === "up" ? x.up++ : x.down++;
@@ -178,6 +188,7 @@ export function buildSeries(messages: UsageMessage[], range: RangeId, now: numbe
 export function metricValue(b: Bucket, metric: MetricId): number | null {
   switch (metric) {
     case "prompts": return b.prompts;
+    case "answers": return b.answers;
     case "tokens": return b.tokens;
     case "questions": return b.questions;
     case "outputLength": return b.wordSamples ? Math.round(b.words / b.wordSamples) : null;
@@ -195,12 +206,13 @@ export function formatValue(value: number | null, metric: MetricId): string {
 // A plain description of the range, built only from the totals.
 export function describeSeries(series: Series, rangeLabel: string): string {
   const t = series.totals;
-  if (t.prompts === 0 && t.questions === 0 && series.assistantMessages === 0) {
+  if (t.prompts === 0 && t.questions === 0 && t.answers === 0 && series.assistantMessages === 0) {
     return `Nothing yet in the last ${rangeLabel}. Once you chat, this fills in.`;
   }
   const parts = [`In the last ${rangeLabel}, Prompt AI built ${t.prompts} prompt${t.prompts === 1 ? "" : "s"}`];
   if (t.scoreSamples) parts[0] += ` at an average completeness of ${Math.round(t.scoreSum / t.scoreSamples)} out of 100`;
   parts[0] += ".";
+  if (t.answers) parts.push(`It gave ${t.answers} direct answer${t.answers === 1 ? "" : "s"}${t.lookups ? `, ${t.lookups} of them from a web search` : ""}.`);
   if (t.questions) parts.push(`It asked ${t.questions} clarifying question${t.questions === 1 ? "" : "s"} along the way.`);
   if (t.tokenMessages) parts.push(`That used about ${t.tokens.toLocaleString()} tokens across ${t.tokenMessages} ${t.tokenMessages === 1 ? "reply" : "replies"}.`);
   return parts.join(" ");

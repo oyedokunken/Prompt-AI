@@ -128,7 +128,7 @@ def test_socket_streams_audio_up_and_text_down_and_flushes_on_stop(fake_upstream
     assert seen[-1]["seconds"] == pytest.approx(0.1, abs=0.01)
     appends = [e for e in fake_upstream.sent if e["type"] == "input_audio_buffer.append"]
     assert len(appends) == 1
-    assert fake_upstream.sent[0]["session"]["audio"]["input"]["transcription"]["model"] == "gpt-4o-mini-transcribe"
+    assert fake_upstream.sent[0]["session"]["audio"]["input"]["transcription"]["model"] == "gpt-realtime-whisper"
     assert fake_upstream.closed
 
 
@@ -151,3 +151,12 @@ def test_a_session_over_the_cap_is_cut_off(fake_upstream, monkeypatch):
     assert any(m["type"] == "error" and "limit" in m["message"] for m in messages)
     sent = [e for e in fake_upstream.sent if e["type"] == "input_audio_buffer.append"]
     assert len(sent) <= 11
+
+
+def test_a_continuous_model_gets_no_turn_detection_and_a_phrase_model_does():
+    continuous = ts.session_config("gpt-realtime-whisper", "en")["session"]["audio"]["input"]
+    assert "turn_detection" not in continuous
+    assert continuous["transcription"] == {"model": "gpt-realtime-whisper", "language": "en"}
+    phrase = ts.session_config("gpt-4o-mini-transcribe", None)["session"]["audio"]["input"]
+    assert phrase["turn_detection"]["type"] == "server_vad"
+    assert ts.is_continuous_model("gpt-live-transcribe") and not ts.is_continuous_model("gpt-4o-transcribe")

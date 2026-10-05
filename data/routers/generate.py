@@ -22,6 +22,8 @@ from core.context import (
     PipelineContext,
     assemble_context,
     attach_memory,
+    keep_memory_with_search,
+    personal_reference,
     fresh_memory_candidates,
     read_attachments,
     run_research,
@@ -111,6 +113,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
         searched_early = False
         if decision.needs_clarification and decision.search_queries and decision.kind == "prompt_request":
             yield events.searching()
+            ctx = await keep_memory_with_search(ctx, provider, personal=personal_reference(ctx.message))
             ctx = await run_research(ctx, decision.search_queries, provider)
             searched_early = True
             yield events.intent_parsing(has_pending_question=False)
@@ -128,6 +131,10 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
             if decision.lookup and decision.search_queries:
                 # Its own stage: the web is being searched for this answer.
                 yield events.lookup(decision.search_queries[0])
+                # Searching never leaves the user's own context behind.
+                ctx = await keep_memory_with_search(
+                    ctx, provider, personal=decision.about_user or personal_reference(ctx.message)
+                )
                 ctx = await run_research(ctx, decision.search_queries, provider, step="lookup")
                 looked_up = True
             yield events.answering(from_web=looked_up)
@@ -182,6 +189,7 @@ async def run_pipeline(ctx: PipelineContext, provider: ModelProvider) -> AsyncIt
         # Web search runs only when the intent stage planned it.
         if queries:
             yield events.searching()
+            ctx = await keep_memory_with_search(ctx, provider, personal=personal_reference(ctx.message))
             ctx = await run_research(ctx, queries, provider)
 
         yield events.constructing(len(state.answers) if state else 0)

@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import { transcribeVoice, warmTranscription } from "@/lib/api/chatApi";
 import { LiveTranscriber, liveTranscriptionSupported } from "@/lib/voice/liveTranscriber";
+import { EndpointDetector } from "@/lib/voice/endpointing";
 import dynamic from "next/dynamic";
 import { ArrowRight, Paperclip, Loader2, Smile, Mic, Square, ChevronDown } from "lucide-react";
 import type { EmojiClickData } from "emoji-picker-react";
@@ -38,7 +39,7 @@ function ModelSelector({
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 md:gap-1.5 px-3.5 py-3 md:px-3 md:py-2 rounded-md border border-border bg-surface cursor-pointer hover:border-border/60 transition-colors"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-signal" />
+        <span className="w-1.5 h-1.5 rounded-full bg-accent-fill" />
         <span className="font-mono text-xs md:text-xs text-text-muted">{model.label}</span>
         <ChevronDown size={14} className="text-text-faint md:!w-[14px] md:!h-[14px]" />
       </button>
@@ -110,6 +111,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const liveRef = useRef<LiveTranscriber | null>(null);
+  const endpointRef = useRef<EndpointDetector | null>(null);
+  const stopRef = useRef<() => void>(() => {});
   const baseTextRef = useRef("");
   const [liveFailed, setLiveFailed] = useState(false);
   const [liveReason, setLiveReason] = useState<string | null>(null);
@@ -161,6 +164,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     // run, and so the socket can open while the permission prompt is answered.
     baseTextRef.current = valueRef.current;
     liveRef.current = null;
+    endpointRef.current = new EndpointDetector();
     setLiveFailed(false);
     setLiveReason(null);
     setPending(0);
@@ -170,9 +174,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         onText: (text) => {
           const base = baseTextRef.current;
           onChange(base && text ? `${base} ${text}` : base || text);
+          endpointRef.current?.noteText(Date.now());
         },
         onPending: setPending,
-        onLevel: (v) => setLevel(v),
+        onLevel: (v) => {
+          setLevel(v);
+          // The message ends when the speaker has stopped, no second press needed.
+          const decision = endpointRef.current?.update(v, Date.now());
+          if (decision && decision !== "listening") {
+            endpointRef.current = null;
+            stopRef.current();
+          }
+        },
         onError: (message) => {
           setLiveFailed(true);
           setLiveReason(message);
@@ -218,6 +231,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   };
 
   const stopRecording = async () => {
+    endpointRef.current = null;
     setIsRecording(false);
     const recorder = mediaRecorderRef.current;
     const stopped = new Promise<void>((resolve) => {
@@ -252,6 +266,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     }
   };
 
+  stopRef.current = () => {
+    if (isRecording) void stopRecording();
+  };
+
   const busy = disabled || isTranscribing;
 
   return (
@@ -261,20 +279,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       </div>
       {voiceError && (
         <p className="text-xs md:text-xs text-red-400 mb-1.5">{voiceError}</p>
-      )}
-      {isRecording && !liveFailed && (
-        <div className="flex items-center gap-2 mb-1.5 text-xs md:text-xs text-text-muted" role="status" aria-live="polite">
-          <span className="flex items-end gap-0.5 h-3" aria-hidden="true">
-            {[0.25, 0.5, 0.8, 0.5, 0.25].map((weight, i) => (
-              <span
-                key={i}
-                className="w-0.5 rounded-full bg-red-400 transition-[height] duration-100"
-                style={{ height: `${Math.max(3, Math.round(12 * Math.min(1, level * (0.6 + weight))))}px` }}
-              />
-            ))}
-          </span>
-          <span>{pending > 0 ? "Writing what you said..." : "Listening, speak and the text appears as you go"}</span>
-        </div>
       )}
       {isRecording && liveFailed && (
         <p className="text-xs md:text-xs text-text-faint mb-1.5">
@@ -320,13 +324,29 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           )}
         </div>
 
+        {/* Recording indicator, inside the input so the text stays in view */}
+        {isRecording && (
+          <div className="shrink-0 self-center flex items-center gap-2 pl-1 pr-2 text-xs text-text-muted" role="status" aria-live="polite">
+            <span className="flex items-center gap-0.5 h-5" aria-hidden="true">
+              {[0.3, 0.6, 1, 0.6, 0.3].map((weight, i) => (
+                <span
+                  key={i}
+                  className="w-[3px] rounded-full bg-accent-fill transition-[height] duration-100"
+                  style={{ height: `${Math.max(4, Math.round(20 * Math.min(1, level * (0.5 + weight))))}px` }}
+                />
+              ))}
+            </span>
+            <span className="hidden sm:inline">{liveFailed ? "Recording" : pending > 0 ? "Writing" : "Listening"}</span>
+          </div>
+        )}
+
         {/* Textarea */}
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKey}
-          placeholder={isTranscribing ? "Finishing your voice message..." : isRecording ? "Listening, start speaking..." : placeholder}
+          placeholder={isTranscribing ? "Finishing your voice message..." : placeholder}
           readOnly={isRecording}
           disabled={busy}
           rows={1}
@@ -346,7 +366,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         >
           {isRecording ? (
             <span className="relative flex items-center justify-center w-5 h-5 md:w-3.5 md:h-3.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
               <Square size={14} className="relative fill-current md:!w-[14px] md:!h-[14px]" />
             </span>
           ) : (

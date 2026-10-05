@@ -1406,3 +1406,62 @@ def test_lookup_subject_only_fires_on_a_named_subject():
     assert lookup_subject("Tell me about Chinua Achebe") == "Chinua Achebe"
     for plain in ["who am I", "who is my boss", "tell me about recursion", "who is responsible for this bug", "who is it"]:
         assert lookup_subject(plain) == "", plain
+
+
+# ---------------------------------------------------------------------------
+# Memory, search and conversation are inputs that combine
+# ---------------------------------------------------------------------------
+
+MEMORIES = [
+    {"category": "projects", "key": "Current project", "value": "A CLI tool that parses server logs, written in Rust"},
+    {"category": "skills", "key": "Deployment", "value": "Ships a static musl binary to Alpine containers"},
+]
+
+
+def test_a_lookup_answer_is_written_from_the_findings_and_the_users_stored_context_together():
+    provider = FakeProvider(
+        [
+            {"kind": "conversation", "lookup": True, "search_queries": ["latest stable Rust release"], "about_user": True},
+            SearchOutcome(summary="Rust 1.99.0 is the latest stable release.", sources=[SearchSource("Rust", "https://rust-lang.org")]),
+            {"reply": "Rust 1.99.0 is current, and it suits your log parser."},
+        ]
+    )
+    request = make_request(message="What is the latest stable Rust release, and does it matter for what I'm building?", memories=MEMORIES)
+    out = collect(assemble_context(request), provider)
+
+    system = provider.calls[-1]["system"]
+    assert "Rust 1.99.0 is the latest stable release." in system
+    assert "A CLI tool that parses server logs" in system and "static musl binary" in system
+    answer = out[-1]
+    assert {m.key for m in answer.memory_used} == {"Current project", "Deployment"}
+    assert [s.kind for s in answer.sources] == ["search"]
+    assert "TODAY'S DATE" in system
+
+
+def test_searching_keeps_the_best_stored_context_even_when_the_words_do_not_match():
+    provider = FakeProvider(
+        [
+            {"kind": "conversation", "lookup": True, "search_queries": ["who is Ada Lovelace"]},
+            SearchOutcome(summary="Ada Lovelace wrote the first program."),
+            {"reply": "ok"},
+        ]
+    )
+    request = make_request(message="Tell me about Ada Lovelace for a talk", memories=MEMORIES)
+    out = collect(assemble_context(request), provider)
+    assert len(out[-1].memory_used) >= 1
+
+
+def test_a_prompt_built_after_a_search_still_sees_stored_memory():
+    provider = FakeProvider(
+        [
+            {"kind": "prompt_request", "sufficient": True, "search_queries": ["fastapi latest version"]},
+            SearchOutcome(summary="FastAPI 0.142 is current."),
+            READY_CONSTRUCTION,
+        ]
+    )
+    request = make_request(message="Write a prompt for upgrading my service to the latest FastAPI", memories=MEMORIES)
+    out = collect(assemble_context(request), provider)
+    system = provider.calls[-1]["system"]
+    assert "FastAPI 0.142 is current." in system
+    assert "A CLI tool that parses server logs" in system
+    assert out[-1].memory_used

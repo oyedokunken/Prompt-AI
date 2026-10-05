@@ -37,7 +37,7 @@ export function fileKind(mime: string, name = ""): FileKind {
 // at a glance.
 export const KIND_STYLES: Record<FileKind, { badge: string; tile: string }> = {
   image: { badge: "bg-sky-500 text-white", tile: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
-  video: { badge: "bg-violet-500 text-white", tile: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  video: { badge: "bg-orange-500 text-white", tile: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
   pdf: { badge: "bg-red-500 text-white", tile: "bg-red-500/15 text-red-400 border-red-500/30" },
   document: { badge: "bg-blue-600 text-white", tile: "bg-blue-600/15 text-blue-400 border-blue-600/30" },
   file: { badge: "bg-zinc-500 text-white", tile: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" },

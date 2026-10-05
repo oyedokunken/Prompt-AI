@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "description": "Each case pairs an input with a note on what a genuinely good outcome looks like. must_include is a list of groups, the output must contain at least one term from every group, case insensitive. must_not_include terms must not appear. For ready results the prompt must be lightweight plain text unless expect.format is markdown. expect.search true means a web search must have run, false means it must not have. expect.decision may be a list of acceptable decisions. expect.memory_used and expect.memory_candidate check the memory behavior. expect.patterns_any lists pattern ids from core/patterns_library.json, at least one of which must be retrieved for the request.",
   "cases": [
     {
@@ -1480,6 +1480,40 @@
         ]
       },
       "good_prompt_notes": "General knowledge that depends on no specific named person or recent fact, answered directly."
+    },
+    {
+      "id": "lookup-with-memory",
+      "input": "What is the latest stable Rust release, and is anything in it relevant to what I'm building?",
+      "profile": {
+        "preferred_name": "Kenny",
+        "role": "Software engineer"
+      },
+      "memories": [
+        {
+          "category": "projects",
+          "key": "Current project",
+          "value": "A CLI tool that parses server logs, written in Rust"
+        },
+        {
+          "category": "skills",
+          "key": "Deployment",
+          "value": "Ships a static musl binary to Alpine containers"
+        }
+      ],
+      "expect": {
+        "decision": "conversation",
+        "lookup": true,
+        "memory_used": true,
+        "must_include": [
+          [
+            "log",
+            "musl",
+            "alpine",
+            "cli"
+          ]
+        ]
+      },
+      "good_prompt_notes": "Needs the web for the release and stored memory for what the user is building. Both must show up in the one answer, and the release must be a current one."
     }
   ]
 }

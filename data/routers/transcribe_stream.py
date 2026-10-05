@@ -48,6 +48,10 @@ REALTIME_URL = "wss://api.openai.com/v1/realtime?intent=transcription"
 AUTH_TIMEOUT_SECONDS = 10
 IDLE_TIMEOUT_SECONDS = 20
 FLUSH_TIMEOUT_SECONDS = 8
+# A continuous model sends text a moment behind the audio, so after a stop the
+# last words are waited for until nothing new has arrived for a short while.
+SETTLE_QUIET_SECONDS = 0.6
+SETTLE_MAX_SECONDS = 2.5
 
 # Server side voice detection only closes a phrase at a pause, so a long run of
 # speech would show nothing until the speaker breathes. These settings close a
@@ -59,6 +63,8 @@ QUIET_RUN_SECONDS = 0.12
 
 # USD per minute of audio, from the list price of each transcription model.
 PRICE_PER_MINUTE = {
+    "gpt-realtime-whisper": 0.017,
+    "gpt-live-transcribe": 0.017,
     "gpt-4o-mini-transcribe": 0.003,
     "gpt-4o-transcribe": 0.006,
     "whisper-1": 0.006,
@@ -112,28 +118,34 @@ UpstreamFactory = Callable[[], Awaitable[Upstream]]
 upstream_factory: UpstreamFactory = open_openai_upstream
 
 
+def is_continuous_model(model: str) -> bool:
+    """Models that decode continuously as audio arrives, with no turn detection.
+
+    They reject turn detection settings and send text while the speaker is
+    still talking, instead of after each phrase closes.
+    """
+    return "live" in model or "realtime-whisper" in model
+
+
 def session_config(model: str, language: Optional[str]) -> dict[str, Any]:
     transcription: dict[str, Any] = {"model": model}
     if language:
         transcription["language"] = language
+    input_config: dict[str, Any] = {
+        "format": {"type": "audio/pcm", "rate": SAMPLE_RATE},
+        "transcription": transcription,
+        "noise_reduction": {"type": "near_field"},
+    }
+    if not is_continuous_model(model):
+        input_config["turn_detection"] = {
+            "type": "server_vad",
+            "threshold": 0.5,
+            "prefix_padding_ms": 300,
+            "silence_duration_ms": 250,
+        }
     return {
         "type": "session.update",
-        "session": {
-            "type": "transcription",
-            "audio": {
-                "input": {
-                    "format": {"type": "audio/pcm", "rate": SAMPLE_RATE},
-                    "transcription": transcription,
-                    "noise_reduction": {"type": "near_field"},
-                    "turn_detection": {
-                        "type": "server_vad",
-                        "threshold": 0.5,
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 250,
-                    },
-                }
-            },
-        },
+        "session": {"type": "transcription", "audio": {"input": input_config}},
     }
 
 
@@ -205,7 +217,8 @@ async def transcribe_stream(ws: WebSocket) -> None:
         await ws.close(code=1011)
         return
 
-    state = {"bytes": 0, "speaking": False, "stopping": False, "segment_start": 0, "quiet": 0}
+    state = {"bytes": 0, "speaking": False, "stopping": False, "segment_start": 0, "quiet": 0, "last_text": 0.0}
+    continuous = is_continuous_model(model)
     pending: set[str] = set()
     committed_at: dict[str, float] = {}
     drained = asyncio.Event()
@@ -231,6 +244,7 @@ async def transcribe_stream(ws: WebSocket) -> None:
                     state["segment_start"] = state["bytes"]
                     await _send(ws, {"type": "order", "itemId": item_id, "previousItemId": event.get("previous_item_id")})
                 elif kind == "conversation.item.input_audio_transcription.delta":
+                    state["last_text"] = time.monotonic()
                     await _send(ws, {"type": "delta", "itemId": event.get("item_id", ""), "text": event.get("delta", "")})
                 elif kind == "conversation.item.input_audio_transcription.completed":
                     item_id = event.get("item_id", "")
@@ -272,7 +286,7 @@ async def transcribe_stream(ws: WebSocket) -> None:
                         break
                     await upstream.send({"type": "input_audio_buffer.append", "audio": base64.b64encode(data).decode()})
                     state["quiet"] = state["quiet"] + len(data) if frame_level(data) < QUIET_LEVEL else 0
-                    if should_close_phrase(state["speaking"], state["bytes"] - state["segment_start"], state["quiet"]):
+                    if not continuous and should_close_phrase(state["speaking"], state["bytes"] - state["segment_start"], state["quiet"]):
                         state["segment_start"] = state["bytes"]
                         state["quiet"] = 0
                         await upstream.send({"type": "input_audio_buffer.commit"})
@@ -290,6 +304,12 @@ async def transcribe_stream(ws: WebSocket) -> None:
         if state["speaking"] and state["bytes"]:
             await upstream.send({"type": "input_audio_buffer.commit"})
             await asyncio.sleep(0.05)
+        if continuous:
+            # Text trails the audio by a moment. Give the last words time to
+            # arrive, and stop waiting once nothing new has come for a beat.
+            deadline = time.monotonic() + SETTLE_MAX_SECONDS
+            while time.monotonic() < deadline and time.monotonic() - state["last_text"] < SETTLE_QUIET_SECONDS:
+                await asyncio.sleep(0.1)
         try:
             await asyncio.wait_for(drained.wait(), timeout=FLUSH_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:

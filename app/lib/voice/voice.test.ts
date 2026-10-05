@@ -55,3 +55,42 @@ test("empty phrases add nothing and unknown items are tolerated", () => {
   t.apply({ type: "delta", itemId: "late", text: "hi" });
   assert.equal(t.text(), "hi");
 });
+
+import { EndpointDetector } from "./endpointing";
+
+test("recording ends after quiet that follows speech, and not before", () => {
+  const d = new EndpointDetector();
+  assert.equal(d.update(0.02, 0), "listening");
+  assert.equal(d.update(0.5, 1000), "listening");
+  assert.equal(d.update(0.4, 2000), "listening");
+  // quiet, but not yet long enough
+  assert.equal(d.update(0.02, 3000), "listening");
+  assert.equal(d.update(0.03, 3700), "listening");
+  assert.equal(d.update(0.02, 3900), "silence");
+});
+
+test("a pause shorter than the limit does not end the message", () => {
+  const d = new EndpointDetector();
+  d.update(0.6, 0);
+  assert.equal(d.update(0.01, 1500), "listening");
+  assert.equal(d.update(0.6, 1700), "listening");
+  assert.equal(d.update(0.01, 3000), "listening");
+});
+
+test("new text counts as the speaker still talking, even when the audio is soft", () => {
+  const d = new EndpointDetector();
+  d.update(0.5, 0);
+  d.noteText(1500);
+  assert.equal(d.update(0.02, 3000), "listening");
+  assert.equal(d.update(0.02, 3400), "silence");
+});
+
+test("silence from the start gives up, and a long message is cut off at the ceiling", () => {
+  const quiet = new EndpointDetector();
+  assert.equal(quiet.update(0.01, 0), "listening");
+  assert.equal(quiet.update(0.01, 10_000), "no-speech");
+
+  const long = new EndpointDetector({ speechLevel: 0.1, silenceMs: 1800, noSpeechMs: 10_000, maxMs: 5000 });
+  long.update(0.5, 0);
+  assert.equal(long.update(0.5, 5000), "too-long");
+});

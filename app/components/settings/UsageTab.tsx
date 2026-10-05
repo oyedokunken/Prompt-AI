@@ -63,7 +63,8 @@ function useUsageData(): { data: UsageData | null; failed: boolean } {
 
 const COLORS: Record<MetricId, string> = {
   prompts: "rgb(var(--color-accent-fill))",
-  tokens: "#8B7CF6",
+  answers: "#64748B",
+  tokens: "#D97706",
   outputLength: "#0EA5E9",
   score: "#22C55E",
   questions: "#F59E0B",

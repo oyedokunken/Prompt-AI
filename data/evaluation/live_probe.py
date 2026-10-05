@@ -69,6 +69,7 @@ async def main() -> None:
             print("score", data.get("score"), "| words", len(data["content"].split()))
         else:
             print(json.dumps(data, indent=2)[:2000])
+        print("memory_used:", [m["key"] for m in data.get("memory_used", [])])
         for src in data.get("sources", []):
             print("source:", src.get("kind"), src.get("label"), [l["url"] for l in src.get("links", [])][:4])
         print("usage", data.get("usage"))

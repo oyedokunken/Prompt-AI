@@ -25,9 +25,11 @@
   --color-accent: 154 105 8;
   --color-accent-fill: 242 169 59;
   --color-accent-fill-foreground: 10 10 11;
-  --color-signal: 90 74 191;
-  --color-signal-fill: 139 124 246;
-  --color-signal-fill-foreground: 10 10 11;
+  /* The secondary tone is a neutral, not a hue. The brand has one colour, the
+     amber accent, and everything else is ink. */
+  --color-signal: 82 82 91;
+  --color-signal-fill: 113 113 122;
+  --color-signal-fill-foreground: 255 255 255;
 
   /* The logo mark. On a light page it is the dark badge with the amber prompt
      glyph. On a dark page that badge would vanish, so it flips to a light
@@ -50,8 +52,8 @@
 
   --color-accent: 242 169 59;
   --color-accent-fill: 242 169 59;
-  --color-signal: 139 124 246;
-  --color-signal-fill: 139 124 246;
+  --color-signal: 161 161 170;
+  --color-signal-fill: 113 113 122;
 
   --logo-badge: 244 244 245;
   --logo-stroke: 212 212 216;

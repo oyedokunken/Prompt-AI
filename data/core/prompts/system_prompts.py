@@ -7,6 +7,7 @@ user, and one task template from core/prompts/templates.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from core.context import PipelineContext
@@ -104,6 +105,11 @@ def sources_block(sources: list[SourceNote], *, limit: Optional[int] = None) -> 
     return "\n\n".join(parts)
 
 
+def date_block() -> str:
+    """Today's date, so the model can tell what is current and what is stale."""
+    return f"TODAY'S DATE\n{datetime.now(timezone.utc).date().isoformat()}"
+
+
 def _compose(*sections: str) -> str:
     return "\n\n".join(s for s in sections if s)
 
@@ -133,6 +139,7 @@ def intent_system_prompt(ctx: PipelineContext, pending: Optional[ClarifyQuestion
     return _compose(
         _static_prefix("intent"),
         REQUEST_CONTEXT_HEADER,
+        date_block(),
         user_knowledge_block(ctx),
         SPARSE_PROFILE_NOTE if ctx.knows_little and pending is None else "",
         history_digest_block(ctx),
@@ -145,6 +152,7 @@ def construct_system_prompt(ctx: PipelineContext, style: FormatStyle = "plain", 
     return _compose(
         _static_prefix("construct"),
         REQUEST_CONTEXT_HEADER,
+        date_block(),
         user_knowledge_block(ctx),
         history_digest_block(ctx),
         sources_block(ctx.sources),
@@ -157,6 +165,7 @@ def answer_system_prompt(ctx: PipelineContext) -> str:
     return _compose(
         _static_prefix("answer"),
         REQUEST_CONTEXT_HEADER,
+        date_block(),
         user_knowledge_block(ctx),
         history_digest_block(ctx),
         sources_block(ctx.sources, limit=6000),

@@ -6,6 +6,7 @@ This is the only module in the whole system that talks to OpenAI.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 import logging
 import re
 from typing import Any, Optional
@@ -214,17 +215,24 @@ class OpenAIProvider(ModelProvider):
         # reads wider and reports more than the short research note that only
         # feeds a prompt.
         lookup = step == "lookup"
+        today = datetime.now(timezone.utc).date().isoformat()
+        recency = (
+            f"Today's date is {today}. Prefer the most recent sources, state the date of what you report, "
+            "and if sources disagree about what is latest, report the newest dated one.\n\n"
+        )
         if lookup:
             instruction = (
                 "Search the web and report what is publicly known about the query below, drawing on more than one source. "
                 "Plain text, no markdown, at most 250 words. Give full names, current and past roles with the organisations and dates, "
                 "and the most notable facts. If more than one real person or thing matches the query, say so and describe each briefly. "
                 "Report only what the sources support, and leave out anything you cannot tie to a source.\n\n"
+                + recency
             )
         else:
             instruction = (
                 "Search the web and report concise, factual findings for the query below. "
                 "Plain text, no markdown, at most 150 words. State dates where they matter.\n\n"
+                + recency
             )
         try:
             response = await self._client.responses.create(

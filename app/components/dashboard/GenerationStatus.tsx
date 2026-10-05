@@ -20,7 +20,7 @@ export function GenerationStatus({ message }: GenerationStatusProps) {
           {[0, 1, 2].map((i) => (
             <span
               key={i}
-              className="w-1.5 h-1.5 rounded-full bg-signal animate-[blink_1.2s_step-end_infinite]"
+              className="w-1.5 h-1.5 rounded-full bg-accent-fill animate-[blink_1.2s_step-end_infinite]"
               style={{ animationDelay: `${i * 0.2}s` }}
             />
           ))}

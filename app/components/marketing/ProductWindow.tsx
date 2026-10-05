@@ -208,7 +208,7 @@ export function ProductWindow() {
               onSend={noop}
               model={MODELS[0]}
               onModelChange={noop}
-              placeholder="Describe what you need, plain language works best"
+              placeholder="Start a new chat"
             />
           </div>
         </div>

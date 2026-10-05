@@ -129,8 +129,10 @@ export class LiveTranscriber {
   }
 
   private onAudio(samples: Float32Array): void {
-    if (this.failed) return;
+    // The level is reported even when the socket failed, so a message still
+    // ends by itself on silence while the recording is kept for the fallback.
     this.options.onLevel?.(level(samples));
+    if (this.failed) return;
     const pcm = this.resampler!.push(samples);
     const buffer = pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength) as ArrayBuffer;
     if (this.ready && this.ws?.readyState === WebSocket.OPEN) this.ws.send(buffer);

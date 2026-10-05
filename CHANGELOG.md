@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-10-05
+
+### Added
+
+- Direct answers on the Usage tab. The count of prompts was correct but narrow, it counts only finished structured prompts, so a period made up of direct answers and web lookups read as zero activity beside real token spend. Prompts are now labelled Prompts built, Direct answers are counted on their own with how many came from a web search, and the summary sentence says both
+- True streaming transcription. The default live model is gpt-realtime-whisper, which decodes continuously, so words appear while the speaker is still talking, where the earlier model released text only after a phrase closed. It costs about $0.017 a minute, and a session is still capped at 180 seconds
+- Voice recording ends by itself after about two seconds of silence once the speaker has been heard, gives up if nothing is heard for ten seconds, and stops at two minutes
+- Today's date in the context of intent, construction and answering, and in the web search request, so what is current is judged against the real date
+- An eval case that needs both stored memory and a web search in one answer
+
+### Changed
+
+- Memory, web search and the conversation now combine. A search no longer leaves the user's own context behind: a request that refers to the user's situation brings in all stored memory, and any other search keeps at least the four best stored items even when none matched the request's words. A question can be marked as needing both a lookup and memory, and then uses both. The answer template (v7) says so explicitly
+- The recording indicator sits inside the chat input, beside the text, and no longer pulses over the buttons next to it
+- Loading and status colours use the amber accent or a neutral instead of purple, and the secondary tone in the palette is now neutral
+- The role in settings can be written in the user's own words as well as chosen from the presets, and a failed save is reported
+- The placeholder in the marketing preview of the chat input reads Start a new chat like the real one
+
 ## [0.7.0] - 2026-10-04
 
 ### Added
