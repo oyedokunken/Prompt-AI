@@ -41,6 +41,8 @@ export interface LiveOptions {
   onText: (text: string) => void;
   // How many phrases have been heard but not finished yet.
   onPending?: (pending: number) => void;
+  // The socket is open and audio is flowing to the transcriber.
+  onReady?: () => void;
   onLevel?: (level: number) => void;
   onError?: (message: string) => void;
 }
